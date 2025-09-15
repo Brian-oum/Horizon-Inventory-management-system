@@ -1,0 +1,226 @@
+:root {
+  --sidebar-bg: white;
+  --sidebar-text: #0f0f0f; /* Dark text for better contrast */
+  --sidebar-active: #27ae60; /* Slightly darker green */
+  --sidebar-hover: #15b33c;
+
+  --card-total-bg: #28a745; /* Green */
+  --card-approved-bg: #007bff; /* Blue */
+  --card-pending-bg: #ffc107; /* Yellow */
+  --card-returned-bg: #6f42c1; /* Purple for Fully Returned */
+  --card-partial-bg: #fd7e14; /* Orange for Partially Returned */
+
+  /* Status Text Colors */
+  --status-approved: #28a745; /* Bootstrap Success Green */
+  --status-denied: #dc3545; /* Bootstrap Danger Red */
+  --status-pending: #ffc107; /* Bootstrap Warning Yellow */
+  --status-issued: #17a2b8; /* Bootstrap Info Cyan */
+  --status-fully-returned: #6f42c1; /* Custom Purple */
+  --status-partially-returned: #fd7e14; /* Custom Orange */
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0; /* Ensure no default body margin */
+  padding: 0; /* Ensure no default body padding */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+}
+
+/* Improved Sidebar */
+.sidebar {
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+  transition: all 0.3s;
+  position: fixed; /* Keep sidebar fixed on scroll */
+  height: 100vh; /* Full height */
+  width: 250px; /* Default width */
+  z-index: 1000; /* Ensure it's above other content */
+}
+
+.sidebar .nav-link {
+  color: var(--sidebar-text);
+  border-radius: 5px;
+  padding: 10px 15px;
+  margin-bottom: 5px;
+  transition: all 0.3s;
+  display: flex; /* Use flexbox for alignment */
+  align-items: center; /* Vertically center icon and text */
+}
+
+.sidebar .nav-link:hover {
+  background-color: var(--sidebar-hover);
+  transform: translateX(5px);
+}
+
+.sidebar .nav-link.active {
+  background-color: var(--sidebar-active);
+  font-weight: 600;
+  color: white !important; /* Ensure active link text is white */
+}
+
+.sidebar .nav-link.active i {
+  color: white !important; /* Ensure active link icon is white */
+}
+
+.sidebar .nav-link i {
+  width: 20px;
+  text-align: center;
+  margin-right: 10px;
+}
+
+/* Logout Button Hover Effect */
+.sidebar .logout-link {
+  color: var(--sidebar-text); /* Default color */
+  transition: color 0.3s;
+  display: flex; /* Use flexbox for alignment */
+  align-items: center; /* Vertically center icon and text */
+}
+
+.sidebar .logout-link:hover {
+  color: #dc3545 !important; /* Red on hover */
+}
+
+/* Main Content */
+.main-content {
+  padding: 20px;
+  background-color: #f8f9fa;
+  min-height: 100vh;
+  margin-left: 250px; /* Adjust based on default sidebar width */
+  transition: margin-left 0.3s; /* Smooth transition for margin */
+}
+
+/* Cards */
+.summary-card {
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  transition: transform 0.3s, background-color 0.3s, color 0.3s;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  color: white; /* Default text color for cards */
+  margin-bottom: 20px; /* Add margin between cards for stacking */
+}
+
+.summary-card:hover {
+  transform: translateY(-5px);
+}
+
+.card-icon {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  font-size: 2rem;
+  opacity: 0.2;
+  color: rgba(255,255,255,0.8); /* Icon color for all cards */
+}
+
+.summary-card h6, .summary-card h2 {
+  color: white !important; /* Ensure all card text is white */
+}
+
+/* Specific Card Backgrounds and Borders */
+.card-total {
+  background-color: var(--card-total-bg);
+  border-left: 4px solid var(--card-total-bg);
+}
+.card-approved {
+  background-color: var(--card-approved-bg);
+  border-left: 4px solid var(--card-approved-bg);
+}
+.card-pending {
+  background-color: var(--card-pending-bg);
+  border-left: 4px solid var(--card-pending-bg);
+}
+.card-returned {
+  background-color: var(--card-returned-bg);
+  border-left: 4px solid var(--card-returned-bg);
+}
+.card-partial {
+  background-color: var(--card-partial-bg);
+  border-left: 4px solid var(--card-partial-bg);
+}
+
+/* Data Table */
+.data-table {
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  overflow-x: auto; /* Make table horizontally scrollable on small screens */
+}
+
+/* Table Row Hover Effect for interactivity */
+.table-hover tbody tr:hover {
+  background-color: #f0f0f0; /* Lighter background on hover */
+  cursor: pointer; /* Indicate it's clickable */
+}
+
+/* Status Badges - Font Colors Only */
+.badge-status-approved { color: var(--status-approved); }
+.badge-status-denied { color: var(--status-denied); }
+.badge-status-pending { color: var(--status-pending); }
+.badge-status-issued { color: var(--status-issued); }
+.badge-status-fully-returned { color: var(--status-fully-returned); }
+.badge-status-partially-returned { color: var(--status-partially-returned); }
+
+/* Remove Bootstrap badge background for status text colors */
+.badge-status-approved,
+.badge-status-denied,
+.badge-status-pending,
+.badge-status-issued,
+.badge-status-fully-returned,
+.badge-status-partially-returned {
+  background-color: transparent !important; /* Ensure no background */
+  padding: 0; /* Remove padding from badge */
+  font-weight: 600; /* Make text bolder */
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 70px; /* Collapsed width */
+    overflow: hidden;
+  }
+
+  .sidebar .nav-link span,
+  .sidebar .logout-link span { /* Hide text for nav links and logout */
+    display: none;
+  }
+
+  .sidebar .nav-link i,
+  .sidebar .logout-link i { /* Center icons when text is hidden */
+    margin-right: 0;
+    font-size: 1.2rem;
+    width: 100%; /* Make icon take full width of collapsed sidebar */
+    text-align: center;
+  }
+
+  .main-content {
+    margin-left: 70px; /* Adjust main content margin for collapsed sidebar */
+  }
+
+  .greeting {
+    font-size: 1.2rem;
+  }
+
+  /* Adjust card layout for smaller screens */
+  .summary-cards-container .col-md-4, /* Assuming Bootstrap grid classes */
+  .summary-cards-container .col-lg-3 {
+    flex: 0 0 100%; /* Make cards take full width */
+    max-width: 100%;
+  }
+}
+
+/* Further adjustments for very small screens (e.g., phones) */
+@media (max-width: 576px) {
+  .main-content {
+    padding: 10px; /* Reduce padding on very small screens */
+  }
+
+  .summary-card h6 {
+    font-size: 0.9rem; /* Smaller font for card titles */
+  }
+
+  .summary-card h2 {
+    font-size: 1.8rem; /* Smaller font for card numbers */
+  }
+}
