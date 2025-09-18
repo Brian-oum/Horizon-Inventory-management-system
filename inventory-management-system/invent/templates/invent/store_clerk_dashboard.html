@@ -48,6 +48,60 @@
         </div>
     </div>
 
+<div class="row text-center mb-4">
+    <!-- Total IoT Devices -->
+    <div class="col-sm-6 col-md-3 mb-3">
+        <div class="dashboard-card bg-info text-white p-3 rounded shadow-sm">
+            <h6>Total IoT Devices</h6>
+            <h3>{{ total_devices }}</h3>
+        </div>
+    </div>
+    <!-- Devices Available -->
+    <div class="col-sm-6 col-md-3 mb-3">
+        <div class="dashboard-card bg-success text-white p-3 rounded shadow-sm">
+            <h6>Devices Available</h6>
+            <h3>{{ devices_available }}</h3>
+        </div>
+    </div>
+    <!-- Devices Issued -->
+    <div class="col-sm-6 col-md-3 mb-3">
+        <div class="dashboard-card bg-warning text-dark p-3 rounded shadow-sm">
+            <h6>Devices Issued</h6>
+            <h3>{{ devices_issued }}</h3>
+        </div>
+    </div>
+    <!-- Devices Returned -->
+    <div class="col-sm-6 col-md-3 mb-3">
+        <div class="dashboard-card bg-secondary text-white p-3 rounded shadow-sm">
+            <h6>Devices Returned</h6>
+            <h3>{{ devices_returned }}</h3>
+        </div>
+    </div>
+</div>
+    <div class="row text-center mb-4">
+    <!-- Total Boxes -->
+    <div class="col-sm-6 col-md-4 mb-3">
+        <div class="dashboard-card bg-primary text-white p-3 rounded shadow-sm">
+            <h6>Total Boxes</h6>
+            <h3>{{ total_boxes }}</h3>
+        </div>
+    </div>
+    <!-- Boxes In Progress -->
+    <div class="col-sm-6 col-md-4 mb-3">
+        <div class="dashboard-card bg-light border p-3 rounded shadow-sm">
+            <h6>Boxes In Progress</h6>
+            <h3>{{ boxes_in_progress }}</h3>
+        </div>
+    </div>
+    <!-- Boxes Completed -->
+    <div class="col-sm-6 col-md-4 mb-3">
+        <div class="dashboard-card bg-success text-white p-3 rounded shadow-sm">
+            <h6>Boxes Completed</h6>
+            <h3>{{ boxes_completed }}</h3>
+        </div>
+    </div>
+  </div>
+<div class="row text-center mb-4">
   <div class="bg-white p-4 rounded shadow-sm mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
         <h5 class="mb-2 mb-sm-0">Recent Inventory Activity</h5>

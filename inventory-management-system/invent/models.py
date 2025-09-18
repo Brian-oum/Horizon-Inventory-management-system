@@ -228,3 +228,102 @@ class StockTransaction(models.Model):
             ("can_adjust_stock", "Can adjust inventory stock"),
             ("can_receive_stock", "Can receive new stock into inventory"),
         ]
+
+# --- BEGIN IoT/Box/Client/Supplier Models ---
+
+class Office(models.Model):
+    address = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.address
+
+
+class Supplier(models.Model):
+    name = models.CharField(max_length=255)
+    contact_person = models.CharField(max_length=255)
+    phone_email = models.CharField(max_length=255)
+    address = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.name
+
+
+class PurchaseOrder(models.Model):
+    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
+    order_date = models.DateField()
+    expected_delivery = models.DateField()
+    status = models.CharField(max_length=50)
+
+    def __str__(self):
+        return f"PO #{self.id} - {self.supplier.name}"
+
+
+class Box(models.Model):
+    number = models.CharField(max_length=50, unique=True)
+    status = models.CharField(
+        max_length=20,
+        choices=(
+            ('available', 'Available'),
+            ('in_progress', 'In Progress'),
+            ('completed', 'Completed'),
+        ),
+        default='available'
+    )
+
+    def __str__(self):
+        return f"Box {self.number} ({self.status})"
+
+
+class Device(models.Model):
+    box = models.ForeignKey(Box, on_delete=models.CASCADE, related_name='devices')
+    imei_no = models.CharField(max_length=50, unique=True)
+    serial_no = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    category = models.CharField(max_length=50)
+    description = models.TextField(blank=True)
+    selling_price_usd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    selling_price_ksh = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    selling_price_tsh = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=(
+            ('available', 'Available'),
+            ('issued', 'Issued'),
+            ('returned', 'Returned'),
+            ('faulty', 'Faulty'),
+        ),
+        default='available'
+    )
+
+    def __str__(self):
+        return f"Device IMEI:{self.imei_no} Box:{self.box.number} Status:{self.status}"
+
+
+class Client(models.Model):
+    name = models.CharField(max_length=255)
+    phone_no = models.CharField(max_length=50)
+    email = models.EmailField()
+    address = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.name
+
+
+class IssuanceRecord(models.Model):
+    device = models.ForeignKey(Device, on_delete=models.CASCADE)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE)
+    logistics_manager = models.ForeignKey(User, on_delete=models.CASCADE)
+    issued_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.device} issued to {self.client.name} by {self.logistics_manager.username}"
+
+
+class ReturnRecord(models.Model):
+    device = models.ForeignKey(Device, on_delete=models.CASCADE)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE)
+    returned_at = models.DateTimeField(auto_now_add=True)
+    reason = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.device} returned by {self.client.name} on {self.returned_at.strftime('%Y-%m-%d')}"
+# --- END IoT/Box/Client/Supplier Models ---

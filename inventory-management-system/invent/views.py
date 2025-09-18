@@ -31,6 +31,15 @@ from django.contrib.auth.models import Group
 from django.contrib import messages
 from django.core.paginator import Paginator
 
+from .models import Box, Device, IssuanceRecord, ReturnRecord, Client
+from django.contrib.auth.decorators import login_required, permission_required
+from django.db import transaction
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
+
+def get_next_available_box():
+    """Return the next box available for issuance (FIFO)."""
+    return Box.objects.filter(status='available').order_by('id').first()
 
 def register(request):
     if request.method == 'POST':
@@ -210,8 +219,8 @@ def store_clerk_dashboard(request):
 
     total_inventory_items = inventory_items.aggregate(
         total_sum=Sum('quantity_total'))['total_sum'] or 0
-    items_issued = inventory_items.aggregate(total_issued=Sum('quantity_issued'))[
-        'total_issued'] or 0
+    items_issued = inventory_items.aggregate(
+        total_issued=Sum('quantity_issued'))['total_issued'] or 0
     items_returned = inventory_items.aggregate(
         total_returned=Sum('quantity_returned'))['total_returned'] or 0
 
@@ -220,13 +229,21 @@ def store_clerk_dashboard(request):
     pending_requests_count = ItemRequest.objects.filter(
         status='Pending').count()
 
-    # Count of Issued Requests that are not fully returned yet (eligible for return)
     issued_but_not_fully_returned_count = ItemRequest.objects.filter(
         status='Issued'
     ).exclude(
-        # Exclude if original quantity <= returned quantity
         quantity__lte=F('returned_quantity')
     ).count()
+
+    # --- IoT Device & Box Stats ---
+    total_devices = Device.objects.count()
+    devices_available = Device.objects.filter(status='available').count()
+    devices_issued = Device.objects.filter(status='issued').count()
+    devices_returned = Device.objects.filter(status='returned').count()
+
+    total_boxes = Box.objects.count()
+    boxes_in_progress = Box.objects.filter(status='in_progress').count()
+    boxes_completed = Box.objects.filter(status='completed').count()
 
     context = {
         'total_items': total_inventory_items,
@@ -234,8 +251,15 @@ def store_clerk_dashboard(request):
         'items_returned': items_returned,
         'items': items_for_dashboard,
         'pending_requests_count': pending_requests_count,
-        # NEW for dashboard
         'issued_but_not_fully_returned_count': issued_but_not_fully_returned_count,
+        # --- IoT stats below ---
+        "total_devices": total_devices,
+        "devices_available": devices_available,
+        "devices_issued": devices_issued,
+        "devices_returned": devices_returned,
+        "total_boxes": total_boxes,
+        "boxes_in_progress": boxes_in_progress,
+        "boxes_completed": boxes_completed,
     }
     return render(request, 'invent/store_clerk_dashboard.html', context)
 
@@ -493,6 +517,71 @@ def issue_item(request):
     }
     return render(request, 'invent/issue_item.html', context)
 
+ # IoT Device Issuance/Return Views
+@login_required
+@permission_required('invent.can_issue_item', raise_exception=True)
+def issue_device(request):
+    box = Box.objects.filter(status='available').order_by('id').first()
+    if not box:
+        messages.error(request, "No device boxes available for issuance.")
+        return redirect('store_clerk_dashboard')
+    available_devices = box.devices.filter(status='available')
+    clients = Client.objects.all()
+
+    if request.method == 'POST':
+        device_id = request.POST.get('device_id')
+        client_id = request.POST.get('client_id')
+        if not device_id or not client_id:
+            messages.error(request, "Please select a device and client.")
+            return redirect('issue_device')
+
+        device = get_object_or_404(Device, id=device_id, box=box, status='available')
+        client = get_object_or_404(Client, id=client_id)
+
+        with transaction.atomic():
+            device.status = 'issued'
+            device.save()
+            IssuanceRecord.objects.create(device=device, client=client, logistics_manager=request.user)
+            # Check if box is now completed
+            if not box.devices.filter(status='available').exists():
+                box.status = 'completed'
+                box.save()
+                # Unlock next box if needed (optional logic, up to you)
+                next_box = Box.objects.filter(status='in_progress').order_by('id').first()
+                if next_box:
+                    next_box.status = 'available'
+                    next_box.save()
+            messages.success(request, f"Device {device.imei_no} issued to {client.name}.")
+
+        return redirect('issue_device')
+
+    return render(request, 'invent/issue_device.html', {
+        'box': box,
+        'available_devices': available_devices,
+        'clients': clients,
+    })
+
+@login_required
+@permission_required('invent.can_issue_item', raise_exception=True)
+def return_device(request):
+    issued_devices = Device.objects.filter(status='issued')
+    clients = Client.objects.all()
+    if request.method == 'POST':
+        device_id = request.POST.get('device_id')
+        client_id = request.POST.get('client_id')
+        reason = request.POST.get('reason', '')
+        device = get_object_or_404(Device, id=device_id, status='issued')
+        client = get_object_or_404(Client, id=client_id)
+        with transaction.atomic():
+            device.status = 'returned'
+            device.save()
+            ReturnRecord.objects.create(device=device, client=client, reason=reason)
+            messages.success(request, f"Device {device.imei_no} returned by {client.name}.")
+        return redirect('return_device')
+    return render(request, 'invent/return_device.html', {
+        'issued_devices': issued_devices,
+        'clients': clients
+    })
 
 @login_required
 def request_summary(request):

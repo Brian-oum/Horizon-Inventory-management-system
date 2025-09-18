@@ -167,3 +167,15 @@ class StockTransactionAdmin(admin.ModelAdmin):
     readonly_fields = ('transaction_date',)
     # Use raw_id_fields for FKs
     raw_id_fields = ('item', 'item_request', 'recorded_by')
+
+
+from .models import Office, Supplier, PurchaseOrder, Box, Device, Client, IssuanceRecord, ReturnRecord
+
+admin.site.register(Office)
+admin.site.register(Supplier)
+admin.site.register(PurchaseOrder)
+admin.site.register(Box)
+admin.site.register(Device)
+admin.site.register(Client)
+admin.site.register(IssuanceRecord)
+admin.site.register(ReturnRecord)
