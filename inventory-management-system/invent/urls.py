@@ -38,6 +38,10 @@ urlpatterns = [
     # NEW: Standalone page for listing all inventory items
     path('inventory_list/', views.inventory_list_view, name='inventory_list'), # Added this URL pattern
 
+    # IoT Device Issuance/Return Paths
+    path('issue_device/', views.issue_device, name='issue_device'),
+    path('return_device/', views.return_device, name='return_device'),
+
     # Reports
     path('reports/total-requests/', views.total_requests, name='total_requests'),
     path('reports/export/total-requests/',
