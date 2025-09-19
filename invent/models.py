@@ -174,7 +174,8 @@ class ItemRequest(models.Model):
             self._original_status = self.status  # Update tracker
 
     def __str__(self):
-        return f"Request for {self.item.name} by {self.requestor.username}"
+        requestor_name = self.requestor.username if self.requestor else "N/A"
+        return f"Request for {self.item.name} by {requestor_name}"
 
     def quantity_to_be_returned(self):
         """Calculates the quantity that was issued and is not yet returned for this request."""
@@ -213,21 +214,23 @@ class StockTransaction(models.Model):
     recorded_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='recorded_transactions')
 
-    def __str__(self):
-        action = "added" if self.quantity > 0 else "removed"
-        # Adjusting the __str__ to be more descriptive for returns
-        if self.transaction_type == 'Return':
-            return f"{self.item.name} - Returned: {self.quantity} by {self.recorded_by.username} on {self.transaction_date.strftime('%Y-%m-%d')}"
-        else:
-            return f"{self.item.name} - {self.transaction_type}: {abs(self.quantity)} ({action}) by {self.recorded_by.username} on {self.transaction_date.strftime('%Y-%m-%d')}"
+def __str__(self):
+    action = "added" if self.quantity > 0 else "removed"
+    recorded_by_name = self.recorded_by.username if self.recorded_by else "N/A"
+    date_str = self.transaction_date.strftime('%Y-%m-%d') if self.transaction_date else "Unknown date"
+    # Adjusting the __str__ to be more descriptive for returns
+    if self.transaction_type == 'Return':
+        return f"{self.item.name} - Returned: {self.quantity} by {recorded_by_name} on {date_str}"
+    else:
+        return f"{self.item.name} - {self.transaction_type}: {abs(self.quantity)} ({action}) by {recorded_by_name} on {date_str}"
 
-    class Meta:
-        ordering = ['-transaction_date']
-        permissions = [
-            ("can_issue_item", "Can issue inventory items"),
-            ("can_adjust_stock", "Can adjust inventory stock"),
-            ("can_receive_stock", "Can receive new stock into inventory"),
-        ]
+class Meta:
+    ordering = ['-transaction_date']
+    permissions = [
+        ("can_issue_item", "Can issue inventory items"),
+        ("can_adjust_stock", "Can adjust inventory stock"),
+        ("can_receive_stock", "Can receive new stock into inventory"),
+    ]
 
 # --- BEGIN IoT/Box/Client/Supplier Models ---
 
