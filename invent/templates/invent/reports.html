@@ -1,0 +1,263 @@
+{% extends 'invent/base_store_clerk.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .summary-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #f8f9fa;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .summary-header h2 {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .back-btn {
+        padding: 8px 16px;
+        color: #6c757d;
+        background-color: transparent;
+        border: 1px solid #ced4da;
+        border-radius: 5px;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        height:8px;
+        width:15px;
+    }
+
+    .back-btn:hover {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    .card-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 15px;
+        margin-bottom: 40px;
+    }
+
+    .card-tile {
+        padding: 20px;
+        color: white;
+        border-radius: 10px;
+        text-align: center;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: transform 0.2s ease-in-out;
+    }
+
+    .card-tile:hover {
+        transform: translateY(-3px);
+    }
+
+    .card-link {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
+
+    .bg-blue { background-color: #0d61fd; }
+    .bg-orange { background-color: #fdc714; }
+    .bg-green { background-color: #198754; }
+    .bg-lightblue { background-color: #0dcaf0; }
+    .bg-red { background-color: #dc3545; }
+
+    .top-requested h4 {
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 5px;
+        margin-bottom: 15px;
+        font-weight: bold;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        text-align: left;
+        padding: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<style>
+    .summary-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #f1f1f1;
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .summary-header h2 {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .back-btn {
+        padding: 8px 16px;
+        color: #6c757d;
+        background-color: transparent;
+        border: 1px solid #ced4da;
+        border-radius: 8px;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+    .back-btn:hover {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    .card-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 3rem;
+    }
+
+    .card-tile {
+        padding: 1.25rem;
+        border-radius: 12px;
+        color: white;
+        text-align: center;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: transform 0.2s ease-in-out;
+    }
+
+    .card-tile:hover {
+        transform: translateY(-3px);
+    }
+
+    .card-link {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
+
+    .bg-blue { background-color: #0d6efd; }
+    .bg-orange { background-color: #fd7e14; }
+    .bg-green { background-color: #198754; }
+    .bg-lightblue { background-color: #0dcaf0; }
+    .bg-red { background-color: #dc3545; }
+
+    .top-requested h4 {
+        font-weight: bold;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #ccc;
+        margin-bottom: 1rem;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: white;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    th, td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+    }
+</style>
+
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="summary-header">
+        <h2>Items Summary</h2>
+        <a href="{% url 'store_clerk_dashboard' %}" class="back-btn">Back to Dashboard</a>
+    </div>
+
+    <!-- Cards -->
+    <div class="card-container">
+        <a href="{% url 'inventory_list' %}" class="card-link">
+            <div class="card-tile bg-blue">
+        Total Items<br><strong>{{ total_items }}</strong>
+            </div>
+        </a>
+        <a href="{% url 'total_requests' %}?status=" class="card-link">
+            <div class="card-tile bg-blue">
+                Total Requests<br><strong>{{ total_requests }}</strong>
+            </div>
+        </a>
+
+        <a href="{% url 'total_requests' %}?status=Pending" class="card-link">
+            <div class="card-tile bg-orange">
+                Pending<br><strong>{{ pending_count }}</strong>
+            </div>
+        </a>
+
+        <a href="{% url 'total_requests' %}?status=Approved" class="card-link">
+            <div class="card-tile bg-green">
+                Approved<br><strong>{{ approved_count }}</strong>
+            </div>
+        </a>
+
+        <a href="{% url 'total_requests' %}?status=Issued" class="card-link">
+            <div class="card-tile bg-lightblue">
+                Issued<br><strong>{{ issued_count }}</strong>
+            </div>
+        </a>
+
+        <a href="{% url 'total_requests' %}?status=Rejected" class="card-link">
+            <div class="card-tile bg-red">
+                Rejected<br><strong>{{ rejected_count }}</strong>
+            </div>
+        </a>
+
+        <a href="{% url 'total_requests' %}?status=Fully Returned" class="card-link">
+            <div class="card-tile bg-green">
+                Returned<br><strong>{{ fully_returned_count }}</strong>
+            </div>
+        </a>
+    </div>
+
+    <!-- Top Requested Items Table -->
+    <div class="top-requested">
+        <h4>Top Requested Items</h4>
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Requests</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in top_requested_items %}
+                <tr>
+                    <td>{{ item.item__name }}</td>
+                    <td>{{ item.request_count }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="2">No requests found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
