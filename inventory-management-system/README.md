@@ -1,4 +1,3 @@
-
 ## 1. Create a Virtual Environment
 
 Open your command prompt or terminal and navigate to the folder where `manage.py` is located. Then run:
@@ -32,5 +31,3 @@ pip install -r requirements.txt
 ```
 python manage.py runserver
 ```
-
-# Horizon-Inventory-management-system

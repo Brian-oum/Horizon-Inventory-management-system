@@ -1,0 +1,162 @@
+{% extends 'invent/base_store_clerk.html' %} {# Extend the responsive base template #}
+{% load static %}
+
+{% block title %}Store Clerk Dashboard{% endblock %} {# Set page title #}
+
+{% block content %} {# Content for the main area #}
+    <h2 class="mb-3">Hello {{ user.first_name|default:user.username }}</h2>
+
+    <div class="d-flex flex-wrap gap-3 mb-4"> {# flex-wrap to stack buttons on small screens #}
+        <a class="btn btn-outline-primary" href="{% url 'issue_item' %}">📤 Issue Item</a>
+        <a class="btn btn-outline-secondary" href="{% url 'manage_stock' %}">⚙ Manage Stock</a>
+        <a class="btn btn-outline-dark" href="{% url 'adjust_stock' %}">🔧 Adjust Stock</a>
+        <a class="btn btn-outline-success" href="{% url 'upload_inventory' %}">📥 Upload Inventory</a>
+        <a class="btn btn-outline-info" href="{% url 'list_issued_requests_for_return' %}">↩ Return Item</a>
+    </div>
+
+    <div class="row text-center mb-4">
+        <div class="col-sm-6 col-md-3 mb-3"> {# Responsive columns for cards #}
+            <div class="dashboard-card bg-success text-white p-3 rounded shadow-sm"> {# Added p-3, rounded, shadow-sm #}
+                <h6>Total Inventory Items</h6>
+                <h3>{{ total_items }}</h3>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3 mb-3">
+            <div class="dashboard-card bg-light border p-3 rounded shadow-sm">
+                <h6>Quantity Issued (Aggregate)</h6> {# Clarified this is aggregate #}
+                <h3>{{ items_issued }}</h3>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3 mb-3">
+            <div class="dashboard-card bg-light border p-3 rounded shadow-sm">
+                <h6>Quantity Returned (Aggregate)</h6> {# Clarified this is aggregate #}
+                <h3>{{ items_returned }}</h3>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3 mb-3">
+            <div class="dashboard-card bg-warning text-dark p-3 rounded shadow-sm">
+                <h6>Pending Requests</h6>
+                <h3>{{ pending_requests_count }}</h3>
+            </div>
+        </div>
+        {# NEW CARD: Issued (to be Returned) #}
+        <div class="col-sm-6 col-md-3 mb-3">
+            <div class="dashboard-card bg-primary text-white p-3 rounded shadow-sm">
+                <h6>Issued (to be Returned)</h6>
+                <h3>{{ issued_but_not_fully_returned_count }}</h3>
+            </div>
+        </div>
+    </div>
+
+<div class="row text-center mb-4">
+    <!-- Total IoT Devices -->
+    <div class="col-sm-6 col-md-3 mb-3">
+        <div class="dashboard-card bg-info text-white p-3 rounded shadow-sm">
+            <h6>Total IoT Devices</h6>
+            <h3>{{ total_devices }}</h3>
+        </div>
+    </div>
+    <!-- Devices Available -->
+    <div class="col-sm-6 col-md-3 mb-3">
+        <div class="dashboard-card bg-success text-white p-3 rounded shadow-sm">
+            <h6>Devices Available</h6>
+            <h3>{{ devices_available }}</h3>
+        </div>
+    </div>
+    <!-- Devices Issued -->
+    <div class="col-sm-6 col-md-3 mb-3">
+        <div class="dashboard-card bg-warning text-dark p-3 rounded shadow-sm">
+            <h6>Devices Issued</h6>
+            <h3>{{ devices_issued }}</h3>
+        </div>
+    </div>
+    <!-- Devices Returned -->
+    <div class="col-sm-6 col-md-3 mb-3">
+        <div class="dashboard-card bg-secondary text-white p-3 rounded shadow-sm">
+            <h6>Devices Returned</h6>
+            <h3>{{ devices_returned }}</h3>
+        </div>
+    </div>
+</div>
+    <div class="row text-center mb-4">
+    <!-- Total Boxes -->
+    <div class="col-sm-6 col-md-4 mb-3">
+        <div class="dashboard-card bg-primary text-white p-3 rounded shadow-sm">
+            <h6>Total Boxes</h6>
+            <h3>{{ total_boxes }}</h3>
+        </div>
+    </div>
+    <!-- Boxes In Progress -->
+    <div class="col-sm-6 col-md-4 mb-3">
+        <div class="dashboard-card bg-light border p-3 rounded shadow-sm">
+            <h6>Boxes In Progress</h6>
+            <h3>{{ boxes_in_progress }}</h3>
+        </div>
+    </div>
+    <!-- Boxes Completed -->
+    <div class="col-sm-6 col-md-4 mb-3">
+        <div class="dashboard-card bg-success text-white p-3 rounded shadow-sm">
+            <h6>Boxes Completed</h6>
+            <h3>{{ boxes_completed }}</h3>
+        </div>
+    </div>
+  </div>
+<div class="row text-center mb-4">
+  <div class="bg-white p-4 rounded shadow-sm mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+        <h5 class="mb-2 mb-sm-0">Recent Inventory Activity</h5>
+        <div class="d-flex gap-2">
+            {# UPDATED: This now links to the new standalone inventory list page #}
+            <a href="{% url 'inventory_list' %}" class="btn btn-sm btn-outline-primary">View All Stock</a>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Total Qty</th>
+                    <th>Issued Qty</th>
+                    <th>Returned Qty (Aggregate)</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.category|default:"N/A" }}</td>
+                    <td>{{ item.quantity_total }}</td>
+                    <td>{{ item.quantity_issued }}</td>
+                    <td>{{ item.quantity_returned }}</td>
+                    <td>
+                        <span class="badge
+                            {% if item.status == 'Approved' or item.status == 'In Stock' %}bg-success
+                            {% elif item.status == 'Pending' %}bg-info
+                            {% elif item.status == 'Issued' %}bg-primary
+                            {% elif item.status == 'Returned' %}bg-secondary
+                            {% elif item.is_expired %}bg-dark text-white
+                            {% elif item.quantity_remaining <= 5 and item.quantity_remaining > 0 %}bg-warning text-dark
+                            {% elif item.quantity_remaining <= 0 %}bg-danger
+                            {% else %}bg-info{% endif %}">
+                            {{ item.status }}{% if item.is_expired %} (Expired){% endif %}
+                        </span>
+                    </td>
+                    <td><a href="{% url 'edit_item' item.id %}" class="text-success fw-bold">View/Edit</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="text-center text-muted">No recent inventory items found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# Any page-specific JavaScript can go here #}
+{% endblock %}

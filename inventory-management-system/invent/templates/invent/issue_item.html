@@ -1,0 +1,146 @@
+{% extends 'invent/base_store_clerk.html' %}
+{% load static %}
+
+{% block title %}Issue Item & Manage Requests{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Issue Items & Manage Requests</h2>
+
+    {% if messages %}
+        <div class="messages mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <ul class="nav nav-tabs mb-4" id="issueManageTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            {# Add 'active' and 'aria-selected="true"' to the tab you want to be active by default #}
+            <button class="nav-link active" id="pending-requests-tab" data-bs-toggle="tab" data-bs-target="#pending-requests" type="button" role="tab" aria-controls="pending-requests" aria-selected="true">
+                Pending Requests
+                {% if pending_requests_count > 0 %}
+                    <span class="badge rounded-pill bg-danger ms-1">
+                        {{ pending_requests_count }}
+                    </span>
+                {% endif %}
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="all-requests-tab" data-bs-toggle="tab" data-bs-target="#all-requests" type="button" role="tab" aria-controls="all-requests" aria-selected="false">All Requests ({{ all_requests.count }})</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="issueManageTabsContent">
+        <div class="tab-pane fade show active" id="pending-requests" role="tabpanel" aria-labelledby="pending-requests-tab">
+            <h5 class="mb-3">Pending and Approved Requests Awaiting Action</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Requested By</th>
+                            <th>Item Name</th>
+                            <th>Quantity</th>
+                            <th>Status</th>
+                            <th>Requested At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in pending_and_approved_requests %}
+                        <tr>
+                            <td>{{ req.id }}</td>
+                            <td>{{ req.requestor.username }}</td>
+                            <td>{{ req.item.name }}</td>
+                            <td>{{ req.quantity }}</td>
+                            <td>
+                                <span class="badge
+                                    {% if req.status == 'Pending' %}bg-warning text-dark
+                                    {% elif req.status == 'Approved' %}bg-success
+                                    {% elif req.status == 'Issued' %}bg-primary
+                                    {% elif req.status == 'Rejected' %}bg-danger
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ req.status }}
+                                </span>
+                            </td>
+                            <td>{{ req.date_requested|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <form action="{% url 'issue_item' %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="request_id" value="{{ req.id }}">
+                                    {% if req.status == 'Pending' %}
+                                        <button type="submit" name="action" value="approve" class="btn btn-success btn-sm me-1">Approve</button>
+                                        <button type="submit" name="action" value="reject" class="btn btn-danger btn-sm me-1">Reject</button>
+                                    {% elif req.status == 'Approved' %}
+                                        <button type="submit" name="action" value="issue_from_request" class="btn btn-info btn-sm">Issue (Approved)</button>
+                                        <button type="submit" name="action" value="reject" class="btn btn-danger btn-sm me-1">Reject</button>
+                                    {% else %}
+                                        <small class="text-muted">No actions</small>
+                                    {% endif %}
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="7" class="text-center text-muted">No pending or approved requests found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="all-requests" role="tabpanel" aria-labelledby="all-requests-tab">
+            <h5 class="mb-3">All Item Requests</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Requested By</th>
+                            <th>Item Name</th>
+                            <th>Serial Number</th>
+                            <th>Quantity</th>
+                            <th>Status</th>
+                            <th>Requested At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in all_requests %}
+                        <tr>
+                            <td>{{ req.id }}</td>
+                            <td>{{ req.requestor.username }}</td>
+                            <td>{{ req.item.name }}</td>
+                            <td>{{ req.item.serial_number|default:"N/A" }}</td>
+                            <td>{{ req.quantity }}</td>
+                            <td>
+                                <span class="badge
+                                    {% if req.status == 'Pending' %}bg-warning text-dark
+                                    {% elif req.status == 'Approved' %}bg-success
+                                    {% elif req.status == 'Issued' %}bg-primary
+                                    {% elif req.status == 'Rejected' %}bg-danger
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ req.status }}
+                                </span>
+                            </td>
+                            <td>{{ req.date_requested|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">No requests found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div> {# Close the tab-content div #}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}
