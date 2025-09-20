@@ -46,4 +46,8 @@ urlpatterns = [
     path('reports/total-requests/', views.total_requests, name='total_requests'),
     path('reports/export/total-requests/',
          views.export_total_requests, name='export_total_requests'),
+     
+    #IoT Box/Supplier Management
+    path('add-supplier/', views.add_supplier, name='add_supplier'),
+    path('add-box/', views.add_box, name='add_box'),
 ]

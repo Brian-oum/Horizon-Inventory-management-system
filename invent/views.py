@@ -20,6 +20,8 @@ from .forms import ItemRequestForm
 from .forms import InventoryItemForm
 from .forms import IssueItemForm
 from .forms import AdjustStockForm
+from .forms import SupplierForm, BoxForm
+from .forms import DeviceForm
 # Import the new forms for return logic
 from .forms import ReturnItemForm, SelectRequestForReturnForm  # NEW
 
@@ -263,6 +265,27 @@ def store_clerk_dashboard(request):
     }
     return render(request, 'invent/store_clerk_dashboard.html', context)
 
+#Box and supplier views
+def add_supplier(request):
+    if request.method == 'POST':
+        form = SupplierForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('store_clerk_dashboard')  # Change this if you want to redirect elsewhere
+    else:
+        form = SupplierForm()
+    return render(request, 'invent/add_supplier.html', {'form': form})
+
+def add_box(request):
+    if request.method == 'POST':
+        form = BoxForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('store_clerk_dashboard')  # Change this if you want to redirect elsewhere
+    else:
+        form = BoxForm()
+    return render(request, 'invent/add_box.html', {'form': form})
+
 # invent/views.py
 
 @login_required
@@ -292,40 +315,20 @@ def inventory_list_view(request):
     }
     return render(request, 'invent/list_inventory_items.html', context)
 
-@login_required
-@permission_required('invent.view_inventoryitem', raise_exception=True)
-def manage_stock(request):
-    form = InventoryItemForm()
 
-    if request.method == 'POST':
-        form = InventoryItemForm(request.POST)
+@login_required
+@permission_required('invent.add_device', raise_exception=True)
+def manage_stock(request):
+    form = DeviceForm()
+    if request.method == "POST":
+        form = DeviceForm(request.POST)
         if form.is_valid():
-            new_item = form.save(commit=False)
-            new_item.created_by = request.user
-            new_item.save()
-            messages.success(
-                request, f'Inventory item "{new_item.name}" added successfully.')
+            form.save()
+            messages.success(request, "Device added successfully.")
             return redirect('manage_stock')
         else:
-            messages.error(
-                request, "Error adding item. Please check the form.")
-
-    query = request.GET.get('q', '')
-    items = InventoryItem.objects.all().order_by('name')
-
-    if query:
-        items = items.filter(
-            Q(name__icontains=query) |
-            Q(serial_number__icontains=query) |
-            Q(category__icontains=query)
-        )
-
-    context = {
-        'form': form,
-        'items': items,
-        'query': query,
-    }
-    return render(request, 'invent/manage_stock.html', context)
+            messages.error(request, "Please correct the errors below.")
+    return render(request, 'invent/manage_stock.html', {'form': form})
 
 
 @login_required

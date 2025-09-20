@@ -3,6 +3,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.db.models import F  # Import F expression for queryset filtering
 from .models import ItemRequest, InventoryItem, StockTransaction
+from .models import Device, Supplier, Box
 
 
 class CustomCreationForm(UserCreationForm):
@@ -208,3 +209,55 @@ class SelectRequestForReturnForm(forms.Form):
         empty_label="--- Select an Issued Request ---",
         widget=forms.Select(attrs={'class': 'form-control'})
     )
+
+class SupplierForm(forms.ModelForm):
+    class Meta:
+        model = Supplier
+        fields = ['supplier_id','name', 'contact_person', 'phone_email', 'address']
+        widgets = {
+            'supplier_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Supplier ID'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Supplier Name'}),
+            'contact_person': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Contact Person'}),
+            'phone_email': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone or Email'}),
+            'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Address'}),
+        }
+
+class BoxForm(forms.ModelForm):
+    class Meta:
+        model = Box
+        fields = ['number', 'status']
+        widgets = {
+            'number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Box Number'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'supplier': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+class DeviceForm(forms.ModelForm):
+    class Meta:
+        model = Device
+        fields = [
+            'box',
+            'product_id',
+            'supplier',
+            'imei_no',
+            'serial_no',
+            'category',
+            'description',
+            'selling_price_usd',
+            'selling_price_ksh',
+            'selling_price_tsh',
+            'status',
+        ]
+        widgets = {
+            'box': forms.Select(attrs={'class': 'form-select'}),
+            'product_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Product ID'}),
+            'supplier': forms.Select(attrs={'class': 'form-select'}),
+            'imei_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'IMEI Number'}),
+            'serial_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Serial Number'}),
+            'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Category'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Description', 'rows': 2}),
+            'selling_price_usd': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price in USD'}),
+            'selling_price_ksh': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price in KSH'}),
+            'selling_price_tsh': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price in TSH'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+        }

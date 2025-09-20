@@ -242,13 +242,14 @@ class Office(models.Model):
 
 
 class Supplier(models.Model):
-    name = models.CharField(max_length=255)
-    contact_person = models.CharField(max_length=255)
-    phone_email = models.CharField(max_length=255)
-    address = models.CharField(max_length=255)
+    supplier_id = models.CharField(max_length=20, unique=True)  # Or IntegerField if numbers
+    name = models.CharField(max_length=100)
+    contact_person = models.CharField(max_length=100, blank=True)
+    phone_email = models.CharField(max_length=100, blank=True)
+    address = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.supplier_id})"
 
 
 class PurchaseOrder(models.Model):
@@ -279,6 +280,8 @@ class Box(models.Model):
 
 class Device(models.Model):
     box = models.ForeignKey(Box, on_delete=models.CASCADE, related_name='devices')
+    product_id = models.CharField(max_length=30, unique=True)
+    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, to_field='supplier_id', related_name='devices')
     imei_no = models.CharField(max_length=50, unique=True)
     serial_no = models.CharField(max_length=50, unique=True, null=True, blank=True)
     category = models.CharField(max_length=50)
