@@ -1,12 +1,12 @@
 {% extends 'invent/base_store_clerk.html' %}
 {% load static %}
 
-{% block title %}Manage Inventory Stock{% endblock %}
+{% block title %}Manage Devices{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4"> {# Use container-fluid for wider layout #}
+<div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0 text-primary"><i class="fas fa-boxes me-2"></i> Manage Inventory Stock</h2> {# Added icon and color #}
+        <h2 class="mb-0 text-primary"><i class="fas fa-microchip me-2"></i> Add Device</h2>
         <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
         </a>
@@ -23,64 +23,80 @@
         </ul>
     {% endif %}
 
-    {# Section for Adding New Item #}
-    <div class="card shadow-sm mb-5"> {# Added shadow-sm and mb-5 for spacing #}
-        <div class="card-header bg-primary text-white py-3"> {# Card header for title #}
-            <h4 class="mb-0"><i class="fas fa-plus-circle me-2"></i> Add New Item</h4>
+    <div class="card shadow-sm mb-5">
+        <div class="card-header bg-primary text-white py-3">
+            <h4 class="mb-0"><i class="fas fa-plus-circle me-2"></i> Add New Device</h4>
         </div>
         <div class="card-body">
             <form method="post">
                 {% csrf_token %}
-                {# Render fields manually for finer control over layout #}
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label for="{{ form.name.id_for_label }}" class="form-label">Item Name:</label>
-                        {{ form.name }}
-                        {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
+                        <label for="{{ form.box.id_for_label }}" class="form-label">Box:</label>
+                        {{ form.box }}
+                        {% if form.box.errors %}<div class="text-danger small">{{ form.box.errors }}</div>{% endif %}
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label for="{{ form.serial_number.id_for_label }}" class="form-label">Serial Number:</label>
-                        {{ form.serial_number }}
-                        {% if form.serial_number.errors %}<div class="text-danger small">{{ form.serial_number.errors }}</div>{% endif %}
+                        <label for="{{ form.product_id.id_for_label }}" class="form-label">Product ID:</label>
+                        {{ form.product_id }}
+                        {% if form.product_id.errors %}<div class="text-danger small">{{ form.product_id.errors }}</div>{% endif %}
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.supplier.id_for_label }}" class="form-label">Supplier:</label>
+                        {{ form.supplier }}
+                        {% if form.supplier.errors %}<div class="text-danger small">{{ form.supplier.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.imei_no.id_for_label }}" class="form-label">IMEI No:</label>
+                        {{ form.imei_no }}
+                        {% if form.imei_no.errors %}<div class="text-danger small">{{ form.imei_no.errors }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.serial_no.id_for_label }}" class="form-label">Serial No:</label>
+                        {{ form.serial_no }}
+                        {% if form.serial_no.errors %}<div class="text-danger small">{{ form.serial_no.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
                         <label for="{{ form.category.id_for_label }}" class="form-label">Category:</label>
                         {{ form.category }}
                         {% if form.category.errors %}<div class="text-danger small">{{ form.category.errors }}</div>{% endif %}
                     </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">Description:</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="row">
                     <div class="col-md-4 mb-3">
-                        <label for="{{ form.condition.id_for_label }}" class="form-label">Condition:</label>
-                        {{ form.condition }}
-                        {% if form.condition.errors %}<div class="text-danger small">{{ form.condition.errors }}</div>{% endif %}
+                        <label for="{{ form.selling_price_usd.id_for_label }}" class="form-label">Price (USD):</label>
+                        {{ form.selling_price_usd }}
+                        {% if form.selling_price_usd.errors %}<div class="text-danger small">{{ form.selling_price_usd.errors }}</div>{% endif %}
                     </div>
                     <div class="col-md-4 mb-3">
+                        <label for="{{ form.selling_price_ksh.id_for_label }}" class="form-label">Price (KSH):</label>
+                        {{ form.selling_price_ksh }}
+                        {% if form.selling_price_ksh.errors %}<div class="text-danger small">{{ form.selling_price_ksh.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="{{ form.selling_price_tsh.id_for_label }}" class="form-label">Price (TSH):</label>
+                        {{ form.selling_price_tsh }}
+                        {% if form.selling_price_tsh.errors %}<div class="text-danger small">{{ form.selling_price_tsh.errors }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
                         <label for="{{ form.status.id_for_label }}" class="form-label">Status:</label>
                         {{ form.status }}
                         {% if form.status.errors %}<div class="text-danger small">{{ form.status.errors }}</div>{% endif %}
                     </div>
                 </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.quantity_total.id_for_label }}" class="form-label">Total Quantity:</label>
-                        {{ form.quantity_total }}
-                        {% if form.quantity_total.errors %}<div class="text-danger small">{{ form.quantity_total.errors }}</div>{% endif %}
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.quantity_issued.id_for_label }}" class="form-label">Quantity Issued:</label>
-                        {{ form.quantity_issued }}
-                        {% if form.quantity_issued.errors %}<div class="text-danger small">{{ form.quantity_issued.errors }}</div>{% endif %}
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.quantity_returned.id_for_label }}" class="form-label">Quantity Returned:</label>
-                        {{ form.quantity_returned }}
-                        {% if form.quantity_returned.errors %}<div class="text-danger small">{{ form.quantity_returned.errors }}</div>{% endif %}
-                    </div>
-                </div>
-
                 {% if form.non_field_errors %}
                     <div class="alert alert-danger mt-3">
                         {% for error in form.non_field_errors %}
@@ -88,14 +104,9 @@
                         {% endfor %}
                     </div>
                 {% endif %}
-
-                <button type="submit" class="btn btn-primary mt-3"><i class="fas fa-save me-2"></i> Save Item</button>
+                <button type="submit" class="btn btn-primary mt-3"><i class="fas fa-save me-2"></i> Save Device</button>
             </form>
         </div>
     </div>
-
-    {# REMOVED: The list of existing inventory items is now on its own page: list_inventory_items.html #}
-    {# The search form related to the list is also moved to list_inventory_items.html #}
-
 </div>
 {% endblock %}
