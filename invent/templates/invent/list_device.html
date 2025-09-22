@@ -1,0 +1,155 @@
+{% extends 'invent/base_store_clerk.html' %}
+{% load static %}
+
+{% block title %}All IoT Devices{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0 text-primary"><i class="fas fa-microchip me-2"></i> All IoT Devices</h2>
+        <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Messages -->
+    {% if messages %}
+        <ul class="messages list-unstyled">
+            {% for message in messages %}
+                <li{% if message.tags %} class="alert alert-{{ message.tags }} alert-dismissible fade show"{% endif %} role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <!-- Devices Table -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-secondary text-white py-3 d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Device Inventory List</h4>
+            <a href="{% url 'export_inventory_items' %}" class="btn btn-light btn-sm">
+                <i class="fas fa-download me-2"></i> Export All
+            </a>
+        </div>
+        <div class="card-body">
+
+            <!-- Search -->
+            <form method="get" action="{% url 'inventory_list' %}" class="row g-3 align-items-center mb-4">
+                <div class="col-md-8">
+                    <input type="text" name="q" class="form-control"
+                           placeholder="🔍 Search by IMEI, Serial, MAC, Category, Box, Client"
+                           value="{{ query }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success w-100">Search</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="{% url 'inventory_list' %}" class="btn btn-outline-secondary w-100">Reset</a>
+                </div>
+            </form>
+
+            {% if page_obj %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Box</th>
+                            <th>Category</th>
+                            <th>IMEI</th>
+                            <th>Serial</th>
+                            <th>MAC</th>
+                            <th>Status</th>
+                            <th>Client</th>
+                            <th>Issued At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for device in page_obj %}
+                        <tr>
+                            <td>{{ device.id }}</td>
+                            <td>{{ device.box.box_number }}</td>
+                            <td>{{ device.category }}</td>
+                            <td>{{ device.imei|default:"-" }}</td>
+                            <td>{{ device.serial_number|default:"-" }}</td>
+                            <td>{{ device.mac_address|default:"-" }}</td>
+                            <td>
+                                <span class="badge
+                                    {% if device.status == 'available' %}bg-success
+                                    {% elif device.status == 'issued' %}bg-primary
+                                    {% elif device.status == 'returned' %}bg-secondary
+                                    {% elif device.status == 'faulty' %}bg-danger
+                                    {% else %}bg-dark{% endif %}">
+                                    {{ device.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if device.current_client %}
+                                    {{ device.current_client.name }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ device.issued_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <a href="{% url 'issue_device' %}" class="btn btn-sm btn-success me-1" title="Issue Device">
+                                    <i class="fas fa-share-square"></i>
+                                </a>
+                                <a href="{% url 'return_device' %}" class="btn btn-sm btn-warning" title="Process Return">
+                                    <i class="fas fa-undo"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center mt-4">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">Previous</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">Previous</span></li>
+                    {% endif %}
+
+                    {% for i in page_obj.paginator.page_range %}
+                        {% if page_obj.number == i %}
+                        <li class="page-item active" aria-current="page"><span class="page-link">{{ i }}</span></li>
+                        {% else %}
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}{% if query %}&q={{ query }}{% endif %}">{{ i }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}">Next</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">Next</span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="alert alert-info text-center py-4" role="alert">
+                <i class="fas fa-info-circle fa-2x mb-3"></i>
+                <p class="mb-0">No devices found.</p>
+                {% if query %}
+                <p>Try adjusting your search terms or <a href="{% url 'inventory_list' %}" class="alert-link">view all devices</a>.</p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
