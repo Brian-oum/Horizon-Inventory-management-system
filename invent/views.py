@@ -39,9 +39,30 @@ from django.db import transaction
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 
+
 def get_next_available_box():
     """Return the next box available for issuance (FIFO)."""
     return Box.objects.filter(status='available').order_by('id').first()
+
+
+@login_required
+def box_list_view(request):
+    """
+    Shows all shipment boxes with their statuses and device counts.
+    """
+    boxes = Box.objects.prefetch_related('devices').all().order_by('id')
+    return render(request, 'invent/list_boxes.html', {'boxes': boxes})
+
+
+@login_required
+def box_detail_view(request, box_id):
+    """
+    Shows details of a single box and the devices inside it.
+    """
+    box = get_object_or_404(Box, id=box_id)
+    devices = box.devices.all()
+    return render(request, 'invent/box_detail.html', {'box': box, 'devices': devices})
+
 
 def register(request):
     if request.method == 'POST':
@@ -265,55 +286,68 @@ def store_clerk_dashboard(request):
     }
     return render(request, 'invent/store_clerk_dashboard.html', context)
 
-#Box and supplier views
+# Box and supplier views
+
+
 def add_supplier(request):
     if request.method == 'POST':
         form = SupplierForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect('store_clerk_dashboard')  # Change this if you want to redirect elsewhere
+            # Change this if you want to redirect elsewhere
+            return redirect('store_clerk_dashboard')
     else:
         form = SupplierForm()
     return render(request, 'invent/add_supplier.html', {'form': form})
+
 
 def add_box(request):
     if request.method == 'POST':
         form = BoxForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect('store_clerk_dashboard')  # Change this if you want to redirect elsewhere
+            # Change this if you want to redirect elsewhere
+            return redirect('store_clerk_dashboard')
     else:
         form = BoxForm()
     return render(request, 'invent/add_box.html', {'form': form})
 
 # invent/views.py
 
+
 @login_required
-@permission_required('invent.view_inventoryitem', raise_exception=True)
+@permission_required('invent/list_device.html', raise_exception=True)
 def inventory_list_view(request):
     """
-    Displays a list of all inventory items with search and pagination.
+    Displays a list of all IoT devices with search, box linkage, and pagination.
     """
     query = request.GET.get('q', '')
-    items = InventoryItem.objects.all().order_by('name')
 
+    # Devices are the atomic unit of issuance
+    devices = Device.objects.select_related(
+        'box').all().order_by('box__id', 'id')
+
+    # Search functionality (IMEI, Serial, Category, Client, Box)
     if query:
-        items = items.filter(
-            Q(name__icontains=query) |
+        devices = devices.filter(
+            Q(imei__icontains=query) |
             Q(serial_number__icontains=query) |
-            Q(category__icontains=query) 
-        )                                    
+            Q(mac_address__icontains=query) |
+            Q(category__icontains=query) |
+            Q(box__box_number__icontains=query) |
+            Q(current_client__name__icontains=query)
+        )
 
-    # Add pagination
-    paginator = Paginator(items, 50)  # Show 50 items per page
+    # Pagination (50 per page)
+    paginator = Paginator(devices, 50)
     page_number = request.GET.get('page')
-    page_obj  = paginator.get_page(page_number) 
+    page_obj = paginator.get_page(page_number)
 
     context = {
-        'page_obj': page_obj,  # Now passing the paginated object as 'page_obj'
+        'page_obj': page_obj,
         'query': query,
     }
-    return render(request, 'invent/list_inventory_items.html', context)
+    return render(request, 'invent/list_device.html', context)
 
 
 @login_required
@@ -521,6 +555,8 @@ def issue_item(request):
     return render(request, 'invent/issue_item.html', context)
 
  # IoT Device Issuance/Return Views
+
+
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
 def issue_device(request):
@@ -538,23 +574,27 @@ def issue_device(request):
             messages.error(request, "Please select a device and client.")
             return redirect('issue_device')
 
-        device = get_object_or_404(Device, id=device_id, box=box, status='available')
+        device = get_object_or_404(
+            Device, id=device_id, box=box, status='available')
         client = get_object_or_404(Client, id=client_id)
 
         with transaction.atomic():
             device.status = 'issued'
             device.save()
-            IssuanceRecord.objects.create(device=device, client=client, logistics_manager=request.user)
+            IssuanceRecord.objects.create(
+                device=device, client=client, logistics_manager=request.user)
             # Check if box is now completed
             if not box.devices.filter(status='available').exists():
                 box.status = 'completed'
                 box.save()
                 # Unlock next box if needed (optional logic, up to you)
-                next_box = Box.objects.filter(status='in_progress').order_by('id').first()
+                next_box = Box.objects.filter(
+                    status='in_progress').order_by('id').first()
                 if next_box:
                     next_box.status = 'available'
                     next_box.save()
-            messages.success(request, f"Device {device.imei_no} issued to {client.name}.")
+            messages.success(
+                request, f"Device {device.imei_no} issued to {client.name}.")
 
         return redirect('issue_device')
 
@@ -563,6 +603,7 @@ def issue_device(request):
         'available_devices': available_devices,
         'clients': clients,
     })
+
 
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
@@ -578,13 +619,16 @@ def return_device(request):
         with transaction.atomic():
             device.status = 'returned'
             device.save()
-            ReturnRecord.objects.create(device=device, client=client, reason=reason)
-            messages.success(request, f"Device {device.imei_no} returned by {client.name}.")
+            ReturnRecord.objects.create(
+                device=device, client=client, reason=reason)
+            messages.success(
+                request, f"Device {device.imei_no} returned by {client.name}.")
         return redirect('return_device')
     return render(request, 'invent/return_device.html', {
         'issued_devices': issued_devices,
         'clients': clients
     })
+
 
 @login_required
 def request_summary(request):

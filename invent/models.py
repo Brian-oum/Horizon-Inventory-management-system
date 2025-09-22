@@ -214,15 +214,18 @@ class StockTransaction(models.Model):
     recorded_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='recorded_transactions')
 
+
 def __str__(self):
     action = "added" if self.quantity > 0 else "removed"
     recorded_by_name = self.recorded_by.username if self.recorded_by else "N/A"
-    date_str = self.transaction_date.strftime('%Y-%m-%d') if self.transaction_date else "Unknown date"
+    date_str = self.transaction_date.strftime(
+        '%Y-%m-%d') if self.transaction_date else "Unknown date"
     # Adjusting the __str__ to be more descriptive for returns
     if self.transaction_type == 'Return':
         return f"{self.item.name} - Returned: {self.quantity} by {recorded_by_name} on {date_str}"
     else:
         return f"{self.item.name} - {self.transaction_type}: {abs(self.quantity)} ({action}) by {recorded_by_name} on {date_str}"
+
 
 class Meta:
     ordering = ['-transaction_date']
@@ -234,6 +237,7 @@ class Meta:
 
 # --- BEGIN IoT/Box/Client/Supplier Models ---
 
+
 class Office(models.Model):
     address = models.CharField(max_length=255)
 
@@ -242,7 +246,8 @@ class Office(models.Model):
 
 
 class Supplier(models.Model):
-    supplier_id = models.CharField(max_length=20, unique=True)  # Or IntegerField if numbers
+    # Or IntegerField if numbers
+    supplier_id = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=100)
     contact_person = models.CharField(max_length=100, blank=True)
     phone_email = models.CharField(max_length=100, blank=True)
@@ -279,16 +284,22 @@ class Box(models.Model):
 
 
 class Device(models.Model):
-    box = models.ForeignKey(Box, on_delete=models.CASCADE, related_name='devices')
+    box = models.ForeignKey(
+        Box, on_delete=models.CASCADE, related_name='devices')
     product_id = models.CharField(max_length=30, unique=True)
-    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, to_field='supplier_id', related_name='devices')
+    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL,
+                                 null=True, blank=True, to_field='supplier_id', related_name='devices')
     imei_no = models.CharField(max_length=50, unique=True)
-    serial_no = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    serial_no = models.CharField(
+        max_length=50, unique=True, null=True, blank=True)
     category = models.CharField(max_length=50)
     description = models.TextField(blank=True)
-    selling_price_usd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    selling_price_ksh = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    selling_price_tsh = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    selling_price_usd = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    selling_price_ksh = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    selling_price_tsh = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=(
