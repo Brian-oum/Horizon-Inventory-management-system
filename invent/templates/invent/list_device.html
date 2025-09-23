@@ -40,7 +40,7 @@
             <form method="get" action="{% url 'inventory_list' %}" class="row g-3 align-items-center mb-4">
                 <div class="col-md-8">
                     <input type="text" name="q" class="form-control"
-                           placeholder="🔍 Search by IMEI, Serial, MAC, Category, Box, Client"
+                           placeholder="🔍 Search by IMEI, Serial, Category, Box, Client"
                            value="{{ query }}">
                 </div>
                 <div class="col-md-2">
@@ -61,7 +61,6 @@
                             <th>Category</th>
                             <th>IMEI</th>
                             <th>Serial</th>
-                            <th>MAC</th>
                             <th>Status</th>
                             <th>Client</th>
                             <th>Issued At</th>
@@ -72,11 +71,10 @@
                         {% for device in page_obj %}
                         <tr>
                             <td>{{ device.id }}</td>
-                            <td>{{ device.box.box_number }}</td>
+                            <td>{{ device.box.number }}</td>
                             <td>{{ device.category }}</td>
-                            <td>{{ device.imei|default:"-" }}</td>
-                            <td>{{ device.serial_number|default:"-" }}</td>
-                            <td>{{ device.mac_address|default:"-" }}</td>
+                            <td>{{ device.imei_no|default:"-" }}</td>
+                            <td>{{device.serial_no|default:"-" }}</td>
                             <td>
                                 <span class="badge
                                     {% if device.status == 'available' %}bg-success
@@ -94,7 +92,13 @@
                                     -
                                 {% endif %}
                             </td>
-                            <td>{{ device.issued_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if device.issued_at %}
+                                     {{ device.issued_at|date:"Y-m-d H:i" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
                             <td>
                                 <a href="{% url 'issue_device' %}" class="btn btn-sm btn-success me-1" title="Issue Device">
                                     <i class="fas fa-share-square"></i>
