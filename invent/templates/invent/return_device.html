@@ -61,7 +61,6 @@
                 <tr>
                     <th>IMEI</th>
                     <th>Serial #</th>
-                    <th>MAC Address</th>
                     <th>Category</th>
                     <th>Issued To</th>
                     <th>Status</th>
@@ -72,7 +71,6 @@
                 <tr>
                     <td>{{ device.imei_no }}</td>
                     <td>{{ device.serial_no|default:"N/A" }}</td>
-                    <td>{{ device.mac_address|default:"N/A" }}</td>
                     <td>{{ device.category|default:"N/A" }}</td>
                     <td>
                         {% for record in device.issuancerecord_set.all %}

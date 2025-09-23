@@ -268,6 +268,25 @@ def store_clerk_dashboard(request):
     boxes_in_progress = Box.objects.filter(status='in_progress').count()
     boxes_completed = Box.objects.filter(status='completed').count()
 
+    # --- Recent Device Activity (for dashboard table) ---
+    from .models import IssuanceRecord  # If not already imported
+    recent_issuances = (
+        IssuanceRecord.objects
+            .select_related('device', 'device__box', 'client')
+            .order_by('-issued_at')[:10]
+    )
+    seen = set()
+    recent_devices = []
+    for record in recent_issuances:
+        if record.device.id not in seen:
+            # Attach extra fields for template compatibility
+            record.device.current_client = record.client
+            record.device.issued_at = record.issued_at
+            recent_devices.append(record.device)
+            seen.add(record.device.id)
+        if len(recent_devices) >= 5:  # Only show 5 most recent unique devices
+            break
+
     context = {
         'total_items': total_inventory_items,
         'items_issued': items_issued,
@@ -283,6 +302,8 @@ def store_clerk_dashboard(request):
         "total_boxes": total_boxes,
         "boxes_in_progress": boxes_in_progress,
         "boxes_completed": boxes_completed,
+        # --- Add this! ---
+        "recent_devices": recent_devices,
     }
     return render(request, 'invent/store_clerk_dashboard.html', context)
 
@@ -332,11 +353,23 @@ def inventory_list_view(request):
         devices = devices.filter(
             Q(imei__icontains=query) |
             Q(serial_number__icontains=query) |
-            Q(mac_address__icontains=query) |
             Q(category__icontains=query) |
             Q(box__box_number__icontains=query) |
             Q(current_client__name__icontains=query)
         )
+
+ # Attach latest IssuanceRecord to each device for template access to client and issued_at
+    for device in devices:
+        last_issuance = (
+            IssuanceRecord.objects
+                .filter(device=device)
+                .order_by('-issued_at')
+                .select_related('client')
+                .first()
+        )
+        device.current_client = last_issuance.client if last_issuance else None
+        device.issued_at = last_issuance.issued_at if last_issuance else None
+
 
     # Pagination (50 per page)
     paginator = Paginator(devices, 50)
