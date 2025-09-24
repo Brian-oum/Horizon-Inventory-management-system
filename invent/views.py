@@ -32,6 +32,7 @@ from django.core.files.base import ContentFile
 from django.contrib.auth.models import Group
 from django.contrib import messages
 from django.core.paginator import Paginator
+import re
 
 from .models import Box, Device, IssuanceRecord, ReturnRecord, Client
 from django.contrib.auth.decorators import login_required, permission_required
@@ -272,8 +273,8 @@ def store_clerk_dashboard(request):
     from .models import IssuanceRecord  # If not already imported
     recent_issuances = (
         IssuanceRecord.objects
-            .select_related('device', 'device__box', 'client')
-            .order_by('-issued_at')[:10]
+        .select_related('device', 'device__box', 'client')
+        .order_by('-issued_at')[:10]
     )
     seen = set()
     recent_devices = []
@@ -362,14 +363,13 @@ def inventory_list_view(request):
     for device in devices:
         last_issuance = (
             IssuanceRecord.objects
-                .filter(device=device)
-                .order_by('-issued_at')
-                .select_related('client')
-                .first()
+            .filter(device=device)
+            .order_by('-issued_at')
+            .select_related('client')
+            .first()
         )
         device.current_client = last_issuance.client if last_issuance else None
         device.issued_at = last_issuance.issued_at if last_issuance else None
-
 
     # Pagination (50 per page)
     paginator = Paginator(devices, 50)
@@ -802,17 +802,26 @@ def reports_view(request):
 @login_required
 @permission_required('invent.add_inventoryitem', raise_exception=True)
 def upload_inventory(request):
+    """
+    Upload IoT devices from Excel.
+    Expected columns:
+    Box, Product ID, IMEI No, Serial No, Category, Description,
+    Selling Price (USD), Selling Price (KSH), Selling Price (TSH),
+    Status (available, issued, returned, faulty)
+    """
+
     if request.method == 'POST' and request.FILES.get('excel_file'):
         excel_file = request.FILES['excel_file']
 
-        # File extension check
+        # Validate extension
         if not excel_file.name.endswith('.xlsx'):
             messages.error(request, "Only .xlsx files are supported.")
             return redirect('upload_inventory')
 
-        # Save file temporarily
+        # Save temporarily
         file_name = default_storage.save(
-            excel_file.name, ContentFile(excel_file.read()))
+            excel_file.name, ContentFile(excel_file.read())
+        )
         file_path = default_storage.path(file_name)
 
         try:
@@ -822,48 +831,100 @@ def upload_inventory(request):
             success_count = 0
             skipped_count = 0
 
-            for row in sheet.iter_rows(min_row=2, values_only=True):  # Skip header row
-                # Ensure the number of columns matches your excel structure
-                # This needs to be consistent with the actual columns in your Excel file.
-                # Assuming the order is: name, serial, category, condition, status, total, issued, returned
-                name, serial, category, condition, status, total, issued, returned = row
+            # Normalize headers
+            headers = [cell.value for cell in sheet[1]]
+            headers = [h.strip().lower() if h else "" for h in headers]
 
-                # Skip if required fields are missing
-                if not name:
-                    skipped_count += 1
-                    continue
+            valid_statuses = ["available", "issued", "returned", "faulty"]
+
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                row_data = dict(zip(headers, row))
 
                 try:
-                    InventoryItem.objects.create(
-                        name=name.strip(),
-                        serial_number=(serial or "").strip(),
-                        category=(category or "").strip(),
-                        condition=condition or "Serviceable",
-                        status=status or "In Stock",
-                        quantity_total=int(total or 0),
-                        quantity_issued=int(issued or 0),
-                        # Ensure this maps correctly
-                        quantity_returned=int(returned or 0),
-                        created_by=request.user
+                    imei = (row_data.get("imei no") or "").strip()
+                    serial_no = (row_data.get("serial no")
+                                 or "").strip() or None
+                    category = (row_data.get("category") or "").strip()
+                    description = row_data.get("description") or ""
+                    raw_box = (row_data.get("box") or "").strip()
+
+                    # Prices (optional, any or all may be present)
+                    price_usd = row_data.get("selling price (usd)") or None
+                    price_ksh = row_data.get("selling price (ksh)") or None
+                    price_tsh = row_data.get("selling price (tsh)") or None
+
+                    # Status validation
+                    status = (row_data.get("status")
+                              or "available").strip().lower()
+                    if status not in valid_statuses:
+                        status = "available"
+
+                    # Must have IMEI
+                    if not imei:
+                        skipped_count += 1
+                        continue
+
+                    # Ensure unique IMEI
+                    if Device.objects.filter(imei_no=imei).exists():
+                        messages.warning(
+                            request, f"Duplicate IMEI '{imei}' skipped.")
+                        skipped_count += 1
+                        continue
+
+                    # Must have Box → enforce strictly numeric/alphanumeric, no "Box001"
+                    if not raw_box:
+                        messages.warning(
+                            request, f"Missing Box for IMEI {imei}, skipped.")
+                        skipped_count += 1
+                        continue
+
+                    # Reject if it starts with "box" or contains non-alphanumeric
+                    if raw_box.lower().startswith("box"):
+                        messages.warning(
+                            request, f"Invalid Box '{raw_box}' for IMEI {imei}. Use only the number like '001'.")
+                        skipped_count += 1
+                        continue
+
+                    if not re.match(r"^[A-Za-z0-9]+$", raw_box):
+                        messages.warning(
+                            request, f"Invalid Box '{raw_box}' for IMEI {imei}. Only numbers/letters allowed.")
+                        skipped_count += 1
+                        continue
+
+                    # Box is valid
+                    box, _ = Box.objects.get_or_create(number=raw_box)
+
+                    # Create device
+                    Device.objects.create(
+                        box=box,
+                        product_id=row_data.get("product id") or imei,
+                        imei_no=imei,
+                        serial_no=serial_no,
+                        category=category,
+                        description=description,
+                        selling_price_usd=price_usd,
+                        selling_price_ksh=price_ksh,
+                        selling_price_tsh=price_tsh,
+                        status=status
                     )
                     success_count += 1
-                except Exception as e:
-                    messages.error(
-                        request, f"Error processing row for item '{name}': {e}")
-                    skipped_count += 1  # Skip row if conversion or save fails
 
-            # Feedback message
+                except Exception as e:
+                    messages.error(request, f"Error on row {row}: {e}")
+                    skipped_count += 1
+
             messages.success(
                 request,
-                f"{success_count} item(s) uploaded successfully. {skipped_count} row(s) skipped due to errors or missing data."
+                f"{success_count} device(s) uploaded successfully. "
+                f"{skipped_count} row(s) skipped."
             )
             return redirect('upload_inventory')
 
         except Exception as e:
-            messages.error(request, f"Failed to process Excel file: {e}")
+            messages.error(request, f"Failed to process file: {e}")
             return redirect('upload_inventory')
+
         finally:
-            # Clean up the temporary file
             if default_storage.exists(file_name):
                 default_storage.delete(file_name)
 
