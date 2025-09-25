@@ -246,7 +246,7 @@ class Device(models.Model):
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, to_field='supplier_id', related_name='devices')
     imei_no = models.CharField(max_length=50, unique=True)
     serial_no = models.CharField(max_length=50, unique=True, null=True, blank=True)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, blank=True, null=True, related_name='devices')
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, blank=True, null=True, default=None, related_name='devices')
     description = models.TextField(blank=True)
     selling_price_usd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     selling_price_ksh = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)

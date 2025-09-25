@@ -55,7 +55,7 @@ class InventoryItemForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Item Name'}),
             'serial_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Serial Number'}),
-            'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Category'}),
+            'category': forms.Select(attrs={'class': 'form-control', 'placeholder': 'Category'}),
             'condition': forms.Select(attrs={'class': 'form-select'}, choices=InventoryItem.CONDITION_CHOICES),
             'status': forms.Select(attrs={'class': 'form-select'}, choices=InventoryItem.STATUS_CHOICES),
             'quantity_total': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
