@@ -284,6 +284,8 @@ class Box(models.Model):
 
 
 class Device(models.Model):
+    name = models.CharField(max_length=255, blank=True)  # Device name
+    total_quantity = models.PositiveIntegerField(default=1)  # Total number of this device
     box = models.ForeignKey(Box, on_delete=models.CASCADE, related_name='devices')
     product_id = models.CharField(max_length=30, unique=True)
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, to_field='supplier_id', related_name='devices')

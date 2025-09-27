@@ -45,10 +45,11 @@
                             <option value="">Select a device</option>
                             {% for device in available_devices %}
                                 <option value="{{ device.id }}"
+                                        data-name="{{ device.name}}"                
                                         data-category="{{ device.category }}"
                                         data-imei="{{ device.imei_no }}"
                                         data-status="{{ device.status }}">
-                                    {{ device.imei_no }} - {{ device.category }}
+                                    {{ device.name }} - {{ device.imei_no }}
                                 </option>
                             {% endfor %}
                         </select>

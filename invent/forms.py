@@ -237,6 +237,8 @@ class DeviceForm(forms.ModelForm):
     class Meta:
         model = Device
         fields = [
+            'name',
+            'total_quantity',
             'box',
             'product_id',
             'supplier',
@@ -250,6 +252,8 @@ class DeviceForm(forms.ModelForm):
             'status',
         ]
         widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name'}),
+            'total_quantity': forms.NumberInput(attrs={'min': 1}),
             'box': forms.Select(attrs={'class': 'form-select'}),
             'product_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Product ID'}),
             'supplier': forms.Select(attrs={'class': 'form-select'}),
