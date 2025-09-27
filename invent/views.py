@@ -22,6 +22,7 @@ from .forms import IssueItemForm
 from .forms import AdjustStockForm
 from .forms import SupplierForm, BoxForm
 from .forms import DeviceForm
+from .forms import DeviceRequestForm
 # Import the new forms for return logic
 from .forms import ReturnItemForm, SelectRequestForReturnForm  # NEW
 
@@ -138,72 +139,67 @@ def requestor_dashboard(request):
 
 
 @login_required
-def request_item(request):
-    item_id_from_get = request.GET.get('item')
+def request_device(request):
+    device_id_from_get = request.GET.get('device')
 
-    available_inventory_queryset = InventoryItem.objects.all().order_by('name')
-    available_inventory_list = [
-        item for item in available_inventory_queryset if item.quantity_remaining() > 0]
+    available_device_queryset = Device.objects.filter(status='available').order_by('imei_no')
+    available_device_list = list(available_device_queryset)
 
-    available_item_ids = [item.id for item in available_inventory_list]
-    filtered_inventory_queryset = InventoryItem.objects.filter(
-        id__in=available_item_ids).order_by('name')
-
-    # JS-safe JSON data for showing item quantity/condition
-    available_inventory_json = mark_safe(json.dumps([
+    available_device_json = mark_safe(json.dumps([
         {
-            "id": item.id,
-            "quantity_remaining": item.quantity_remaining(),
-            "condition": item.condition or "N/A"
+            "id": device.id,
+            "imei_no": device.imei_no,
+            "serial_no": device.serial_no,
+            "category": device.category,
+            "description": device.description,
+            "status": device.status,
         }
-        for item in available_inventory_list
+        for device in available_device_list
     ]))
 
     if request.method == 'POST':
-        form = ItemRequestForm(request.POST)
-        form.fields['item'].queryset = filtered_inventory_queryset
+        form = DeviceRequestForm(request.POST)
+        form.fields['device'].queryset = available_device_queryset
 
         if form.is_valid():
-            item_request = form.save(commit=False)
-            item_request.requestor = request.user
-            item_request.name = item_request.item.name
-            item_request.save()
+            device_request = form.save(requestor=request.user)  # 👈 pass requestor
 
-            # Send email notification to the requestor
+            # ✅ Email notification
             send_mail(
-                subject='Item Request Confirmation',
+                subject='Device Request Confirmation',
                 message=(
                     f"Dear {request.user.first_name or request.user.username},\n\n"
-                    f"Your request for item \"{item_request.item.name}\" has been successfully submitted.\n"
+                    f"Your request for device (IMEI: {device_request.device.imei_no}, "
+                    f"Model: {device_request.device.category}) has been submitted successfully.\n"
                     f"We will notify you once it is reviewed or issued.\n\n"
                     f"Thank you,\nInventory Management Team"
                 ),
-                from_email=None,  # Uses DEFAULT_FROM_EMAIL
+                from_email=None,
                 recipient_list=[request.user.email],
                 fail_silently=False,
             )
 
-            messages.success(request, "Item request submitted successfully!")
+            messages.success(request, "Device request submitted successfully!")
             return redirect('requestor_dashboard')
         else:
             messages.error(request, "Please correct the errors below.")
     else:
         initial_data = {}
-        if item_id_from_get and item_id_from_get.isdigit():
+        if device_id_from_get and device_id_from_get.isdigit():
             try:
-                item = InventoryItem.objects.get(id=int(item_id_from_get))
-                if item.id in available_item_ids:
-                    initial_data['item'] = item.id
-            except InventoryItem.DoesNotExist:
+                device = Device.objects.get(id=int(device_id_from_get))
+                if device in available_device_list:
+                    initial_data['device'] = device.id
+            except Device.DoesNotExist:
                 pass
 
-        form = ItemRequestForm(initial=initial_data)
-        form.fields['item'].queryset = filtered_inventory_queryset
+        form = DeviceRequestForm(initial=initial_data)
+        form.fields['device'].queryset = available_device_queryset
 
     return render(request, 'invent/request_item.html', {
         'form': form,
-        'available_inventory': available_inventory_list,
-        'available_inventory_json': available_inventory_json,
+        'available_devices': available_device_list,
+        'available_device_json': available_device_json,
     })
 
 
@@ -236,6 +232,8 @@ def cancel_request(request, request_id):
 
 # --- Store Clerk Functionality ---
 
+from .models import DeviceRequest
+
 @login_required
 @permission_required('invent.view_inventoryitem', raise_exception=True)
 def store_clerk_dashboard(request):
@@ -259,7 +257,7 @@ def store_clerk_dashboard(request):
         quantity__lte=F('returned_quantity')
     ).count()
 
-    # --- IoT Device & Box Stats ---
+    # IoT Device & Box Stats
     total_devices = Device.objects.count()
     devices_available = Device.objects.filter(status='available').count()
     devices_issued = Device.objects.filter(status='issued').count()
@@ -269,8 +267,8 @@ def store_clerk_dashboard(request):
     boxes_in_progress = Box.objects.filter(status='in_progress').count()
     boxes_completed = Box.objects.filter(status='completed').count()
 
-    # --- Recent Device Activity (for dashboard table) ---
-    from .models import IssuanceRecord  # If not already imported
+    # Recent Device Activity
+    from .models import IssuanceRecord
     recent_issuances = (
         IssuanceRecord.objects
         .select_related('device', 'device__box', 'client')
@@ -280,13 +278,15 @@ def store_clerk_dashboard(request):
     recent_devices = []
     for record in recent_issuances:
         if record.device.id not in seen:
-            # Attach extra fields for template compatibility
             record.device.current_client = record.client
             record.device.issued_at = record.issued_at
             recent_devices.append(record.device)
             seen.add(record.device.id)
-        if len(recent_devices) >= 5:  # Only show 5 most recent unique devices
+        if len(recent_devices) >= 5:
             break
+
+    # ✅ Add Device Requests here
+    pending_device_requests = DeviceRequest.objects.filter(status="Pending").select_related("requestor", "device")
 
     context = {
         'total_items': total_inventory_items,
@@ -295,7 +295,8 @@ def store_clerk_dashboard(request):
         'items': items_for_dashboard,
         'pending_requests_count': pending_requests_count,
         'issued_but_not_fully_returned_count': issued_but_not_fully_returned_count,
-        # --- IoT stats below ---
+
+        # IoT stats
         "total_devices": total_devices,
         "devices_available": devices_available,
         "devices_issued": devices_issued,
@@ -303,38 +304,31 @@ def store_clerk_dashboard(request):
         "total_boxes": total_boxes,
         "boxes_in_progress": boxes_in_progress,
         "boxes_completed": boxes_completed,
-        # --- Add this! ---
+
+        # Tables
         "recent_devices": recent_devices,
+        "pending_device_requests": pending_device_requests,  # ✅ pass to template
     }
     return render(request, 'invent/store_clerk_dashboard.html', context)
 
-# Box and supplier views
-
-
-def add_supplier(request):
-    if request.method == 'POST':
-        form = SupplierForm(request.POST)
-        if form.is_valid():
-            form.save()
-            # Change this if you want to redirect elsewhere
-            return redirect('store_clerk_dashboard')
-    else:
-        form = SupplierForm()
-    return render(request, 'invent/add_supplier.html', {'form': form})
-
-
-def add_box(request):
-    if request.method == 'POST':
-        form = BoxForm(request.POST)
-        if form.is_valid():
-            form.save()
-            # Change this if you want to redirect elsewhere
-            return redirect('store_clerk_dashboard')
-    else:
-        form = BoxForm()
-    return render(request, 'invent/add_box.html', {'form': form})
-
 # invent/views.py
+@login_required
+@permission_required('invent.change_devicerequest', raise_exception=True)
+def approve_request(request, request_id):
+    device_request = get_object_or_404(DeviceRequest, id=request_id)
+    device_request.status = "Approved"
+    device_request.save()
+    messages.success(request, f"Request {device_request.id} approved successfully.")
+    return redirect("store_clerk_dashboard")
+
+@login_required
+@permission_required('invent.change_devicerequest', raise_exception=True)
+def reject_request(request, request_id):
+    device_request = get_object_or_404(DeviceRequest, id=request_id)
+    device_request.status = "Rejected"
+    device_request.save()
+    messages.warning(request, f"Request {device_request.id} rejected.")
+    return redirect("store_clerk_dashboard")
 
 
 @login_required
@@ -756,6 +750,33 @@ def adjust_stock(request):
         'recent_transactions': recent_transactions,
     }
     return render(request, 'invent/adjust_stock.html', context)
+def add_supplier(request):
+    if request.method == 'POST':
+        form = SupplierForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Supplier added successfully!")
+            return redirect('store_clerk_dashboard')  # go back to clerk dashboard
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = SupplierForm()
+
+    return render(request, 'invent/add_supplier.html', {'form': form})
+
+def add_box(request):
+    if request.method == 'POST':
+        form = BoxForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Box added successfully!")
+            return redirect('store_clerk_dashboard')  # Redirect to dashboard
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = BoxForm()
+
+    return render(request, 'invent/add_box.html', {'form': form})
 
 
 @login_required

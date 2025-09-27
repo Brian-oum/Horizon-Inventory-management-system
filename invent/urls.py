@@ -8,7 +8,7 @@ urlpatterns = [
 
     # Requestor Paths
     path('', views.requestor_dashboard, name='requestor_dashboard'),
-    path('request_item/', views.request_item, name='request_item'),
+    path('request_device/', views.request_device, name='request_device'),
     path('request_summary/', views.request_summary, name='request_summary'),
     path('cancel-request/<int:request_id>/',
          views.cancel_request, name='cancel_request'),
@@ -51,4 +51,9 @@ urlpatterns = [
     # IoT Box/Supplier Management
     path('add-supplier/', views.add_supplier, name='add_supplier'),
     path('add-box/', views.add_box, name='add_box'),
+    # Device Approval and Rejection
+    path('approve-request/<int:request_id>/', views.approve_request, name='approve_request'),
+    path('reject-request/<int:request_id>/', views.reject_request, name='reject_request'),
 ]
+
+

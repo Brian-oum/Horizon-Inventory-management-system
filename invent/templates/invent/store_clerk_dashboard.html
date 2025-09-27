@@ -143,6 +143,48 @@
         </table>
     </div>
 </div>
+<!-- Pending Device Requests -->
+<div class="bg-white p-4 rounded shadow-sm mb-4">
+    <h5 class="mb-3">Pending Device Requests</h5>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead class="table-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Requested By</th>
+                    <th>Device</th>
+                    <th>Message</th>
+                    <th>Status</th>
+                    <th>Requested At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in pending_device_requests %}
+                <tr>
+                    <td>{{ req.id }}</td>
+                    <td>{{ req.requestor.username }}</td>
+                    <td>{{ req.device }}</td>
+                    <td>{{ req.message|default:"-" }}</td>
+                    <td>
+                        <span class="badge {% if req.status == 'Pending' %}bg-warning{% else %}bg-success{% endif %}">
+                            {{ req.status }}
+                        </span>
+                    </td>
+                    <td>{{ req.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        <a href="{% url 'approve_request' req.id %}" class="btn btn-sm btn-success">Approve</a>
+                        <a href="{% url 'reject_request' req.id %}" class="btn btn-sm btn-danger">Reject</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center text-muted">No pending requests.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
