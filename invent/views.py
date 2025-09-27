@@ -826,32 +826,34 @@ def reports(request):
 # Consolidated reports_view for cleaner logic and direct use.
 # Added permission requirement for store clerks.
 @login_required
-# Assuming clerks need to see reports
-@permission_required('invent.view_inventoryitem', raise_exception=True)
+@permission_required('invent.view_device', raise_exception=True)  # ✅ corrected permission
 def reports_view(request):
     context = {
-        'total_items': InventoryItem.objects.aggregate(total=Sum('quantity_total'))['total'] or 0,
-        'total_requests': ItemRequest.objects.count(),
-        'pending_count': ItemRequest.objects.filter(status='Pending').count(),
-        'approved_count': ItemRequest.objects.filter(status='Approved').count(),
-        'issued_count': ItemRequest.objects.filter(status='Issued').count(),
-        'rejected_count': ItemRequest.objects.filter(status='Rejected').count(),
-        # MODIFIED: Calculate returned_count from ItemRequest statues
-        'fully_returned_count': ItemRequest.objects.filter(status='Fully Returned').count(),
-        'partially_returned_count': ItemRequest.objects.filter(status='Partially Returned').count(),
-        # Sum of actual quantities returned via transactions or the ItemRequest.returned_quantity field
-        'total_returned_quantity_all_items': ItemRequest.objects.aggregate(total_returned=Sum('returned_quantity'))['total_returned'] or 0,
+        # Total stock count
+        'total_items': Device.objects.aggregate(total=Sum('total_quantity'))['total'] or 0,
 
+        # Request stats
+        'total_requests': DeviceRequest.objects.count(),
+        'pending_count': DeviceRequest.objects.filter(status='Pending').count(),
+        'approved_count': DeviceRequest.objects.filter(status='Approved').count(),
+        'issued_count': DeviceRequest.objects.filter(status='Issued').count(),
+        'rejected_count': DeviceRequest.objects.filter(status='Rejected').count(),
+        'fully_returned_count': DeviceRequest.objects.filter(status='Fully Returned').count(),
+        'partially_returned_count': DeviceRequest.objects.filter(status='Partially Returned').count(),
 
-        # Top 2 requested items
+        # Total returned quantity (if field exists)
+        'total_returned_quantity_all_items': DeviceRequest.objects.aggregate(
+            total_returned=Sum('returned_quantity')
+        )['total_returned'] or 0,
+
+        # Top 2 requested devices (grouped by device name)
         'top_requested_items': (
-            ItemRequest.objects.values('item__name')
+            DeviceRequest.objects.values('device__name')
             .annotate(request_count=Count('id'))
             .order_by('-request_count')[:2]
         )
     }
     return render(request, 'invent/reports.html', context)
-
 
 @login_required
 @permission_required('invent.add_inventoryitem', raise_exception=True)
