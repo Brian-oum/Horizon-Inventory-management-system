@@ -142,9 +142,11 @@ def requestor_dashboard(request):
 def request_device(request):
     device_id_from_get = request.GET.get('device')
 
+    # Only available devices
     available_device_queryset = Device.objects.filter(status='available').order_by('imei_no')
     available_device_list = list(available_device_queryset)
 
+    # Prepare JSON for frontend
     available_device_json = mark_safe(json.dumps([
         {
             "id": device.id,
@@ -157,14 +159,17 @@ def request_device(request):
         for device in available_device_list
     ]))
 
+    # Distinct categories
+    categories = Device.objects.filter(status='available').values_list('category', flat=True).distinct()
+
     if request.method == 'POST':
         form = DeviceRequestForm(request.POST)
         form.fields['device'].queryset = available_device_queryset
 
         if form.is_valid():
-            device_request = form.save(requestor=request.user)  # 👈 pass requestor
+            device_request = form.save(requestor=request.user)
 
-            # ✅ Email notification
+            # Email notification
             send_mail(
                 subject='Device Request Confirmation',
                 message=(
@@ -200,6 +205,7 @@ def request_device(request):
         'form': form,
         'available_devices': available_device_list,
         'available_device_json': available_device_json,
+        'categories': categories,  # ✅ pass categories to template
     })
 
 

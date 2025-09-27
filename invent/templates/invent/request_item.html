@@ -20,10 +20,31 @@
         <form method="post" id="deviceRequestForm">
             {% csrf_token %}
 
+            <!-- Category Dropdown -->
+            <div class="mb-3">
+                <label for="id_category" class="form-label">Category:</label>
+                <select id="id_category" class="form-control">
+                    <option value="">Select a category</option>
+                    {% for category in categories %}
+                        <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
             <!-- Device Dropdown -->
             <div class="mb-3">
                 <label for="{{ form.device.id_for_label }}" class="form-label">{{ form.device.label }}:</label>
-                {{ form.device }}
+                <select name="device" id="id_device" class="form-control">
+                    <option value="">Select a device</option>
+                    {% for device in available_devices %}
+                        <option value="{{ device.id }}"
+                                data-category="{{ device.category }}"
+                                data-imei="{{ device.imei_no }}"
+                                data-status="{{ device.status }}">
+                            {{ device.imei_no }} - {{ device.box.number }}
+                        </option>
+                    {% endfor %}
+                </select>
                 {% for error in form.device.errors %}
                     <div class="text-danger small">{{ error }}</div>
                 {% endfor %}
@@ -99,51 +120,70 @@
     </div>
 </div>
 
-<!-- Select2 for better dropdown -->
+<!-- Select2 and jQuery -->
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const imeiSpan = document.getElementById('device_imei');
-        const modelSpan = document.getElementById('device_model');
-        const statusSpan = document.getElementById('device_status');
-        const deviceDetails = JSON.parse('{{ available_device_json|escapejs }}');
+    $(document).ready(function () {
+    const categorySelect = $('#id_category');
+    const deviceSelect = $('#id_device');
+    const imeiSpan = $('#device_imei');
+    const modelSpan = $('#device_model');
+    const statusSpan = $('#device_status');
 
-        function updateDeviceInfo() {
-            const selectedDeviceId = $('#id_device').val();
-            const details = deviceDetails.find(d => d.id == selectedDeviceId);
+    // Store all devices (exclude placeholder)
+    const allDevices = deviceSelect.find('option').map(function () {
+        const opt = $(this);
+        if (!opt.val()) return null;
+        return {
+            id: opt.val(),
+            text: opt.text(),
+            category: opt.data('category'),
+            imei: opt.data('imei'),
+            status: opt.data('status')
+        };
+    }).get();
 
-            if (details) {
-                imeiSpan.textContent = details.imei_no;
-                modelSpan.textContent = details.category;
-                statusSpan.textContent = details.status;
-            } else {
-                imeiSpan.textContent = '--';
-                modelSpan.textContent = '--';
-                statusSpan.textContent = '--';
-            }
-        }
+    // Initialize Select2
+    deviceSelect.select2({ placeholder: 'Select a device', width: '100%' });
 
-        // Enable Select2
-        $('#id_device').select2({
-            placeholder: 'Select a device',
-            width: '100%'
-        });
+    // Filter devices when category changes
+    categorySelect.on('change', function () {
+        const selectedCategory = $(this).val();
 
-        $('#id_device').on('change', updateDeviceInfo);
-        updateDeviceInfo();
+        // Clear and repopulate
+        deviceSelect.empty().append('<option value="">Select a device</option>');
 
-        // Prevent double submission
-        const form = document.getElementById('deviceRequestForm');
-        const submitBtn = document.getElementById('submitBtn');
-        const spinner = document.getElementById('submitSpinner');
+        allDevices.filter(d => d.category === selectedCategory)
+                  .forEach(d => {
+                      deviceSelect.append(
+                          `<option value="${d.id}" data-category="${d.category}" data-imei="${d.imei}" data-status="${d.status}">${d.text}</option>`
+                      );
+                  });
 
-        form.addEventListener('submit', function () {
-            submitBtn.disabled = true;
-            spinner.classList.remove('d-none');
-        });
+        deviceSelect.val(null).trigger('change');
+
+        imeiSpan.text('--');
+        modelSpan.text('--');
+        statusSpan.text('--');
     });
+
+    // Update device info
+    deviceSelect.on('change', function () {
+        const selectedOption = $(this).find('option:selected');
+        if (selectedOption.val()) {
+            imeiSpan.text(selectedOption.data('imei'));
+            modelSpan.text(selectedOption.data('category'));
+            statusSpan.text(selectedOption.data('status'));
+        } else {
+            imeiSpan.text('--');
+            modelSpan.text('--');
+            statusSpan.text('--');
+        }
+    });
+});
+
 </script>
 {% endblock main_content %}
