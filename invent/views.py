@@ -107,36 +107,53 @@ def logout_view(request):
 
 @login_required
 def requestor_dashboard(request):
-    user_requests = ItemRequest.objects.filter(
-        requestor=request.user).order_by('-date_requested')
+    # Fetch all device requests for the logged-in user, ascending order
+    user_requests = DeviceRequest.objects.filter(
+        requestor=request.user
+    ).order_by('id')  # ascending order
 
-    # Fetch available inventory items for the requestor
-    # Only show items with a quantity remaining > 0
-    available_inventory = [item for item in InventoryItem.objects.all().order_by(
-        'name') if item.quantity_remaining() > 0]
+    # Reverse enumerate to label the latest request as 1
+    labeled_requests = []
+    total_requests_count = user_requests.count()
+    for idx, req in enumerate(user_requests, start=1):
+        # Latest request gets label 1
+        label = total_requests_count - idx + 1
+        req.label_id = label
+        labeled_requests.append(req)
 
+    # Compute device summary
+    device_summary = (
+        user_requests
+        .values('device__imei_no')  # use the actual field name
+        .annotate(
+            total_requested=Count('id'),
+            total_approved=Count('id', filter=Q(status='Approved')),
+            total_pending=Count('id', filter=Q(status='Pending')),
+            total_issued=Count('id', filter=Q(status='Issued')),
+            total_fully_returned=Count('id', filter=Q(status='Fully Returned')),
+            total_partially_returned=Count('id', filter=Q(status='Partially Returned')),
+        )
+        .order_by('device__imei_no')
+    )
+
+    # Totals for cards
     total_requests = user_requests.count()
     approved_count = user_requests.filter(status='Approved').count()
     pending_count = user_requests.filter(status='Pending').count()
-    # ADDED: Count issued and returned requests for requestor dashboard
     issued_count = user_requests.filter(status='Issued').count()
-    fully_returned_count = user_requests.filter(
-        status='Fully Returned').count()
-    partially_returned_count = user_requests.filter(
-        status='Partially Returned').count()
+    fully_returned_count = user_requests.filter(status='Fully Returned').count()
+    partially_returned_count = user_requests.filter(status='Partially Returned').count()
 
     return render(request, 'invent/requestor_dashboard.html', {
-        'requests': user_requests,
+        'requests': labeled_requests,
         'total_requests': total_requests,
         'approved_count': approved_count,
         'pending_count': pending_count,
-        'issued_count': issued_count,  # NEW
-        'fully_returned_count': fully_returned_count,  # NEW
-        'partially_returned_count': partially_returned_count,  # NEW
-        # Pass available inventory (though not directly used by default dashboard content, good to have)
-        'available_inventory': available_inventory,
+        'issued_count': issued_count,
+        'fully_returned_count': fully_returned_count,
+        'partially_returned_count': partially_returned_count,
+        'device_summary': device_summary,
     })
-
 
 @login_required
 def request_device(request):
@@ -673,33 +690,33 @@ def return_device(request):
 
 @login_required
 def request_summary(request):
-    # Filter all requests to only those made by the logged-in requestor
-    user_requests = ItemRequest.objects.filter(requestor=request.user)
+    # Filter all device requests made by the logged-in requestor
+    user_requests = DeviceRequest.objects.filter(requestor=request.user)
 
+    # Total counts by status
     total_requests = user_requests.count()
     pending_requests = user_requests.filter(status='Pending').count()
     approved_requests = user_requests.filter(status='Approved').count()
     issued_requests = user_requests.filter(status='Issued').count()
-    rejected_requests = user_requests.filter(status='Rejected').count()
-    # NEW: Add counts for returned statuses
-    partially_returned_requests = user_requests.filter(
-        status='Partially Returned').count()
-    fully_returned_requests = user_requests.filter(
-        status='Fully Returned').count()
-    # Sum of all returned quantities across all requests by this user
+    rejected_requests = user_requests.filter(status='Denied').count()  # renamed to match device request
+    partially_returned_requests = user_requests.filter(status='Partially Returned').count()
+    fully_returned_requests = user_requests.filter(status='Fully Returned').count()
+
+    # Total returned quantity (if your DeviceRequest model has a 'quantity' or 'returned_quantity' field)
     total_returned_quantity_by_user = user_requests.aggregate(
-        Sum('returned_quantity'))['returned_quantity__sum'] or 0
+        total_returned=Sum('quantity')  # adjust if you have a specific returned field
+    )['total_returned'] or 0
 
-    requests_by_status = user_requests.values(
-        'status').annotate(count=Count('id')).order_by('status')
+    # Requests grouped by status
+    requests_by_status = user_requests.values('status').annotate(count=Count('id')).order_by('status')
 
-    requests_by_item = user_requests.values('item__name').annotate(
-        count=Sum('quantity')).order_by('-count')[:10]
+    # Requests grouped by device (top 10 requested devices)
+    requests_by_device = user_requests.values('device__imei_no').annotate(
+        total_requested=Sum('quantity')
+    ).order_by('-total_requested')[:10]
 
-    # No need to show top requestors to the current requestor (omit or just show current user’s total)
-    # Alternatively, show how many times *they* requested:
-    requests_by_requestor = user_requests.values(
-        'requestor__username').annotate(count=Count('id'))
+    # Requests grouped by the user (for the current requestor this is mostly themselves)
+    requests_by_requestor = user_requests.values('requestor__username').annotate(count=Count('id'))
 
     context = {
         'total_requests': total_requests,
@@ -707,13 +724,14 @@ def request_summary(request):
         'approved_requests': approved_requests,
         'issued_requests': issued_requests,
         'rejected_requests': rejected_requests,
-        'partially_returned_requests': partially_returned_requests,  # NEW
-        'fully_returned_requests': fully_returned_requests,       # NEW
-        'total_returned_quantity_by_user': total_returned_quantity_by_user,  # NEW
+        'partially_returned_requests': partially_returned_requests,
+        'fully_returned_requests': fully_returned_requests,
+        'total_returned_quantity_by_user': total_returned_quantity_by_user,
         'requests_by_status': requests_by_status,
-        'requests_by_item': requests_by_item,
+        'requests_by_device': requests_by_device,
         'requests_by_requestor': requests_by_requestor,
     }
+
     return render(request, 'invent/request_summary.html', context)
 
 
