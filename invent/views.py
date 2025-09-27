@@ -175,6 +175,7 @@ def request_device(request):
     available_device_json = mark_safe(json.dumps([
         {
             "id": device.id,
+            "name":device.name,
             "imei_no": device.imei_no,
             "serial_no": device.serial_no,
             "category": device.category,
