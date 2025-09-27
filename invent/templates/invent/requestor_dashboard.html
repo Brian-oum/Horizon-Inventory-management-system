@@ -293,7 +293,7 @@
           </a>
         </li>
         <li class="nav-item mb-2">
-          <a class="nav-link {% if request.resolver_match.url_name == 'request_item' %}active{% endif %}" href="{% url 'request_item' %}">
+          <a class="nav-link {% if request.resolver_match.url_name == 'request_device' %}active{% endif %}" href="{% url 'request_device' %}">
             <i class="fas fa-fw fa-share-square me-2"></i> <span>Request Item</span>
           </a>
         </li>
@@ -334,7 +334,7 @@
     {% block main_content %}
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
       <h2 class="greeting mb-3 mb-md-0 animate__animated animate__fadeInLeft">Hello {{ user.first_name|default:user.username }}!</h2>
-      <a href="{% url 'request_item' %}" class="btn btn-success animate__animated animate__fadeInRight">
+      <a href="{% url 'request_device' %}" class="btn btn-success animate__animated animate__fadeInRight">
         <i class="fas fa-plus me-2"></i> New Request
       </a>
     </div>

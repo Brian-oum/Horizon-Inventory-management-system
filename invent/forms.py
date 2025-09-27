@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.db.models import F  # Import F expression for queryset filtering
 from .models import ItemRequest, InventoryItem, StockTransaction
 from .models import Device, Supplier, Box
+from .models import DeviceRequest, Client
 
 
 class CustomCreationForm(UserCreationForm):
@@ -261,3 +262,31 @@ class DeviceForm(forms.ModelForm):
             'selling_price_tsh': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price in TSH'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
         }
+class DeviceRequestForm(forms.ModelForm):
+    client_name = forms.CharField(max_length=255, required=True, label="Client Name")
+    client_phone = forms.CharField(max_length=50, required=True, label="Client Phone")
+    client_email = forms.EmailField(required=True, label="Client Email")
+    client_address = forms.CharField(max_length=255, required=True, label="Client Address")
+
+    class Meta:
+        model = DeviceRequest
+        fields = ['device', 'quantity', 'reason']  # client fields are extra
+
+    def save(self, commit=True, requestor=None):
+        # ✅ Create the client first
+        client = Client.objects.create(
+            name=self.cleaned_data['client_name'],
+            phone_no=self.cleaned_data['client_phone'],
+            email=self.cleaned_data['client_email'],
+            address=self.cleaned_data['client_address'],
+        )
+
+        # ✅ Link client + requestor to the request
+        device_request = super().save(commit=False)
+        if requestor:
+            device_request.requestor = requestor
+        device_request.client = client
+
+        if commit:
+            device_request.save()
+        return device_request
