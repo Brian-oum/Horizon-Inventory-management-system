@@ -234,6 +234,16 @@ class BoxForm(forms.ModelForm):
         }
 
 class DeviceForm(forms.ModelForm):
+    imei_no = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control autosize', 'rows': 1}),
+        help_text="Enter one IMEI per line"
+    )
+    serial_no = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control autosize', 'rows': 1}),
+        help_text="(Optional) Enter one Serial per line"
+    )
+
     class Meta:
         model = Device
         fields = [
@@ -242,8 +252,6 @@ class DeviceForm(forms.ModelForm):
             'box',
             'product_id',
             'supplier',
-            'imei_no',
-            'serial_no',
             'category',
             'description',
             'selling_price_usd',
@@ -252,20 +260,19 @@ class DeviceForm(forms.ModelForm):
             'status',
         ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name'}),
-            'total_quantity': forms.NumberInput(attrs={'min': 1}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'total_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'box': forms.Select(attrs={'class': 'form-select'}),
-            'product_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Product ID'}),
+            'product_id': forms.TextInput(attrs={'class': 'form-control'}),
             'supplier': forms.Select(attrs={'class': 'form-select'}),
-            'imei_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'IMEI Number'}),
-            'serial_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Serial Number'}),
-            'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Category'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Description', 'rows': 2}),
-            'selling_price_usd': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price in USD'}),
-            'selling_price_ksh': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price in KSH'}),
-            'selling_price_tsh': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price in TSH'}),
+            'category': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'selling_price_usd': forms.NumberInput(attrs={'class': 'form-control'}),
+            'selling_price_ksh': forms.NumberInput(attrs={'class': 'form-control'}),
+            'selling_price_tsh': forms.NumberInput(attrs={'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
         }
+
 class DeviceRequestForm(forms.ModelForm):
     client_name = forms.CharField(max_length=255, required=True, label="Client Name")
     client_phone = forms.CharField(max_length=50, required=True, label="Client Phone")
