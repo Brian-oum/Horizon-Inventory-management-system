@@ -287,7 +287,7 @@ class Device(models.Model):
     name = models.CharField(max_length=255, blank=True)  # Device name
     total_quantity = models.PositiveIntegerField(default=1)  # Total number of this device
     box = models.ForeignKey(Box, on_delete=models.CASCADE, related_name='devices')
-    product_id = models.CharField(max_length=30, unique=True)
+    product_id = models.CharField(max_length=30)
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, to_field='supplier_id', related_name='devices')
     imei_no = models.CharField(max_length=50, unique=True)
     serial_no = models.CharField(max_length=50, unique=True, null=True, blank=True)
