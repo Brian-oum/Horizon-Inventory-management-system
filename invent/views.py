@@ -292,7 +292,7 @@ def store_clerk_dashboard(request):
             break
 
     # ✅ Add Device Requests here
-    pending_device_requests = DeviceRequest.objects.filter(status="Pending").select_related("requestor", "device")
+    pending_device_requests = DeviceRequest.objects.filter(status="Pending").select_related("requestor", "device", "client")
 
     context = {
         'total_items': total_inventory_items,

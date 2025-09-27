@@ -1,47 +1,42 @@
-{% extends 'invent/base_store_clerk.html' %} {# Extend the responsive base template #}
+{% extends 'invent/base_store_clerk.html' %}
 {% load static %}
 
-{% block title %}Store Clerk Dashboard{% endblock %} {# Set page title #}
+{% block title %}Store Clerk Dashboard{% endblock %}
 
-{% block content %} {# Content for the main area #}
-    <h2 class="mb-3">Hello {{ user.first_name|default:user.username }}</h2>
+{% block content %}
+<h2 class="mb-3">Hello {{ user.first_name|default:user.username }}</h2>
 
-    <div class="d-flex flex-wrap gap-3 mb-4"> {# flex-wrap to stack buttons on small screens #}
-        <a class="btn btn-outline-primary" href="{% url 'issue_device' %}">📤 Issue Device</a>
-        <a class="btn btn-outline-secondary" href="{% url 'manage_stock' %}">⚙ Manage Stock</a>
-        <a class="btn btn-outline-dark" href="{% url 'adjust_stock' %}">🔧 Adjust Stock</a>
-        <a class="btn btn-outline-success" href="{% url 'upload_inventory' %}">📥 Upload Inventory</a>
-        <a class="btn btn-outline-info" href="{% url 'list_issued_requests_for_return' %}">↩ Return Item</a>
-        <a href="{% url 'add_box' %}" class="btn btn-success">
-          <i class="fas fa-plus-square me-1"></i> Add Box</a>
-        <a href="{% url 'add_supplier' %}" class="btn btn-info">
-          <i class="fas fa-user-plus me-1"></i> Add Supplier</a>
-    </div>
+<!-- Action Buttons -->
+<div class="d-flex flex-wrap gap-3 mb-4">
+    <a class="btn btn-outline-primary" href="{% url 'issue_device' %}">📤 Issue Device</a>
+    <a class="btn btn-outline-secondary" href="{% url 'manage_stock' %}">⚙ Manage Stock</a>
+    <a class="btn btn-outline-dark" href="{% url 'adjust_stock' %}">🔧 Adjust Stock</a>
+    <a class="btn btn-outline-success" href="{% url 'upload_inventory' %}">📥 Upload Inventory</a>
+    <a class="btn btn-outline-info" href="{% url 'list_issued_requests_for_return' %}">↩ Return Item</a>
+    <a href="{% url 'add_box' %}" class="btn btn-success"><i class="fas fa-plus-square me-1"></i> Add Box</a>
+    <a href="{% url 'add_supplier' %}" class="btn btn-info"><i class="fas fa-user-plus me-1"></i> Add Supplier</a>
+</div>
 
-    
+<!-- IoT Device Stats -->
 <div class="row text-center mb-4">
-    <!-- Total IoT Devices -->
     <div class="col-sm-6 col-md-3 mb-3">
         <div class="dashboard-card bg-info text-white p-3 rounded shadow-sm">
             <h6>Total IoT Devices</h6>
             <h3>{{ total_devices }}</h3>
         </div>
     </div>
-    <!-- Devices Available -->
     <div class="col-sm-6 col-md-3 mb-3">
         <div class="dashboard-card bg-success text-white p-3 rounded shadow-sm">
             <h6>Devices Available</h6>
             <h3>{{ devices_available }}</h3>
         </div>
     </div>
-    <!-- Devices Issued -->
     <div class="col-sm-6 col-md-3 mb-3">
         <div class="dashboard-card bg-warning text-dark p-3 rounded shadow-sm">
             <h6>Devices Issued</h6>
             <h3>{{ devices_issued }}</h3>
         </div>
     </div>
-    <!-- Devices Returned -->
     <div class="col-sm-6 col-md-3 mb-3">
         <div class="dashboard-card bg-secondary text-white p-3 rounded shadow-sm">
             <h6>Devices Returned</h6>
@@ -49,101 +44,94 @@
         </div>
     </div>
 </div>
-    <div class="row text-center mb-4">
-    <!-- Total Boxes -->
+
+<!-- Box Stats -->
+<div class="row text-center mb-4">
     <div class="col-sm-6 col-md-4 mb-3">
         <div class="dashboard-card bg-primary text-white p-3 rounded shadow-sm">
             <h6>Total Boxes</h6>
             <h3>{{ total_boxes }}</h3>
         </div>
     </div>
-    <!-- Boxes In Progress -->
     <div class="col-sm-6 col-md-4 mb-3">
         <div class="dashboard-card bg-light border p-3 rounded shadow-sm">
             <h6>Boxes In Progress</h6>
             <h3>{{ boxes_in_progress }}</h3>
         </div>
     </div>
-    <!-- Boxes Completed -->
     <div class="col-sm-6 col-md-4 mb-3">
         <div class="dashboard-card bg-success text-white p-3 rounded shadow-sm">
             <h6>Boxes Completed</h6>
             <h3>{{ boxes_completed }}</h3>
         </div>
     </div>
-  </div>
-<div class="row text-center mb-4">
-  <div class="bg-white p-4 rounded shadow-sm mb-4">
+</div>
+
+<!-- Recent Device Activity -->
+<div class="bg-white p-4 rounded shadow-sm mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
-        <h5 class="mb-2 mb-sm-0">Recent Inventory Activity</h5>
-        <div class="d-flex gap-2">
-            {# UPDATED: This now links to the new standalone inventory list page #}
-            <a href="{% url 'inventory_list' %}" class="btn btn-sm btn-outline-primary">View All Stock</a>
-        </div>
+        <h5 class="mb-2 mb-sm-0">Recent Device Activity</h5>
+        <a href="{% url 'inventory_list' %}" class="btn btn-sm btn-outline-primary">View All Stock</a>
     </div>
     <div class="table-responsive">
         <table class="table table-hover">
             <thead class="table-light">
                 <tr>
                     <th>ID</th>
-                    <th>Name</th>
+                    <th>Box Number</th>
                     <th>Category</th>
-                    <th>Total Qty</th>
-                    <th>Issued Qty</th>
-                    <th>Returned Qty (Aggregate)</th>
+                    <th>IMEI</th>
+                    <th>Serial No</th>
                     <th>Status</th>
+                    <th>Current Client</th>
+                    <th>Issued At</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for device in recent_devices %}
                 <tr>
-                   <td>{{ device.id }}</td>
-                   <td>{{ device.box.number }}</td>
-                   <td>{{ device.category }}</td>
-                   <td>{{ device.imei_no|default:"-" }}</td>
-                   <td>{{ device.serial_no|default:"-" }}</td>
-                   <td>
-                      <span class="badge
-                          {% if device.status == 'available' %}bg-success
-                          {% elif device.status == 'issued' %}bg-primary
-                          {% elif device.status == 'returned' %}bg-secondary
-                          {% elif device.status == 'faulty' %}bg-danger
-                          {% else %}bg-dark{% endif %}">
-                          {{ device.get_status_display }}
-                      </span>
-                   </td>
-                   <td>
-                      {% if device.current_client %}
-                          {{ device.current_client.name }}
-                      {% else %}
-                          -
-                      {% endif %}
-                   </td>
-                   <td>
-                     {% if device.issued_at %}
-                         {{ device.issued_at|date:"Y-m-d H:i" }}
-                     {% else %}
-                         -
-                     {% endif %}
-                   </td>
-                   <td>
-                      <a href="{% url 'issue_device' %}" class="btn btn-sm btn-success me-1" title="Issue Device">
-                          <i class="fas fa-share-square"></i>
-                      </a>
-                      <a href="{% url 'return_device' %}" class="btn btn-sm btn-warning" title="Process Return">
-                          <i class="fas fa-undo"></i>
-                      </a>
-                   </td>
-               </tr>
-               {% empty %}
-               <tr><td colspan="9" class="text-center text-muted">No recent device activity found.</td></tr>
-               {% endfor %}
+                    <td>{{ device.id }}</td>
+                    <td>{{ device.box.number }}</td>
+                    <td>{{ device.category }}</td>
+                    <td>{{ device.imei_no }}</td>
+                    <td>{{ device.serial_no|default:"-" }}</td>
+                    <td>
+                        <span class="badge 
+                            {% if device.status == 'available' %}bg-success
+                            {% elif device.status == 'issued' %}bg-primary
+                            {% elif device.status == 'returned' %}bg-secondary
+                            {% elif device.status == 'faulty' %}bg-danger
+                            {% else %}bg-dark{% endif %}">
+                            {{ device.get_status_display }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if device.current_client %}
+                            {{ device.current_client.name }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ device.issued_at|default:"-"|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        <a href="{% url 'issue_device' %}" class="btn btn-sm btn-success me-1" title="Issue Device">
+                            <i class="fas fa-share-square"></i>
+                        </a>
+                        <a href="{% url 'return_device' %}" class="btn btn-sm btn-warning" title="Process Return">
+                            <i class="fas fa-undo"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" class="text-center text-muted">No recent device activity found.</td></tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
-<!-- Pending Device Requests -->
+
+<!-- Pending Device Requests with Client Info -->
 <div class="bg-white p-4 rounded shadow-sm mb-4">
     <h5 class="mb-3">Pending Device Requests</h5>
     <div class="table-responsive">
@@ -153,7 +141,10 @@
                     <th>ID</th>
                     <th>Requested By</th>
                     <th>Device</th>
-                    <th>Message</th>
+                    <th>Client Name</th>
+                    <th>Client Phone</th>
+                    <th>Client Email</th>
+                    <th>Client Address</th>
                     <th>Status</th>
                     <th>Requested At</th>
                     <th>Actions</th>
@@ -164,21 +155,24 @@
                 <tr>
                     <td>{{ req.id }}</td>
                     <td>{{ req.requestor.username }}</td>
-                    <td>{{ req.device }}</td>
-                    <td>{{ req.message|default:"-" }}</td>
+                    <td>{{ req.device.imei_no }} - {{ req.device.box.number }}</td>
+                    <td>{{ req.client.name }}</td>
+                    <td>{{ req.client.phone_no }}</td>
+                    <td>{{ req.client.email }}</td>
+                    <td>{{ req.client.address }}</td>
                     <td>
                         <span class="badge {% if req.status == 'Pending' %}bg-warning{% else %}bg-success{% endif %}">
                             {{ req.status }}
                         </span>
                     </td>
-                    <td>{{ req.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>{{ req.date_requested|date:"Y-m-d H:i" }}</td>
                     <td>
                         <a href="{% url 'approve_request' req.id %}" class="btn btn-sm btn-success">Approve</a>
                         <a href="{% url 'reject_request' req.id %}" class="btn btn-sm btn-danger">Reject</a>
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="text-center text-muted">No pending requests.</td></tr>
+                <tr><td colspan="10" class="text-center text-muted">No pending requests.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -188,5 +182,5 @@
 {% endblock %}
 
 {% block extra_js %}
-{# Any page-specific JavaScript can go here #}
+<!-- Any page-specific JS -->
 {% endblock %}
