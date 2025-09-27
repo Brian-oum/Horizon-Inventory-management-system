@@ -56,27 +56,30 @@
                     </div>
                 </div>
                 <div class="row">
-    <div class="col-md-6 mb-3">
-        <label for="{{ form.imei_no.id_for_label }}" class="form-label">IMEI No:</label>
-        {{ form.imei_no }}
-        {% if form.imei_no.errors %}
-            <div class="text-danger small">{{ form.imei_no.errors }}</div>
-        {% endif %}
-    </div>
-    <div class="col-md-6 mb-3">
-        <label for="{{ form.serial_no.id_for_label }}" class="form-label">Serial No:</label>
-        {{ form.serial_no }}
-        {% if form.serial_no.errors %}
-            <div class="text-danger small">{{ form.serial_no.errors }}</div>
-        {% endif %}
-    </div>
-</div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.supplier.id_for_label }}" class="form-label">Supplier:</label>
+                        {{ form.supplier }}
+                        {% if form.supplier.errors %}<div class="text-danger small">{{ form.supplier.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.imei_no.id_for_label }}" class="form-label">IMEI No:</label>
+                        {{ form.imei_no }}
+                        {% if form.imei_no.errors %}<div class="text-danger small">{{ form.imei_no.errors }}</div>{% endif %}
+                    </div>
+                </div>
                 <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.serial_no.id_for_label }}" class="form-label">Serial No:</label>
+                        {{ form.serial_no }}
+                        {% if form.serial_no.errors %}<div class="text-danger small">{{ form.serial_no.errors }}</div>{% endif %}
+                    </div>
                     <div class="col-md-6 mb-3">
                         <label for="{{ form.category.id_for_label }}" class="form-label">Category:</label>
                         {{ form.category }}
                         {% if form.category.errors %}<div class="text-danger small">{{ form.category.errors }}</div>{% endif %}
                     </div>
+                </div>
+                <div class="row">
                     <div class="col-md-12 mb-3">
                         <label for="{{ form.description.id_for_label }}" class="form-label">Description:</label>
                         {{ form.description }}
@@ -119,16 +122,4 @@
         </div>
     </div>
 </div>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const textareas = document.querySelectorAll("textarea.autosize");
-        textareas.forEach(function (textarea) {
-            textarea.addEventListener("input", function () {
-                this.style.height = "auto";   // reset height
-                this.style.height = (this.scrollHeight) + "px"; // set to scroll height
-            });
-        });
-    });
-</script>
 {% endblock %}
-
