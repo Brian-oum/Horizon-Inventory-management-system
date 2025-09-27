@@ -33,8 +33,7 @@
                         <option value="" disabled selected>-- Select Device (IMEI/Serial) --</option>
                         {% for device in available_devices %}
                         <option value="{{ device.id }}">
-                            IMEI: {{ device.imei_no }}
-                            {% if device.serial_no %} | Serial: {{ device.serial_no }}{% endif %}
+                            IMEI: {{ device.imei_no }}| Name: {{device.name}}
                             | Status: {{ device.status|capfirst }}
                         </option>
                         {% endfor %}
@@ -60,6 +59,7 @@
                     <tr>
                         <th>IMEI</th>
                         <th>Serial #</th>
+                        <th>Name</th>
                         <th>Category</th>
                         <th>Description</th>
                         <th>Status</th>
@@ -70,6 +70,7 @@
                     <tr>
                         <td>{{ device.imei_no }}</td>
                         <td>{{ device.serial_no|default:"N/A" }}</td>
+                        <td>{{ device.name }}</td>
                         <td>{{ device.category|default:"N/A" }}</td>
                         <td>{{ device.description|default:"" }}</td>
                         <td><span class="badge bg-success">{{ device.status|capfirst }}</span></td>

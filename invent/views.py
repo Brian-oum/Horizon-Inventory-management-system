@@ -40,7 +40,6 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from django.db import IntegrityError
 
 
 def get_next_available_box():
@@ -408,6 +407,8 @@ def inventory_list_view(request):
         'query': query,
     }
     return render(request, 'invent/list_device.html', context)
+
+
 @login_required
 @permission_required('invent.add_device', raise_exception=True)
 def manage_stock(request):
@@ -415,55 +416,11 @@ def manage_stock(request):
     if request.method == "POST":
         form = DeviceForm(request.POST)
         if form.is_valid():
-            name = form.cleaned_data['name']
-            total_quantity = form.cleaned_data['total_quantity']
-            box = form.cleaned_data['box']
-            product_id = form.cleaned_data['product_id']
-            supplier = form.cleaned_data['supplier']
-            category = form.cleaned_data['category']
-            description = form.cleaned_data['description']
-            selling_price_usd = form.cleaned_data['selling_price_usd']
-            selling_price_ksh = form.cleaned_data['selling_price_ksh']
-            selling_price_tsh = form.cleaned_data['selling_price_tsh']
-            status = form.cleaned_data['status']
-
-            imei_no = [i.strip() for i in form.cleaned_data['imei_no'].splitlines() if i.strip()]
-            serial_no = [s.strip() for s in form.cleaned_data['serial_no'].splitlines() if s.strip()]
-
-            if len(imei_no) != total_quantity or len(serial_no) != total_quantity:
-                messages.error(request, "IMEI and Serial numbers count must match the total quantity.")
-            else:
-                added, skipped = 0, 0
-                for imei, serial in zip(imei_no, serial_no):
-                    try:
-                        Device.objects.create(
-                            name=name,
-                            total_quantity=1,
-                            box=box,
-                            product_id=product_id,
-                            supplier=supplier,
-                            category=category,
-                            description=description,
-                            selling_price_usd=selling_price_usd,
-                            selling_price_ksh=selling_price_ksh,
-                            selling_price_tsh=selling_price_tsh,
-                            status=status,
-                            imei_no=imei,
-                            serial_no=serial,
-                        )
-                        added += 1
-                    except IntegrityError:
-                        skipped += 1
-
-                if added:
-                    messages.success(request, f"{added} devices added successfully.")
-                if skipped:
-                    messages.warning(request, f"{skipped} devices were skipped because IMEI/Serial already exist.")
-
-                return redirect('manage_stock')
+            form.save()
+            messages.success(request, "Device added successfully.")
+            return redirect('manage_stock')
         else:
             messages.error(request, "Please correct the errors below.")
-
     return render(request, 'invent/manage_stock.html', {'form': form})
 
 
@@ -869,32 +826,34 @@ def reports(request):
 # Consolidated reports_view for cleaner logic and direct use.
 # Added permission requirement for store clerks.
 @login_required
-# Assuming clerks need to see reports
-@permission_required('invent.view_inventoryitem', raise_exception=True)
+@permission_required('invent.view_device', raise_exception=True)  # ✅ corrected permission
 def reports_view(request):
     context = {
-        'total_items': InventoryItem.objects.aggregate(total=Sum('quantity_total'))['total'] or 0,
-        'total_requests': ItemRequest.objects.count(),
-        'pending_count': ItemRequest.objects.filter(status='Pending').count(),
-        'approved_count': ItemRequest.objects.filter(status='Approved').count(),
-        'issued_count': ItemRequest.objects.filter(status='Issued').count(),
-        'rejected_count': ItemRequest.objects.filter(status='Rejected').count(),
-        # MODIFIED: Calculate returned_count from ItemRequest statues
-        'fully_returned_count': ItemRequest.objects.filter(status='Fully Returned').count(),
-        'partially_returned_count': ItemRequest.objects.filter(status='Partially Returned').count(),
-        # Sum of actual quantities returned via transactions or the ItemRequest.returned_quantity field
-        'total_returned_quantity_all_items': ItemRequest.objects.aggregate(total_returned=Sum('returned_quantity'))['total_returned'] or 0,
+        # Total stock count
+        'total_items': Device.objects.aggregate(total=Sum('total_quantity'))['total'] or 0,
 
+        # Request stats
+        'total_requests': DeviceRequest.objects.count(),
+        'pending_count': DeviceRequest.objects.filter(status='Pending').count(),
+        'approved_count': DeviceRequest.objects.filter(status='Approved').count(),
+        'issued_count': DeviceRequest.objects.filter(status='Issued').count(),
+        'rejected_count': DeviceRequest.objects.filter(status='Rejected').count(),
+        'fully_returned_count': DeviceRequest.objects.filter(status='Fully Returned').count(),
+        'partially_returned_count': DeviceRequest.objects.filter(status='Partially Returned').count(),
 
-        # Top 2 requested items
+        # Total returned quantity (if field exists)
+        'total_returned_quantity_all_items': DeviceRequest.objects.aggregate(
+            total_returned=Sum('returned_quantity')
+        )['total_returned'] or 0,
+
+        # Top 2 requested devices (grouped by device name)
         'top_requested_items': (
-            ItemRequest.objects.values('item__name')
+            DeviceRequest.objects.values('device__name')
             .annotate(request_count=Count('id'))
             .order_by('-request_count')[:2]
         )
     }
     return render(request, 'invent/reports.html', context)
-
 
 @login_required
 @permission_required('invent.add_inventoryitem', raise_exception=True)
