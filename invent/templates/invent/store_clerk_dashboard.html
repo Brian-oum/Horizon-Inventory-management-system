@@ -13,7 +13,6 @@
     <a class="btn btn-outline-dark" href="{% url 'adjust_stock' %}">🔧 Adjust Stock</a>
     <a class="btn btn-outline-success" href="{% url 'upload_inventory' %}">📥 Upload Inventory</a>
     <a class="btn btn-outline-info" href="{% url 'list_issued_requests_for_return' %}">↩ Return Item</a>
-    <a href="{% url 'add_box' %}" class="btn btn-success"><i class="fas fa-plus-square me-1"></i> Add Box</a>
     <a href="{% url 'add_supplier' %}" class="btn btn-info"><i class="fas fa-user-plus me-1"></i> Add Supplier</a>
 </div>
 
@@ -45,27 +44,6 @@
     </div>
 </div>
 
-<!-- Box Stats -->
-<div class="row text-center mb-4">
-    <div class="col-sm-6 col-md-4 mb-3">
-        <div class="dashboard-card bg-primary text-white p-3 rounded shadow-sm">
-            <h6>Total Boxes</h6>
-            <h3>{{ total_boxes }}</h3>
-        </div>
-    </div>
-    <div class="col-sm-6 col-md-4 mb-3">
-        <div class="dashboard-card bg-light border p-3 rounded shadow-sm">
-            <h6>Boxes In Progress</h6>
-            <h3>{{ boxes_in_progress }}</h3>
-        </div>
-    </div>
-    <div class="col-sm-6 col-md-4 mb-3">
-        <div class="dashboard-card bg-success text-white p-3 rounded shadow-sm">
-            <h6>Boxes Completed</h6>
-            <h3>{{ boxes_completed }}</h3>
-        </div>
-    </div>
-</div>
 
 <!-- Recent Device Activity -->
 <div class="bg-white p-4 rounded shadow-sm mb-4">
@@ -78,7 +56,6 @@
             <thead class="table-light">
                 <tr>
                     <th>ID</th>
-                    <th>Box Number</th>
                     <th>Category</th>
                     <th>IMEI</th>
                     <th>Serial No</th>
@@ -92,7 +69,6 @@
                 {% for device in recent_devices %}
                 <tr>
                     <td>{{ device.id }}</td>
-                    <td>{{ device.box.number }}</td>
                     <td>{{ device.category }}</td>
                     <td>{{ device.imei_no }}</td>
                     <td>{{ device.serial_no|default:"-" }}</td>
@@ -155,7 +131,7 @@
                 <tr>
                     <td>{{ req.id }}</td>
                     <td>{{ req.requestor.username }}</td>
-                    <td>{{ req.device.imei_no }} - {{ req.device.box.number }}</td>
+                    <td>{{ req.device.imei_no }}</td>
                     <td>{{ req.client.name }}</td>
                     <td>{{ req.client.phone_no }}</td>
                     <td>{{ req.client.email }}</td>

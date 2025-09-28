@@ -1,3 +1,4 @@
+from .models import Office, Supplier, PurchaseOrder, Device, Client, IssuanceRecord, ReturnRecord
 from django.contrib import admin
 # Import all your models
 from .models import InventoryItem, ItemRequest, StockTransaction
@@ -169,12 +170,9 @@ class StockTransactionAdmin(admin.ModelAdmin):
     raw_id_fields = ('item', 'item_request', 'recorded_by')
 
 
-from .models import Office, Supplier, PurchaseOrder, Box, Device, Client, IssuanceRecord, ReturnRecord
-
 admin.site.register(Office)
 admin.site.register(Supplier)
 admin.site.register(PurchaseOrder)
-admin.site.register(Box)
 admin.site.register(Device)
 admin.site.register(Client)
 admin.site.register(IssuanceRecord)

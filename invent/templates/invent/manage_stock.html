@@ -45,42 +45,35 @@
 
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label for="{{ form.box.id_for_label }}" class="form-label">Box:</label>
-                        {{ form.box }}
-                        {% if form.box.errors %}<div class="text-danger small">{{ form.box.errors }}</div>{% endif %}
-                    </div>
-                    <div class="col-md-6 mb-3">
                         <label for="{{ form.product_id.id_for_label }}" class="form-label">Product ID:</label>
                         {{ form.product_id }}
                         {% if form.product_id.errors %}<div class="text-danger small">{{ form.product_id.errors }}</div>{% endif %}
                     </div>
-                </div>
-                <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="{{ form.supplier.id_for_label }}" class="form-label">Supplier:</label>
                         {{ form.supplier }}
                         {% if form.supplier.errors %}<div class="text-danger small">{{ form.supplier.errors }}</div>{% endif %}
                     </div>
+                </div>
+                <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="{{ form.imei_no.id_for_label }}" class="form-label">IMEI No:</label>
                         {{ form.imei_no }}
                         {% if form.imei_no.errors %}<div class="text-danger small">{{ form.imei_no.errors }}</div>{% endif %}
                     </div>
-                </div>
-                <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="{{ form.serial_no.id_for_label }}" class="form-label">Serial No:</label>
                         {{ form.serial_no }}
                         {% if form.serial_no.errors %}<div class="text-danger small">{{ form.serial_no.errors }}</div>{% endif %}
                     </div>
+                </div>
+                <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="{{ form.category.id_for_label }}" class="form-label">Category:</label>
                         {{ form.category }}
                         {% if form.category.errors %}<div class="text-danger small">{{ form.category.errors }}</div>{% endif %}
                     </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-12 mb-3">
+                    <div class="col-md-6 mb-3">
                         <label for="{{ form.description.id_for_label }}" class="form-label">Description:</label>
                         {{ form.description }}
                         {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
