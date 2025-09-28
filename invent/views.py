@@ -826,125 +826,107 @@ def reports_view(request):
 
 
 @login_required
-@permission_required('invent.add_inventoryitem', raise_exception=True)
+@permission_required('invent.add_device', raise_exception=True)
 def upload_inventory(request):
-    """
-    Upload IoT devices from Excel.
-    Expected columns:
-    Supplier ID, Product ID, IMEI No, Serial No, Category, Description,
-    Selling Price (USD), Selling Price (KSH), Selling Price (TSH),
-    Status (available, issued, returned, faulty)
-    """
-
     if request.method == 'POST' and request.FILES.get('excel_file'):
         excel_file = request.FILES['excel_file']
 
-        # Validate extension
-        if not excel_file.name.endswith('.xlsx'):
-            messages.error(request, "Only .xlsx files are supported.")
-            return redirect('upload_inventory')
-
-        # Save temporarily
-        file_name = default_storage.save(
-            excel_file.name, ContentFile(excel_file.read())
-        )
-        file_path = default_storage.path(file_name)
-
         try:
-            wb = openpyxl.load_workbook(file_path)
+            wb = openpyxl.load_workbook(excel_file)
             sheet = wb.active
+        except Exception:
+            messages.error(request, "Invalid Excel file. Please upload a valid .xlsx file.")
+            return redirect("upload_inventory")
 
-            success_count = 0
-            skipped_count = 0
+        # Normalize headers: strip spaces and lowercase
+        header = [str(cell.value).strip() for cell in sheet[1]]
+        header_lower = [h.lower() for h in header]
 
-            # Normalize headers
-            headers = [cell.value for cell in sheet[1]]
-            headers = [h.strip().lower() if h else "" for h in headers]
+        required_columns = [
+            "Supplier ID", "Product ID", "IMEI No", "Serial No", "Category",
+            "Description", "Name", "Quantity", "Selling Price (USD)",
+            "Selling Price (KSH)", "Selling Price (TSH)", "Status"
+        ]
 
-            valid_statuses = ["available", "issued", "returned", "faulty"]
+        # Check required columns
+        for col in required_columns:
+            if col.lower() not in header_lower:
+                messages.error(request, f"Missing required column: {col}")
+                return redirect("upload_inventory")
 
-            for row in sheet.iter_rows(min_row=2, values_only=True):
-                row_data = dict(zip(headers, row))
+        # Map header names to indices for easy access
+        header_index_map = {h.lower(): i for i, h in enumerate(header)}
 
-                try:
-                    supplier_id = (row_data.get("supplier id") or "").strip()
-                    imei = (row_data.get("imei no") or "").strip()
-                    serial_no = (row_data.get("serial no")
-                                 or "").strip() or None
-                    category = (row_data.get("category") or "").strip()
-                    description = row_data.get("description") or ""
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            row_data = {h.lower(): row[i] for h, i in header_index_map.items()}
 
-                    # Prices (optional, any or all may be present)
-                    price_usd = row_data.get("selling price (usd)") or None
-                    price_ksh = row_data.get("selling price (ksh)") or None
-                    price_tsh = row_data.get("selling price (tsh)") or None
+            supplier_id = row_data.get("supplier id")
+            product_id = row_data.get("product id")
+            imei_field = str(row_data.get("imei no") or "").strip()
+            serial_no = row_data.get("serial no")
+            category_value = row_data.get("category")
+            description = row_data.get("description")
+            name = row_data.get("name")
+            qty_field = row_data.get("quantity")
+            price_usd = row_data.get("selling price (usd)") or 0
+            price_ksh = row_data.get("selling price (ksh)") or 0
+            price_tsh = row_data.get("selling price (tsh)") or 0
+            status = (str(row_data.get("status") or "available")).lower()
 
-                    # Status validation
-                    status = (row_data.get("status")
-                              or "available").strip().lower()
-                    if status not in valid_statuses:
-                        status = "available"
+            # Validate status
+            if status not in ["available", "issued", "returned", "faulty"]:
+                messages.warning(request, f"Invalid status '{status}' for product {product_id}. Skipped.")
+                continue
 
-                    # Must have IMEI
-                    if not imei:
-                        skipped_count += 1
-                        continue
+            # Get supplier
+            supplier = Supplier.objects.filter(supplier_id=supplier_id).first()
+            if not supplier:
+                messages.warning(request, f"Supplier ID {supplier_id} not found. Skipped product {product_id}.")
+                continue
 
-                    # Ensure unique IMEI
-                    if Device.objects.filter(imei_no=imei).exists():
-                        messages.warning(
-                            request, f"Duplicate IMEI '{imei}' skipped."
-                        )
-                        skipped_count += 1
-                        continue
+            # Split multiple IMEIs
+            imeis = [i.strip() for i in imei_field.split(",") if i.strip()]
 
-                    # Try to link supplier
-                    supplier = None
-                    if supplier_id:
-                        supplier = Supplier.objects.filter(
-                            supplier_id=supplier_id
-                        ).first()
-                        if not supplier:
-                            messages.warning(
-                                request, f"Supplier '{supplier_id}' not found for IMEI {imei}, device saved without supplier."
-                            )
+            # Determine total quantity
+            try:
+                total_qty = int(qty_field)
+            except (TypeError, ValueError):
+                total_qty = len(imeis)
 
-                    # Create device
-                    Device.objects.create(
-                        product_id=row_data.get("product id") or imei,
-                        imei_no=imei,
-                        serial_no=serial_no,
-                        category=category,
-                        description=description,
-                        selling_price_usd=price_usd,
-                        selling_price_ksh=price_ksh,
-                        selling_price_tsh=price_tsh,
-                        status=status,
-                        supplier=supplier
-                    )
-                    success_count += 1
+            if total_qty != len(imeis):
+                messages.warning(
+                    request,
+                    f"Product '{product_id}' has Quantity={total_qty} "
+                    f"but {len(imeis)} IMEIs provided. Using IMEI count."
+                )
+                total_qty = len(imeis)
 
-                except Exception as e:
-                    messages.error(request, f"Error on row {row}: {e}")
-                    skipped_count += 1
+            # Save each IMEI as a separate Device
+            for imei in imeis:
+                if Device.objects.filter(imei_no=imei).exists():
+                    messages.warning(request, f"IMEI {imei} already exists. Skipped.")
+                    continue
 
-            messages.success(
-                request,
-                f"{success_count} device(s) uploaded successfully. "
-                f"{skipped_count} row(s) skipped."
-            )
-            return redirect('upload_inventory')
+                Device.objects.create(
+                    supplier=supplier,
+                    product_id=product_id,
+                    imei_no=imei,
+                    serial_no=serial_no,
+                    category=category_value,
+                    description=description,
+                    name=name,
+                    total_quantity=total_qty,
+                    selling_price_usd=price_usd,
+                    selling_price_ksh=price_ksh,
+                    selling_price_tsh=price_tsh,
+                    status=status,
+                )
 
-        except Exception as e:
-            messages.error(request, f"Failed to process file: {e}")
-            return redirect('upload_inventory')
+        messages.success(request, "Inventory uploaded successfully.")
+        return redirect("inventory_list")
 
-        finally:
-            if default_storage.exists(file_name):
-                default_storage.delete(file_name)
+    return render(request, "invent/upload_inventory.html")
 
-    return render(request, 'invent/upload_inventory.html')
-# <-- Reports Section ---
 
 
 def total_requests(request):

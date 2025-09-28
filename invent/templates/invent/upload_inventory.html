@@ -35,8 +35,9 @@
                     <ul class="small mt-2 mb-0">
                         <li><code>Supplier ID</code> – <strong>Required</strong>, must match an existing supplier’s ID</li>
                         <li><code>Product ID</code> – Optional, defaults to IMEI if blank</li>
-                        <li><code>IMEI No</code> – <strong>Required</strong>, must be unique</li>
-                        <li><code>Serial No</code> – Optional</li>
+                        <li><code>Name</code> – Optional, device name (e.g., FMB220, Sensor X)</li>
+                        <li><code>IMEI No</code> – <strong>Required</strong>, can contain one or multiple IMEIs separated by commas, must be unique</li>
+                        <li><code>Serial No</code> – Optional, applied to all IMEIs if multiple are provided</li>
                         <li><code>Category</code> – e.g., Dashcam, Tracker, Sensor</li>
                         <li><code>Description</code> – Device description</li>
                         <li><code>Selling Price (USD)</code> – Optional</li>
@@ -49,13 +50,15 @@
                             <span class="badge bg-warning text-dark">returned</span>,
                             <span class="badge bg-danger">faulty</span>
                         </li>
+                        <li><code>Quantity</code> – Optional; if blank, system auto-calculates based on number of IMEIs in that row</li>
                     </ul>
 
                     <small class="form-text text-muted d-block mt-2">
-                        <strong>Note:</strong>  
-                        - <code>Supplier ID</code> must exist in the system. Devices without a matching supplier will still be uploaded but shown with a warning.  
-                        - At least one price column (<code>USD</code>, <code>KSH</code>, or <code>TSH</code>) may be filled.  
-                        - IMEI numbers must always be unique.
+                        <strong>Notes:</strong><br>
+                        - <code>Supplier ID</code> must exist in the system. Devices without a matching supplier will still be uploaded but shown with a warning.<br>
+                        - At least one price column (<code>USD</code>, <code>KSH</code>, or <code>TSH</code>) may be filled.<br>
+                        - IMEI numbers must always be unique.<br>
+                        - If multiple IMEIs are provided in one row, the system will create separate devices for each IMEI and set <code>Quantity</code> to their count.
                     </small>
                 </div>
 
