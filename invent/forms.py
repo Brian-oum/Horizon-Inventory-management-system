@@ -3,7 +3,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.db.models import F  # Import F expression for queryset filtering
 from .models import ItemRequest, InventoryItem, StockTransaction
-from .models import Device, Supplier, Box
+from .models import Device, Supplier
 from .models import DeviceRequest, Client
 
 
@@ -211,10 +211,12 @@ class SelectRequestForReturnForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control'})
     )
 
+
 class SupplierForm(forms.ModelForm):
     class Meta:
         model = Supplier
-        fields = ['supplier_id','name', 'contact_person', 'phone_email', 'address']
+        fields = ['supplier_id', 'name',
+                  'contact_person', 'phone_email', 'address']
         widgets = {
             'supplier_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Supplier ID'}),
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Supplier Name'}),
@@ -223,15 +225,6 @@ class SupplierForm(forms.ModelForm):
             'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Address'}),
         }
 
-class BoxForm(forms.ModelForm):
-    class Meta:
-        model = Box
-        fields = ['number', 'status']
-        widgets = {
-            'number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Box Number'}),
-            'status': forms.Select(attrs={'class': 'form-select'}),
-            'supplier': forms.Select(attrs={'class': 'form-select'}),
-        }
 
 class DeviceForm(forms.ModelForm):
     class Meta:
@@ -239,7 +232,6 @@ class DeviceForm(forms.ModelForm):
         fields = [
             'name',
             'total_quantity',
-            'box',
             'product_id',
             'supplier',
             'imei_no',
@@ -254,7 +246,6 @@ class DeviceForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name'}),
             'total_quantity': forms.NumberInput(attrs={'min': 1}),
-            'box': forms.Select(attrs={'class': 'form-select'}),
             'product_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Product ID'}),
             'supplier': forms.Select(attrs={'class': 'form-select'}),
             'imei_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'IMEI Number'}),
@@ -266,11 +257,16 @@ class DeviceForm(forms.ModelForm):
             'selling_price_tsh': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price in TSH'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
         }
+
+
 class DeviceRequestForm(forms.ModelForm):
-    client_name = forms.CharField(max_length=255, required=True, label="Client Name")
-    client_phone = forms.CharField(max_length=50, required=True, label="Client Phone")
+    client_name = forms.CharField(
+        max_length=255, required=True, label="Client Name")
+    client_phone = forms.CharField(
+        max_length=50, required=True, label="Client Phone")
     client_email = forms.EmailField(required=True, label="Client Email")
-    client_address = forms.CharField(max_length=255, required=True, label="Client Address")
+    client_address = forms.CharField(
+        max_length=255, required=True, label="Client Address")
 
     class Meta:
         model = DeviceRequest

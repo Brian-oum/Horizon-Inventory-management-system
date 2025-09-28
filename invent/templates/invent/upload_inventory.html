@@ -33,7 +33,7 @@
                         Your Excel file must include the following columns (case-insensitive):
                     </small>
                     <ul class="small mt-2 mb-0">
-                        <li><code>Box</code> – Required, the box number this device belongs to (e.g. <code>001</code>)</li>
+                        <li><code>Supplier ID</code> – <strong>Required</strong>, must match an existing supplier’s ID</li>
                         <li><code>Product ID</code> – Optional, defaults to IMEI if blank</li>
                         <li><code>IMEI No</code> – <strong>Required</strong>, must be unique</li>
                         <li><code>Serial No</code> – Optional</li>
@@ -52,8 +52,10 @@
                     </ul>
 
                     <small class="form-text text-muted d-block mt-2">
-                        <strong>Note:</strong> At least one price column (<code>USD</code>, <code>KSH</code>, or <code>TSH</code>) may be filled.  
-                        IMEI numbers must always be unique.
+                        <strong>Note:</strong>  
+                        - <code>Supplier ID</code> must exist in the system. Devices without a matching supplier will still be uploaded but shown with a warning.  
+                        - At least one price column (<code>USD</code>, <code>KSH</code>, or <code>TSH</code>) may be filled.  
+                        - IMEI numbers must always be unique.
                     </small>
                 </div>
 

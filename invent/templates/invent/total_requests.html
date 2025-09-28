@@ -16,7 +16,7 @@
             <div class="input-group">
                 <span class="input-group-text"><i class="fas fa-search"></i></span>
                 <input type="text" name="q" value="{{ request.GET.q }}" class="form-control"
-                       placeholder="Search by IMEI, Serial, Category, Box, Client">
+                       placeholder="Search by IMEI, Serial, Category, Client">
             </div>
             <button type="submit" class="btn btn-success">Search</button>
             <a href="{% url 'total_requests' %}" class="btn btn-outline-secondary">Reset</a>
@@ -32,7 +32,6 @@
         <table class="table table-bordered table-striped">
             <thead class="table-light">
                 <tr>
-                    <th>Box</th>
                     <th>Category</th>
                     <th>IMEI</th>
                     <th>Serial</th>
@@ -44,7 +43,6 @@
             <tbody>
                 {% for device in page_obj %}
                 <tr>
-                    <td>{{ device.box }}</td>
                     <td>{{ device.category }}</td>
                     <td>{{ device.imei }}</td>
                     <td>{{ device.serial }}</td>

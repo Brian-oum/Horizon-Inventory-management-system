@@ -21,11 +21,12 @@ from .forms import ItemRequestForm
 from .forms import InventoryItemForm
 from .forms import IssueItemForm
 from .forms import AdjustStockForm
-from .forms import SupplierForm, BoxForm
+from .forms import SupplierForm
 from .forms import DeviceForm
 from .forms import DeviceRequestForm
 # Import the new forms for return logic
 from .forms import ReturnItemForm, SelectRequestForReturnForm  # NEW
+from .models import Supplier  # <-- Add this import for Supplier model
 
 import openpyxl
 from openpyxl import Workbook
@@ -36,35 +37,11 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 import re
 
-from .models import Box, Device, IssuanceRecord, ReturnRecord, Client
+from .models import Device, IssuanceRecord, ReturnRecord, Client
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-
-
-def get_next_available_box():
-    """Return the next box available for issuance (FIFO)."""
-    return Box.objects.filter(status='available').order_by('id').first()
-
-
-@login_required
-def box_list_view(request):
-    """
-    Shows all shipment boxes with their statuses and device counts.
-    """
-    boxes = Box.objects.prefetch_related('devices').all().order_by('id')
-    return render(request, 'invent/list_boxes.html', {'boxes': boxes})
-
-
-@login_required
-def box_detail_view(request, box_id):
-    """
-    Shows details of a single box and the devices inside it.
-    """
-    box = get_object_or_404(Box, id=box_id)
-    devices = box.devices.all()
-    return render(request, 'invent/box_detail.html', {'box': box, 'devices': devices})
 
 
 def register(request):
@@ -295,21 +272,17 @@ def store_clerk_dashboard(request):
         quantity__lte=F('returned_quantity')
     ).count()
 
-    # IoT Device & Box Stats
+    # IoT Device Stats (Box removed)
     total_devices = Device.objects.count()
     devices_available = Device.objects.filter(status='available').count()
     devices_issued = Device.objects.filter(status='issued').count()
     devices_returned = Device.objects.filter(status='returned').count()
 
-    total_boxes = Box.objects.count()
-    boxes_in_progress = Box.objects.filter(status='in_progress').count()
-    boxes_completed = Box.objects.filter(status='completed').count()
-
     # Recent Device Activity
     from .models import IssuanceRecord
     recent_issuances = (
         IssuanceRecord.objects
-        .select_related('device', 'device__box', 'client')
+        .select_related('device', 'client')  # removed device__box
         .order_by('-issued_at')[:10]
     )
     seen = set()
@@ -340,9 +313,6 @@ def store_clerk_dashboard(request):
         "devices_available": devices_available,
         "devices_issued": devices_issued,
         "devices_returned": devices_returned,
-        "total_boxes": total_boxes,
-        "boxes_in_progress": boxes_in_progress,
-        "boxes_completed": boxes_completed,
 
         # Tables
         "recent_devices": recent_devices,
@@ -378,25 +348,24 @@ def reject_request(request, request_id):
 @permission_required('invent/list_device.html', raise_exception=True)
 def inventory_list_view(request):
     """
-    Displays a list of all IoT devices with search, box linkage, and pagination.
+    Displays a list of all IoT devices with search and pagination.
     """
     query = request.GET.get('q', '')
 
     # Devices are the atomic unit of issuance
-    devices = Device.objects.select_related(
-        'box').all().order_by('box__id', 'id')
+    devices = Device.objects.all().order_by('id')  # removed box linkage
 
-    # Search functionality (IMEI, Serial, Category, Client, Box)
+    # Search functionality (IMEI, Serial, Category, Client) — Box removed
     if query:
         devices = devices.filter(
-            Q(imei__icontains=query) |
-            Q(serial_number__icontains=query) |
+            Q(imei_no__icontains=query) |      # corrected to imei_no
+            Q(serial_no__icontains=query) |    # corrected to serial_no
             Q(category__icontains=query) |
-            Q(box__box_number__icontains=query) |
-            Q(current_client__name__icontains=query)
-        )
+            # search by client name via related IssuanceRecord
+            Q(issuancerecord__client__name__icontains=query)
+        ).distinct()
 
- # Attach latest IssuanceRecord to each device for template access to client and issued_at
+    # Attach latest IssuanceRecord to each device for template access to client and issued_at
     for device in devices:
         last_issuance = (
             IssuanceRecord.objects
@@ -630,46 +599,39 @@ def issue_item(request):
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
 def issue_device(request):
-    box = Box.objects.filter(status='available').order_by('id').first()
-    if not box:
-        messages.error(request, "No device boxes available for issuance.")
-        return redirect('store_clerk_dashboard')
-    available_devices = box.devices.filter(status='available')
+    # Get all available devices (no box dependency anymore)
+    available_devices = Device.objects.filter(status='available')
     clients = Client.objects.all()
 
     if request.method == 'POST':
         device_id = request.POST.get('device_id')
         client_id = request.POST.get('client_id')
+
         if not device_id or not client_id:
             messages.error(request, "Please select a device and client.")
             return redirect('issue_device')
 
-        device = get_object_or_404(
-            Device, id=device_id, box=box, status='available')
+        device = get_object_or_404(Device, id=device_id, status='available')
         client = get_object_or_404(Client, id=client_id)
 
         with transaction.atomic():
             device.status = 'issued'
             device.save()
+
             IssuanceRecord.objects.create(
-                device=device, client=client, logistics_manager=request.user)
-            # Check if box is now completed
-            if not box.devices.filter(status='available').exists():
-                box.status = 'completed'
-                box.save()
-                # Unlock next box if needed (optional logic, up to you)
-                next_box = Box.objects.filter(
-                    status='in_progress').order_by('id').first()
-                if next_box:
-                    next_box.status = 'available'
-                    next_box.save()
+                device=device,
+                client=client,
+                logistics_manager=request.user
+            )
+
             messages.success(
-                request, f"Device {device.imei_no} issued to {client.name}.")
+                request,
+                f"Device {device.imei_no} issued to {client.name}."
+            )
 
         return redirect('issue_device')
 
     return render(request, 'invent/issue_device.html', {
-        'box': box,
         'available_devices': available_devices,
         'clients': clients,
     })
@@ -818,21 +780,6 @@ def add_supplier(request):
     return render(request, 'invent/add_supplier.html', {'form': form})
 
 
-def add_box(request):
-    if request.method == 'POST':
-        form = BoxForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Box added successfully!")
-            return redirect('store_clerk_dashboard')  # Redirect to dashboard
-        else:
-            messages.error(request, "Please correct the errors below.")
-    else:
-        form = BoxForm()
-
-    return render(request, 'invent/add_box.html', {'form': form})
-
-
 @login_required
 @permission_required('invent.change_inventoryitem', raise_exception=True)
 def reports(request):
@@ -884,7 +831,7 @@ def upload_inventory(request):
     """
     Upload IoT devices from Excel.
     Expected columns:
-    Box, Product ID, IMEI No, Serial No, Category, Description,
+    Supplier ID, Product ID, IMEI No, Serial No, Category, Description,
     Selling Price (USD), Selling Price (KSH), Selling Price (TSH),
     Status (available, issued, returned, faulty)
     """
@@ -920,12 +867,12 @@ def upload_inventory(request):
                 row_data = dict(zip(headers, row))
 
                 try:
+                    supplier_id = (row_data.get("supplier id") or "").strip()
                     imei = (row_data.get("imei no") or "").strip()
                     serial_no = (row_data.get("serial no")
                                  or "").strip() or None
                     category = (row_data.get("category") or "").strip()
                     description = row_data.get("description") or ""
-                    raw_box = (row_data.get("box") or "").strip()
 
                     # Prices (optional, any or all may be present)
                     price_usd = row_data.get("selling price (usd)") or None
@@ -946,36 +893,24 @@ def upload_inventory(request):
                     # Ensure unique IMEI
                     if Device.objects.filter(imei_no=imei).exists():
                         messages.warning(
-                            request, f"Duplicate IMEI '{imei}' skipped.")
+                            request, f"Duplicate IMEI '{imei}' skipped."
+                        )
                         skipped_count += 1
                         continue
 
-                    # Must have Box → enforce strictly numeric/alphanumeric, no "Box001"
-                    if not raw_box:
-                        messages.warning(
-                            request, f"Missing Box for IMEI {imei}, skipped.")
-                        skipped_count += 1
-                        continue
-
-                    # Reject if it starts with "box" or contains non-alphanumeric
-                    if raw_box.lower().startswith("box"):
-                        messages.warning(
-                            request, f"Invalid Box '{raw_box}' for IMEI {imei}. Use only the number like '001'.")
-                        skipped_count += 1
-                        continue
-
-                    if not re.match(r"^[A-Za-z0-9]+$", raw_box):
-                        messages.warning(
-                            request, f"Invalid Box '{raw_box}' for IMEI {imei}. Only numbers/letters allowed.")
-                        skipped_count += 1
-                        continue
-
-                    # Box is valid
-                    box, _ = Box.objects.get_or_create(number=raw_box)
+                    # Try to link supplier
+                    supplier = None
+                    if supplier_id:
+                        supplier = Supplier.objects.filter(
+                            supplier_id=supplier_id
+                        ).first()
+                        if not supplier:
+                            messages.warning(
+                                request, f"Supplier '{supplier_id}' not found for IMEI {imei}, device saved without supplier."
+                            )
 
                     # Create device
                     Device.objects.create(
-                        box=box,
                         product_id=row_data.get("product id") or imei,
                         imei_no=imei,
                         serial_no=serial_no,
@@ -984,7 +919,8 @@ def upload_inventory(request):
                         selling_price_usd=price_usd,
                         selling_price_ksh=price_ksh,
                         selling_price_tsh=price_tsh,
-                        status=status
+                        status=status,
+                        supplier=supplier
                     )
                     success_count += 1
 
@@ -1008,7 +944,6 @@ def upload_inventory(request):
                 default_storage.delete(file_name)
 
     return render(request, 'invent/upload_inventory.html')
-
 # <-- Reports Section ---
 
 
@@ -1039,13 +974,80 @@ def export_total_requests(request):
     import openpyxl
     from openpyxl.utils import get_column_letter
     from django.http import HttpResponse
+
+    status_filter = request.GET.get('status')
+    queryset = ItemRequest.objects.all()
+
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+
+    # Create workbook
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Item Requests"
+
+    # Define headers
+    headers = ['Requested By', 'Item', 'Quantity Requested',
+               'Quantity Returned', 'Date Requested', 'Status']  # MODIFIED headers
+    ws.append(headers)
+
+    # Add data rows
+    for item_req in queryset:  # Changed 'item' to 'item_req' for clarity
+        ws.append([
+            item_req.requestor.username,
+            item_req.item.name,
+            item_req.quantity,
+            item_req.returned_quantity,  # NEW column
+            item_req.date_requested.strftime('%Y-%m-%d'),
+            item_req.status
+        ])
+
+    # Adjust column widths (optional)
+    for i, col in enumerate(headers, 1):
+        ws.column_dimensions[get_column_letter(i)].width = 20
+
+    # Set up HTTP response
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename=total_requests.xlsx'
+    wb.save(response)
+    return response
+
+
+# <-- Reports Section ---
+
+
+def total_requests(request):
+    status_filter = request.GET.get('status')
+    # Fetch all ItemRequests (filter if status provided)
+    requests = ItemRequest.objects.all()
+
+    if status_filter:
+        requests = requests.filter(status=status_filter)
+
+    paginator = Paginator(requests.order_by('-date_requested'), 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_obj': page_obj,
+        'status_filter': status_filter,
+    }
+    return render(request, 'invent/total_requests.html', context)
+
+
+# Export
+def export_total_requests(request):
+    import openpyxl
+    from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
     from .models import DeviceRequest  # import your DeviceRequest model
 
     # Optional filter (if you want to filter by status)
     status_filter = request.GET.get('status')
     queryset = DeviceRequest.objects.select_related(
-        "device", "client", "requestor", "device__box"
-    )
+        "device", "client", "requestor")
 
     if status_filter:
         queryset = queryset.filter(status=status_filter)
@@ -1055,9 +1057,8 @@ def export_total_requests(request):
     ws = wb.active
     ws.title = "Device Requests"
 
-    # Define headers (matching your table view)
+    # Define headers (removed Box column)
     headers = [
-        "Box",
         "Category",
         "IMEI",
         "Serial",
@@ -1071,7 +1072,6 @@ def export_total_requests(request):
     for req in queryset:
         device = req.device
         ws.append([
-            device.box.number if device.box else "-",   # Box number
             device.category or "-",                     # Category
             device.imei_no or "-",                      # IMEI
             device.serial_no or "-",                    # Serial
@@ -1110,24 +1110,23 @@ def export_inventory_items(request):
     ws = wb.active
     ws.title = "Inventory Items"
 
-    headers = ['Box', 'Category', 'IMEI', 'Serial',
-               'Status', 'Client', 'Issued At']
+    # ✅ Removed Box column
+    headers = ['Category', 'IMEI', 'Serial', 'Status', 'Client', 'Issued At']
     ws.append(headers)
 
     for device in queryset:
         # Try to fetch latest issuance record (if exists)
         issuance = IssuanceRecord.objects.filter(
-            device=device).order_by('-issued_at').first()
+            device=device
+        ).order_by('-issued_at').first()
 
         ws.append([
-            device.box.number,   # FK to Box
             device.category,
             device.imei_no,
             device.serial_no or "-",
             device.status,
             issuance.client.name if issuance else "-",   # client if issued
-            issuance.issued_at.strftime(
-                '%Y-%m-%d %H:%M') if issuance else "-"  # issued_at if issued
+            issuance.issued_at.strftime('%Y-%m-%d %H:%M') if issuance else "-"
         ])
 
     # Auto-adjust column widths

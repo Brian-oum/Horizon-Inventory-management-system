@@ -267,35 +267,30 @@ class PurchaseOrder(models.Model):
         return f"PO #{self.id} - {self.supplier.name}"
 
 
-class Box(models.Model):
-    number = models.CharField(max_length=50, unique=True)
-    status = models.CharField(
-        max_length=20,
-        choices=(
-            ('available', 'Available'),
-            ('in_progress', 'In Progress'),
-            ('completed', 'Completed'),
-        ),
-        default='available'
-    )
-
-    def __str__(self):
-        return f"Box {self.number} ({self.status})"
-
-
 class Device(models.Model):
     name = models.CharField(max_length=255, blank=True)  # Device name
-    total_quantity = models.PositiveIntegerField(default=1)  # Total number of this device
-    box = models.ForeignKey(Box, on_delete=models.CASCADE, related_name='devices')
+    total_quantity = models.PositiveIntegerField(
+        default=1)  # Total number of this device
     product_id = models.CharField(max_length=30)
-    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, to_field='supplier_id', related_name='devices')
+    supplier = models.ForeignKey(
+        Supplier,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        to_field='supplier_id',
+        related_name='devices'
+    )
     imei_no = models.CharField(max_length=50, unique=True)
-    serial_no = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    serial_no = models.CharField(
+        max_length=50, unique=True, null=True, blank=True)
     category = models.CharField(max_length=50)
     description = models.TextField(blank=True)
-    selling_price_usd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    selling_price_ksh = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    selling_price_tsh = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    selling_price_usd = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    selling_price_ksh = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    selling_price_tsh = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=(
@@ -308,8 +303,10 @@ class Device(models.Model):
     )
 
     def __str__(self):
-        return f"Device IMEI:{self.imei_no} Box:{self.box.number} Status:{self.status}"
+        return f"Device IMEI:{self.imei_no} Status:{self.status}"
+
  # make sure Client is imported
+
 
 class DeviceRequest(models.Model):
     device = models.ForeignKey(
@@ -400,6 +397,8 @@ class DeviceRequest(models.Model):
 
     def __str__(self):
         return f"Request for {self.device} by {self.requestor.username}"
+
+
 class Client(models.Model):
     name = models.CharField(max_length=255)
     phone_no = models.CharField(max_length=50)

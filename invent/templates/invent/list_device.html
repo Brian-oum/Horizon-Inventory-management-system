@@ -40,7 +40,7 @@
             <form method="get" action="{% url 'inventory_list' %}" class="row g-3 align-items-center mb-4">
                 <div class="col-md-8">
                     <input type="text" name="q" class="form-control"
-                           placeholder="🔍 Search by IMEI, Serial, Category, Box, Client"
+                           placeholder="🔍 Search by IMEI, Serial, Category, Client"
                            value="{{ query }}">
                 </div>
                 <div class="col-md-2">
@@ -57,7 +57,6 @@
                     <thead class="table-light">
                         <tr>
                             <th>ID</th>
-                            <th>Box</th>
                             <th>Category</th>
                             <th>IMEI</th>
                             <th>Serial</th>
@@ -71,10 +70,9 @@
                         {% for device in page_obj %}
                         <tr>
                             <td>{{ device.id }}</td>
-                            <td>{{ device.box.number }}</td>
                             <td>{{ device.category }}</td>
                             <td>{{ device.imei_no|default:"-" }}</td>
-                            <td>{{device.serial_no|default:"-" }}</td>
+                            <td>{{ device.serial_no|default:"-" }}</td>
                             <td>
                                 <span class="badge
                                     {% if device.status == 'available' %}bg-success
