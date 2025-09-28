@@ -4,66 +4,75 @@
 
 {% block content %}
 <div class="container mt-4">
+    <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="mb-0">All Requests</h2> {# Removed mb-3 from h2 and added mb-0 here #}
+        <h2 class="mb-0 text-primary"><i class="fas fa-microchip me-2"></i> All IoT Devices</h2>
         <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
     </div>
-    {# The original filter form and export button div follows #}
+
+    <!-- Search and Export -->
     <div class="d-flex justify-content-between mb-3 align-items-center">
         <form method="get" class="d-flex align-items-center" style="gap: 10px;">
-            <label for="status" class="form-label mb-0">Filter by Status:</label>
-            <select name="status" id="status" class="form-select" onchange="this.form.submit()" style="width: 200px;">
-                <option value="">All</option>
-                <option value="Pending" {% if status_filter == 'Pending' %}selected{% endif %}>Pending</option>
-                <option value="Approved" {% if status_filter == 'Approved' %}selected{% endif %}>Approved</option>
-                <option value="Issued" {% if status_filter == 'Issued' %}selected{% endif %}>Issued</option>
-                <option value="Rejected" {% if status_filter == 'Rejected' %}selected{% endif %}>Rejected</option>
-                <option value="Fully Returned" {% if status_filter == 'Fully Returned' %}selected{% endif %}>Fully Returned</option>
-            </select>
+            <div class="input-group">
+                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                <input type="text" name="q" value="{{ request.GET.q }}" class="form-control"
+                       placeholder="Search by IMEI, Serial, Category, Box, Client">
+            </div>
+            <button type="submit" class="btn btn-success">Search</button>
+            <a href="{% url 'total_requests' %}" class="btn btn-outline-secondary">Reset</a>
         </form>
 
-        <a href="{% url 'export_total_requests' %}?{% if status_filter %}status={{ status_filter }}{% endif %}" class="btn btn-success">
-            <i class="fas fa-file-excel"></i> Export to Excel
+        <a href="{% url 'export_total_requests' %}" class="btn btn-success">
+            <i class="fas fa-file-excel"></i> Export All
         </a>
-
     </div>
 
+    <!-- Table -->
     <div class="table-responsive">
         <table class="table table-bordered table-striped">
             <thead class="table-light">
                 <tr>
-                    <th>#</th>
-                    <th>Requested By</th>
-                    <th>Item</th>
-                    <th>Quantity</th>
-                    <th>Date Requested</th>
+                    <th>Box</th>
+                    <th>Category</th>
+                    <th>IMEI</th>
+                    <th>Serial</th>
                     <th>Status</th>
+                    <th>Client</th>
+                    <th>Issued At</th>
                 </tr>
             </thead>
             <tbody>
-                {% for request_obj in page_obj %} {# Changed 'request' to 'request_obj' to avoid conflict with built-in 'request' #}
+                {% for device in page_obj %}
                 <tr>
-                    <td>{{ forloop.counter0|add:page_obj.start_index }}</td>
-                    <td>{{ request_obj.requestor.username }}</td>
-                    <td>{{ request_obj.item.name }}</td>
-                    <td>{{ request_obj.quantity }}</td>
-                    <td>{{ request_obj.date_requested }}</td>
-                    <td>{{ request_obj.status }}</td>
+                    <td>{{ device.box }}</td>
+                    <td>{{ device.category }}</td>
+                    <td>{{ device.imei }}</td>
+                    <td>{{ device.serial }}</td>
+                    <td>
+                        {% if device.status == "Available" %}
+                            <span class="badge bg-success">Available</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ device.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ device.client|default:"-" }}</td>
+                    <td>{{ device.issued_at|date:"Y-m-d H:i" }}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6">No requests found.</td>
+                    <td colspan="7" class="text-center">No devices found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 
-    <div class="pagination mt-4" style="text-align: center;">
-        <ul style="list-style: none; padding: 0; display: inline-flex; gap: 10px;">
+    <!-- Pagination -->
+    <div class="pagination mt-4 text-center">
+        <ul class="list-unstyled d-inline-flex gap-2">
             {% if page_obj.has_previous %}
                 <li>
-                    <a href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="btn btn-outline-secondary">
+                    <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-outline-secondary">
                         <i class="fas fa-chevron-left"></i>
                     </a>
                 </li>
@@ -73,15 +82,13 @@
                 {% if page_obj.number == num %}
                     <li><span class="btn btn-primary">{{ num }}</span></li>
                 {% else %}
-                    <li>
-                        <a href="?page={{ num }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="btn btn-outline-secondary">{{ num }}</a>
-                    </li>
+                    <li><a href="?page={{ num }}" class="btn btn-outline-secondary">{{ num }}</a></li>
                 {% endif %}
             {% endfor %}
 
             {% if page_obj.has_next %}
                 <li>
-                    <a href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="btn btn-outline-secondary">
+                    <a href="?page={{ page_obj.next_page_number }}" class="btn btn-outline-secondary">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </li>

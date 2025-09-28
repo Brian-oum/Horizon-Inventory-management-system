@@ -1,3 +1,4 @@
+from .models import DeviceRequest
 from django.db.models import Q
 from django.core.mail import send_mail
 from django.shortcuts import render, redirect, get_object_or_404
@@ -130,8 +131,10 @@ def requestor_dashboard(request):
             total_approved=Count('id', filter=Q(status='Approved')),
             total_pending=Count('id', filter=Q(status='Pending')),
             total_issued=Count('id', filter=Q(status='Issued')),
-            total_fully_returned=Count('id', filter=Q(status='Fully Returned')),
-            total_partially_returned=Count('id', filter=Q(status='Partially Returned')),
+            total_fully_returned=Count(
+                'id', filter=Q(status='Fully Returned')),
+            total_partially_returned=Count(
+                'id', filter=Q(status='Partially Returned')),
         )
         .order_by('device__imei_no')
     )
@@ -141,8 +144,10 @@ def requestor_dashboard(request):
     approved_count = user_requests.filter(status='Approved').count()
     pending_count = user_requests.filter(status='Pending').count()
     issued_count = user_requests.filter(status='Issued').count()
-    fully_returned_count = user_requests.filter(status='Fully Returned').count()
-    partially_returned_count = user_requests.filter(status='Partially Returned').count()
+    fully_returned_count = user_requests.filter(
+        status='Fully Returned').count()
+    partially_returned_count = user_requests.filter(
+        status='Partially Returned').count()
 
     return render(request, 'invent/requestor_dashboard.html', {
         'requests': labeled_requests,
@@ -154,6 +159,7 @@ def requestor_dashboard(request):
         'partially_returned_count': partially_returned_count,
         'device_summary': device_summary,
     })
+
 
 @login_required
 def request_device(request):
@@ -175,7 +181,7 @@ def request_device(request):
     available_device_json = mark_safe(json.dumps([
         {
             "id": device.id,
-            "name":device.name,
+            "name": device.name,
             "imei_no": device.imei_no,
             "serial_no": device.serial_no,
             "category": device.category,
@@ -186,7 +192,8 @@ def request_device(request):
     ]))
 
     # Distinct categories for dropdown
-    categories = available_device_queryset.values_list('category', flat=True).distinct()
+    categories = available_device_queryset.values_list(
+        'category', flat=True).distinct()
 
     if request.method == 'POST':
         form = DeviceRequestForm(request.POST)
@@ -264,7 +271,6 @@ def cancel_request(request, request_id):
 
 # --- Store Clerk Functionality ---
 
-from .models import DeviceRequest
 
 @login_required
 @permission_required('invent.view_inventoryitem', raise_exception=True)
@@ -318,7 +324,8 @@ def store_clerk_dashboard(request):
             break
 
     # ✅ Add Device Requests here
-    pending_device_requests = DeviceRequest.objects.filter(status="Pending").select_related("requestor", "device", "client")
+    pending_device_requests = DeviceRequest.objects.filter(
+        status="Pending").select_related("requestor", "device", "client")
 
     context = {
         'total_items': total_inventory_items,
@@ -344,14 +351,18 @@ def store_clerk_dashboard(request):
     return render(request, 'invent/store_clerk_dashboard.html', context)
 
 # invent/views.py
+
+
 @login_required
 @permission_required('invent.change_devicerequest', raise_exception=True)
 def approve_request(request, request_id):
     device_request = get_object_or_404(DeviceRequest, id=request_id)
     device_request.status = "Approved"
     device_request.save()
-    messages.success(request, f"Request {device_request.id} approved successfully.")
+    messages.success(
+        request, f"Request {device_request.id} approved successfully.")
     return redirect("store_clerk_dashboard")
+
 
 @login_required
 @permission_required('invent.change_devicerequest', raise_exception=True)
@@ -699,17 +710,22 @@ def request_summary(request):
     pending_requests = user_requests.filter(status='Pending').count()
     approved_requests = user_requests.filter(status='Approved').count()
     issued_requests = user_requests.filter(status='Issued').count()
-    rejected_requests = user_requests.filter(status='Denied').count()  # renamed to match device request
-    partially_returned_requests = user_requests.filter(status='Partially Returned').count()
-    fully_returned_requests = user_requests.filter(status='Fully Returned').count()
+    rejected_requests = user_requests.filter(
+        status='Denied').count()  # renamed to match device request
+    partially_returned_requests = user_requests.filter(
+        status='Partially Returned').count()
+    fully_returned_requests = user_requests.filter(
+        status='Fully Returned').count()
 
     # Total returned quantity (if your DeviceRequest model has a 'quantity' or 'returned_quantity' field)
     total_returned_quantity_by_user = user_requests.aggregate(
-        total_returned=Sum('quantity')  # adjust if you have a specific returned field
+        # adjust if you have a specific returned field
+        total_returned=Sum('quantity')
     )['total_returned'] or 0
 
     # Requests grouped by status
-    requests_by_status = user_requests.values('status').annotate(count=Count('id')).order_by('status')
+    requests_by_status = user_requests.values(
+        'status').annotate(count=Count('id')).order_by('status')
 
     # Requests grouped by device (top 10 requested devices)
     requests_by_device = user_requests.values('device__imei_no').annotate(
@@ -717,7 +733,8 @@ def request_summary(request):
     ).order_by('-total_requested')[:10]
 
     # Requests grouped by the user (for the current requestor this is mostly themselves)
-    requests_by_requestor = user_requests.values('requestor__username').annotate(count=Count('id'))
+    requests_by_requestor = user_requests.values(
+        'requestor__username').annotate(count=Count('id'))
 
     context = {
         'total_requests': total_requests,
@@ -783,19 +800,23 @@ def adjust_stock(request):
         'recent_transactions': recent_transactions,
     }
     return render(request, 'invent/adjust_stock.html', context)
+
+
 def add_supplier(request):
     if request.method == 'POST':
         form = SupplierForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, "Supplier added successfully!")
-            return redirect('store_clerk_dashboard')  # go back to clerk dashboard
+            # go back to clerk dashboard
+            return redirect('store_clerk_dashboard')
         else:
             messages.error(request, "Please correct the errors below.")
     else:
         form = SupplierForm()
 
     return render(request, 'invent/add_supplier.html', {'form': form})
+
 
 def add_box(request):
     if request.method == 'POST':
@@ -826,7 +847,8 @@ def reports(request):
 # Consolidated reports_view for cleaner logic and direct use.
 # Added permission requirement for store clerks.
 @login_required
-@permission_required('invent.view_device', raise_exception=True)  # ✅ corrected permission
+# ✅ corrected permission
+@permission_required('invent.view_device', raise_exception=True)
 def reports_view(request):
     context = {
         # Total stock count
@@ -854,6 +876,7 @@ def reports_view(request):
         )
     }
     return render(request, 'invent/reports.html', context)
+
 
 @login_required
 @permission_required('invent.add_inventoryitem', raise_exception=True)
@@ -1016,9 +1039,13 @@ def export_total_requests(request):
     import openpyxl
     from openpyxl.utils import get_column_letter
     from django.http import HttpResponse
+    from .models import DeviceRequest  # import your DeviceRequest model
 
+    # Optional filter (if you want to filter by status)
     status_filter = request.GET.get('status')
-    queryset = ItemRequest.objects.all()
+    queryset = DeviceRequest.objects.select_related(
+        "device", "client", "requestor", "device__box"
+    )
 
     if status_filter:
         queryset = queryset.filter(status=status_filter)
@@ -1026,79 +1053,91 @@ def export_total_requests(request):
     # Create workbook
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Item Requests"
+    ws.title = "Device Requests"
 
-    # Define headers
-    headers = ['Requested By', 'Item', 'Quantity Requested',
-               'Quantity Returned', 'Date Requested', 'Status']  # MODIFIED headers
+    # Define headers (matching your table view)
+    headers = [
+        "Box",
+        "Category",
+        "IMEI",
+        "Serial",
+        "Status",
+        "Client",
+        "Issued At",
+    ]
     ws.append(headers)
 
     # Add data rows
-    for item_req in queryset:  # Changed 'item' to 'item_req' for clarity
+    for req in queryset:
+        device = req.device
         ws.append([
-            item_req.requestor.username,
-            item_req.item.name,
-            item_req.quantity,
-            item_req.returned_quantity,  # NEW column
-            item_req.date_requested.strftime('%Y-%m-%d'),
-            item_req.status
+            device.box.number if device.box else "-",   # Box number
+            device.category or "-",                     # Category
+            device.imei_no or "-",                      # IMEI
+            device.serial_no or "-",                    # Serial
+            req.status,                                 # Request status
+            req.client.name if req.client else "-",     # Client name
+            req.date_issued.strftime(
+                "%Y-%m-%d %H:%M") if req.date_issued else "-"
         ])
 
-    # Adjust column widths (optional)
+    # Adjust column widths
     for i, col in enumerate(headers, 1):
         ws.column_dimensions[get_column_letter(i)].width = 20
 
     # Set up HTTP response
     response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    response['Content-Disposition'] = 'attachment; filename=total_requests.xlsx'
+    response["Content-Disposition"] = 'attachment; filename=total_requests.xlsx'
     wb.save(response)
     return response
 
 
 def export_inventory_items(request):
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = 'attachment; filename=inventory_items.xlsx'
+    import openpyxl
+    from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
+    from .models import Device, IssuanceRecord
 
-    wb = Workbook()
+    # Optional filter by status
+    status_filter = request.GET.get('status')
+    queryset = Device.objects.all()
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+
+    wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Inventory Items"
 
-    # Header row
-    ws.append([
-        'Item ID',
-        'Item Name',
-        'Serial Number',
-        'Category',
-        'Condition',
-        'Status',
-        'Total Qty',
-        'Issued Qty',
-        # Clarified this is the aggregate field on InventoryItem
-        'Returned Qty (Aggregate)',
-        'Available Qty (Calculated)',  # Clarified this is calculated
-    ])
+    headers = ['Box', 'Category', 'IMEI', 'Serial',
+               'Status', 'Client', 'Issued At']
+    ws.append(headers)
 
-    # Data rows
-    for item in InventoryItem.objects.all():
+    for device in queryset:
+        # Try to fetch latest issuance record (if exists)
+        issuance = IssuanceRecord.objects.filter(
+            device=device).order_by('-issued_at').first()
+
         ws.append([
-            item.id,
-            item.name,
-            item.serial_number if item.serial_number else '',  # Corrected access
-            item.category if item.category else 'N/A',
-            item.condition if item.condition else 'N/A',
-            # This status might be 'In Stock', 'Low Stock', etc.
-            item.status if item.status else 'N/A',
-            item.quantity_total,
-            item.quantity_issued,
-            item.quantity_returned,
-            item.quantity_remaining(),  # Using your existing method which is (total - issued)
-            # If you want it to be (total - issued + returned_to_total), adjust quantity_total logic
+            device.box.number,   # FK to Box
+            device.category,
+            device.imei_no,
+            device.serial_no or "-",
+            device.status,
+            issuance.client.name if issuance else "-",   # client if issued
+            issuance.issued_at.strftime(
+                '%Y-%m-%d %H:%M') if issuance else "-"  # issued_at if issued
         ])
 
+    # Auto-adjust column widths
+    for i, col in enumerate(headers, 1):
+        ws.column_dimensions[get_column_letter(i)].width = 20
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename=inventory_items.xlsx'
     wb.save(response)
     return response
 
