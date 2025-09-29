@@ -45,10 +45,11 @@
                             <option value="">Select a device</option>
                             {% for device in available_devices %}
                                 <option value="{{ device.id }}"
-                                        data-name="{{ device.name}}"                
+                                        data-name="{{ device.name }}"                
                                         data-category="{{ device.category }}"
-                                        data-imei="{{ device.imei_no }}"
-                                        data-status="{{ device.status }}">
+                                        data-imei="{{ device.imei_no|join:", " }}"
+                                        data-status="{{ device.status }}"
+                                        data-available-count="{{ device.available_count }}">
                                     {{ device.name }}
                                 </option>
                             {% endfor %}
@@ -179,7 +180,8 @@ document.addEventListener('DOMContentLoaded', function () {
         text: opt.text,
         category: opt.dataset.category,
         imei: opt.dataset.imei,
-        status: opt.dataset.status
+        status: opt.dataset.status,
+        availableCount: opt.dataset.availableCount
     })).filter(d => d.id);
 
     function filterDevices() {
@@ -187,7 +189,11 @@ document.addEventListener('DOMContentLoaded', function () {
         deviceSelect.empty().append('<option value="">Select a device</option>');
         allDevices.filter(d => d.category === selectedCategory).forEach(d => {
             deviceSelect.append(
-                `<option value="${d.id}" data-category="${d.category}" data-imei="${d.imei}" data-status="${d.status}">${d.text}</option>`
+                `<option value="${d.id}" 
+                         data-category="${d.category}" 
+                         data-imei="${d.imei}" 
+                         data-status="${d.status}" 
+                         data-available-count="${d.availableCount}">${d.text}</option>`
             );
         });
         deviceSelect.val(null).trigger('change');
@@ -204,11 +210,13 @@ document.addEventListener('DOMContentLoaded', function () {
             modelSpan.textContent = selectedOption.data('category');
             statusSpan.textContent = selectedOption.data('status');
 
-            if (selectedOption.data('status').toLowerCase() === 'available') {
-                availabilitySpan.textContent = 'Available';
+            // ✅ show available count
+            const availableCount = selectedOption.data('available-count') || 0;
+            availabilitySpan.textContent = availableCount + ' available';
+
+            if (availableCount > 0) {
                 availabilitySpan.className = 'fw-semibold text-success';
             } else {
-                availabilitySpan.textContent = 'Not Available';
                 availabilitySpan.className = 'fw-semibold text-danger';
             }
         } else {
