@@ -42,6 +42,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
+from collections import defaultdict
 
 
 def register(request):
@@ -138,11 +139,13 @@ def requestor_dashboard(request):
     })
 
 
+
+
 @login_required
 def request_device(request):
     device_id_from_get = request.GET.get('device')
 
-    # ✅ Exclude devices that are already requested and pending approval
+    # ✅ Exclude devices already requested and pending approval
     requested_device_ids = DeviceRequest.objects.filter(
         status='Pending'
     ).values_list('device_id', flat=True)
@@ -150,23 +153,26 @@ def request_device(request):
     # Only truly available devices
     available_device_queryset = Device.objects.filter(
         status='available'
-    ).exclude(id__in=requested_device_ids).order_by('imei_no')
+    ).exclude(id__in=requested_device_ids)
 
-    available_device_list = list(available_device_queryset)
+    # ✅ Group by device name
+    grouped_devices = defaultdict(list)
+    for device in available_device_queryset:
+        grouped_devices[device.name].append(device)
 
-    # JSON for frontend
-    available_device_json = mark_safe(json.dumps([
-        {
-            "id": device.id,
-            "name": device.name,
-            "imei_no": device.imei_no,
-            "serial_no": device.serial_no,
-            "category": device.category,
-            "description": device.description,
-            "status": device.status,
-        }
-        for device in available_device_list
-    ]))
+    # ✅ Summarize per device name
+    available_devices = []
+    for name, devices in grouped_devices.items():
+        available_devices.append({
+            "id": devices[0].id,  # keep one ID (first device)
+            "name": name,
+            "imei_no": [d.imei_no for d in devices],  # collect all IMEIs
+            "serial_no": [d.serial_no for d in devices],
+            "category": devices[0].category,
+            "description": devices[0].description,
+            "status": "available",
+            "available_count": len(devices),  # how many units available
+        })
 
     # Distinct categories for dropdown
     categories = available_device_queryset.values_list(
@@ -174,6 +180,9 @@ def request_device(request):
 
     if request.method == 'POST':
         form = DeviceRequestForm(request.POST)
+        # 🔴 Here you must decide: are you binding to "grouped devices" or "raw devices"?
+        # If requests must target a specific IMEI, keep queryset = available_device_queryset
+        # If requests can be at "model" level, use a custom logic
         form.fields['device'].queryset = available_device_queryset
 
         if form.is_valid():
@@ -203,7 +212,7 @@ def request_device(request):
         if device_id_from_get and device_id_from_get.isdigit():
             try:
                 device = Device.objects.get(id=int(device_id_from_get))
-                if device in available_device_list:
+                if device in available_device_queryset:
                     initial_data['device'] = device.id
             except Device.DoesNotExist:
                 pass
@@ -213,8 +222,7 @@ def request_device(request):
 
     return render(request, 'invent/request_item.html', {
         'form': form,
-        'available_devices': available_device_list,
-        'available_device_json': available_device_json,
+        'available_devices': available_devices,   # ✅ summarized list now
         'categories': categories,
     })
 
