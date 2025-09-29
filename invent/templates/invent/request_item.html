@@ -202,31 +202,44 @@ document.addEventListener('DOMContentLoaded', function () {
         statusSpan.textContent = '--';
         availabilitySpan.textContent = '--';
     }
-
     function updateDeviceInfo() {
-        const selectedOption = deviceSelect.find('option:selected');
-        if (selectedOption.val()) {
-            imeiSpan.textContent = selectedOption.data('imei');
-            modelSpan.textContent = selectedOption.data('category');
-            statusSpan.textContent = selectedOption.data('status');
+    const selectedOption = deviceSelect.find('option:selected');
+    const quantityInput = document.getElementById("id_quantity"); // Django default id
 
-            // ✅ show available count
-            const availableCount = selectedOption.data('available-count') || 0;
-            availabilitySpan.textContent = availableCount + ' available';
+    if (selectedOption.val()) {
+        imeiSpan.textContent = selectedOption.data('imei');
+        modelSpan.textContent = selectedOption.data('category');
+        statusSpan.textContent = selectedOption.data('status');
 
-            if (availableCount > 0) {
-                availabilitySpan.className = 'fw-semibold text-success';
-            } else {
-                availabilitySpan.className = 'fw-semibold text-danger';
-            }
+        // ✅ Restrict quantity
+        const availableCount = selectedOption.data('available-count') || 0;
+        availabilitySpan.textContent = availableCount + ' available';
+
+        if (quantityInput) {
+            quantityInput.min = 1;
+            quantityInput.max = availableCount;
+            quantityInput.value = availableCount > 0 ? 1 : 0; // default
+        }
+
+        if (availableCount > 0) {
+            availabilitySpan.className = 'fw-semibold text-success';
         } else {
-            imeiSpan.textContent = '--';
-            modelSpan.textContent = '--';
-            statusSpan.textContent = '--';
-            availabilitySpan.textContent = '--';
-            availabilitySpan.className = 'fw-semibold';
+            availabilitySpan.className = 'fw-semibold text-danger';
+        }
+    } else {
+        imeiSpan.textContent = '--';
+        modelSpan.textContent = '--';
+        statusSpan.textContent = '--';
+        availabilitySpan.textContent = '--';
+        availabilitySpan.className = 'fw-semibold';
+
+        if (quantityInput) {
+            quantityInput.min = 0;
+            quantityInput.max = 0;
+            quantityInput.value = 0;
         }
     }
+}
 
     // Event listeners
     categorySelect.addEventListener('change', filterDevices);
