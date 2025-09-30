@@ -6,9 +6,17 @@
 {% block content %}
 <div class="container-fluid mt-4">
 
-    <!-- Page Header -->
+    <!-- Page Header (Dynamic based on filter) -->
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0 text-primary"><i class="fas fa-microchip me-2"></i> All IoT Devices</h2>
+        {% if status == 'available' %}
+            <h2 class="mb-0 text-success"><i class="fas fa-microchip me-2"></i> Available IoT Devices</h2>
+        {% elif status == 'issued' %}
+            <h2 class="mb-0 text-warning"><i class="fas fa-microchip me-2"></i> Issued IoT Devices</h2>
+        {% elif status == 'returned' %}
+            <h2 class="mb-0 text-secondary"><i class="fas fa-microchip me-2"></i> Returned IoT Devices</h2>
+        {% else %}
+            <h2 class="mb-0 text-primary"><i class="fas fa-microchip me-2"></i> All IoT Devices</h2>
+        {% endif %}
         <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
         </a>
@@ -117,7 +125,7 @@
                 <ul class="pagination justify-content-center mt-4">
                     {% if page_obj.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">Previous</a>
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if query %}&q={{ query }}{% endif %}">Previous</a>
                     </li>
                     {% else %}
                     <li class="page-item disabled"><span class="page-link">Previous</span></li>
@@ -127,13 +135,13 @@
                         {% if page_obj.number == i %}
                         <li class="page-item active" aria-current="page"><span class="page-link">{{ i }}</span></li>
                         {% else %}
-                        <li class="page-item"><a class="page-link" href="?page={{ i }}{% if query %}&q={{ query }}{% endif %}">{{ i }}</a></li>
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}{% if status %}&status={{ status }}{% endif %}{% if query %}&q={{ query }}{% endif %}">{{ i }}</a></li>
                         {% endif %}
                     {% endfor %}
 
                     {% if page_obj.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}">Next</a>
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if query %}&q={{ query }}{% endif %}">Next</a>
                     </li>
                     {% else %}
                     <li class="page-item disabled"><span class="page-link">Next</span></li>

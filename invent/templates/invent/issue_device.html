@@ -18,65 +18,203 @@
         </div>
     {% endif %}
 
-    <form method="post">
-        {% csrf_token %}
-        <div class="row mb-3">
-            <div class="col-md-5 mb-2">
-                <label for="device_id" class="form-label"><strong>Select Device</strong></label>
-                <select name="device_id" id="device_id" class="form-select" required>
-                    <option value="" disabled selected>-- Select Device (IMEI/Serial) --</option>
-                    {% for device in available_devices %}
-                    <option value="{{ device.id }}">
-                        IMEI: {{ device.imei_no }} | Name: {{ device.name }}
-                        | Status: {{ device.status|capfirst }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-5 mb-2">
-                <label for="client_id" class="form-label"><strong>Select Client</strong></label>
-                <select name="client_id" id="client_id" class="form-select" required>
-                    <option value="" disabled selected>-- Select Client --</option>
-                    {% for client in clients %}
-                    <option value="{{ client.id }}">{{ client.name }} ({{ client.phone_no }})</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-2 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary w-100">Issue Device</button>
+    <ul class="nav nav-tabs mb-4" id="deviceIssueTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+                Pending Requests
+                {% if pending_requests_count > 0 %}
+                    <span class="badge rounded-pill bg-danger ms-1">
+                        {{ pending_requests_count }}
+                    </span>
+                {% endif %}
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="issue-tab" data-bs-toggle="tab" data-bs-target="#issue" type="button" role="tab">
+                Issue Device
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab">
+                All Requests ({{ all_requests.count }})
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="deviceIssueTabsContent">
+        <!-- 1. Pending Requests Tab -->
+        <div class="tab-pane fade show active" id="pending" role="tabpanel" aria-labelledby="pending-tab">
+            <h5 class="mb-3">Pending Device Requests Awaiting Action</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Requestor</th>
+                            <th>Device</th>
+                            <th>Client</th>
+                            <th>Status</th>
+                            <th>Requested At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in pending_requests %}
+                        <tr>
+                            <td>{{ req.id }}</td>
+                            <td>{{ req.requestor.username }}</td>
+                            <td>
+                                IMEI: {{ req.device.imei_no }}
+                                {% if req.device.serial_no %}| Serial: {{ req.device.serial_no }}{% endif %}
+                            </td>
+                            <td>{{ req.client.name|default:"N/A" }}</td>
+                            <td>
+                                <span class="badge bg-warning text-dark">
+                                    {{ req.status|capfirst }}
+                                </span>
+                            </td>
+                            <td>{{ req.requested_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <form action="{% url 'issue_device' %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="approve">
+                                    <input type="hidden" name="device_request_id" value="{{ req.id }}">
+                                    <button type="submit" class="btn btn-success btn-sm me-1">Approve</button>
+                                </form>
+                                <form action="{% url 'issue_device' %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="reject">
+                                    <input type="hidden" name="device_request_id" value="{{ req.id }}">
+                                    <button type="submit" class="btn btn-danger btn-sm me-1">Reject</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">No pending device requests found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
-    </form>
 
-    <div class="table-responsive mt-4">
-        <table class="table table-hover table-striped">
-            <thead class="table-dark">
-                <tr>
-                    <th>IMEI</th>
-                    <th>Serial #</th>
-                    <th>Name</th>
-                    <th>Category</th>
-                    <th>Description</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for device in available_devices %}
-                <tr>
-                    <td>{{ device.imei_no }}</td>
-                    <td>{{ device.serial_no|default:"N/A" }}</td>
-                    <td>{{ device.name }}</td>
-                    <td>{{ device.category|default:"N/A" }}</td>
-                    <td>{{ device.description|default:"" }}</td>
-                    <td><span class="badge bg-success">{{ device.status|capfirst }}</span></td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6" class="text-center text-muted">No available devices for issuance.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <!-- 2. Issue Device Tab -->
+        <div class="tab-pane fade" id="issue" role="tabpanel" aria-labelledby="issue-tab">
+            <h5 class="mb-3">Issue Device</h5>
+            <form method="post">
+                {% csrf_token %}
+                <div class="row mb-3">
+                    <div class="col-md-5 mb-2">
+                        <label for="device_id" class="form-label"><strong>Select Device</strong></label>
+                        <select name="device_id" id="device_id" class="form-select" required>
+                            <option value="" disabled selected>-- Select Device (IMEI/Serial) --</option>
+                            {% for device in available_devices %}
+                            <option value="{{ device.id }}">
+                                IMEI: {{ device.imei_no }} | Name: {{ device.name }}
+                                | Status: {{ device.status|capfirst }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-5 mb-2">
+                        <label for="client_id" class="form-label"><strong>Select Client</strong></label>
+                        <select name="client_id" id="client_id" class="form-select" required>
+                            <option value="" disabled selected>-- Select Client --</option>
+                            {% for client in clients %}
+                            <option value="{{ client.id }}">{{ client.name }} ({{ client.phone_no }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">Issue Device</button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Available Devices Table -->
+            <div class="table-responsive mt-4">
+                <table class="table table-hover table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>IMEI</th>
+                            <th>Serial #</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for device in available_devices %}
+                        <tr>
+                            <td>{{ device.imei_no }}</td>
+                            <td>{{ device.serial_no|default:"N/A" }}</td>
+                            <td>{{ device.name }}</td>
+                            <td>{{ device.category|default:"N/A" }}</td>
+                            <td>{{ device.description|default:"" }}</td>
+                            <td><span class="badge bg-success">{{ device.status|capfirst }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No available devices for issuance.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 3. All Requests Tab -->
+        <div class="tab-pane fade" id="all" role="tabpanel" aria-labelledby="all-tab">
+            <h5 class="mb-3">All Device Requests</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Requestor</th>
+                            <th>Device</th>
+                            <th>Client</th>
+                            <th>Status</th>
+                            <th>Requested At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in all_requests %}
+                        <tr>
+                            <td>{{ req.id }}</td>
+                            <td>{{ req.requestor.username }}</td>
+                            <td>
+                                IMEI: {{ req.device.imei_no }}
+                                {% if req.device.serial_no %}| Serial: {{ req.device.serial_no }}{% endif %}
+                            </td>
+                            <td>{{ req.client.name|default:"N/A" }}</td>
+                            <td>
+                                <span class="badge
+                                    {% if req.status == 'pending' %}bg-warning text-dark
+                                    {% elif req.status == 'approved' %}bg-success
+                                    {% elif req.status == 'issued' %}bg-primary
+                                    {% elif req.status == 'rejected' %}bg-danger
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ req.status|capfirst }}
+                                </span>
+                            </td>
+                            <td>{{ req.requested_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No device requests found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 {% endblock %}

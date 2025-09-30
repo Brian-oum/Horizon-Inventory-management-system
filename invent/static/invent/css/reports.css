@@ -1,0 +1,91 @@
+.summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #f8f9fa;
+    padding: 1.5rem 2rem;
+    border-radius: 20px;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+.summary-header h2 {
+    margin: 0;
+    font-weight: 700;
+    font-size: 2.3rem;
+}
+.back-btn {
+    padding: 10px 24px;
+    color: #495057;
+    background-color: #f8f9fa;
+    border: 2px solid #ced4da;
+    border-radius: 10px;
+    font-weight: 500;
+    font-size: 1.05rem;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+.back-btn:hover {
+    background-color: #ced4da;
+    color: #212529;
+}
+.card-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 22px;
+    margin-bottom: 40px;
+}
+.card-tile {
+    padding: 36px 0 32px 0;
+    color: #fff;
+    border-radius: 20px;
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 700;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.07);
+    cursor: pointer;
+    transition: transform 0.18s ease-in-out;
+    min-width: 180px;
+}
+.card-tile strong {
+    display: block;
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-top: 6px;
+}
+.card-tile:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+}
+.card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+.bg-blue { background-color: #1765d6; }
+.bg-orange { background-color: #fc9706; }
+.bg-green { background-color: #218860; }
+.bg-lightblue { background-color: #0dcaf0; }
+.bg-red { background-color: #dc3545; }
+.top-requested h4 {
+    font-weight: bold;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #ccc;
+    margin-bottom: 1rem;
+    font-size: 1.3rem;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: white;
+    border-radius: 12px;
+    overflow: hidden;
+}
+th, td {
+    padding: 16px;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+th {
+    background-color: #f8f9fa;
+    font-weight: 700;
+}
