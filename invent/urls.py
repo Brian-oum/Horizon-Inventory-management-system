@@ -30,7 +30,6 @@ urlpatterns = [
          views.export_total_requests, name='export_total_requests'),
 
     # Inventory Actions
-    path('issue-item/', views.issue_item, name='issue_item'),
     path('adjust_stock/', views.adjust_stock, name='adjust_stock'),
     path('upload-inventory/', views.upload_inventory, name='upload_inventory'),
 
