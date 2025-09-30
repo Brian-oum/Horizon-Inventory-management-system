@@ -14,6 +14,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 import json
 from django.utils.safestring import mark_safe
+from django.urls import reverse
 
 # Correct Model and Form Imports
 from .models import ItemRequest, InventoryItem, StockTransaction
@@ -43,6 +44,7 @@ from django.db import transaction
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from collections import defaultdict
+from django.views.decorators.http import require_POST
 
 
 def register(request):
@@ -280,7 +282,7 @@ def store_clerk_dashboard(request):
         quantity__lte=F('returned_quantity')
     ).count()
 
-    # IoT Device Stats (Box removed)
+    # IoT Device Stats
     total_devices = Device.objects.count()
     devices_available = Device.objects.filter(status='available').count()
     devices_issued = Device.objects.filter(status='issued').count()
@@ -290,7 +292,7 @@ def store_clerk_dashboard(request):
     from .models import IssuanceRecord
     recent_issuances = (
         IssuanceRecord.objects
-        .select_related('device', 'client')  # removed device__box
+        .select_related('device', 'client')  
         .order_by('-issued_at')[:10]
     )
     seen = set()
@@ -328,6 +330,18 @@ def store_clerk_dashboard(request):
     }
     return render(request, 'invent/store_clerk_dashboard.html', context)
 
+#Delete device views
+@require_POST
+def delete_device(request, device_id=None):
+    if device_id:
+        device = get_object_or_404(Device, pk=device_id)
+        device.delete()
+    else:
+        # For bulk deletion via checkboxes
+        device_ids = request.POST.getlist('device_ids')
+        Device.objects.filter(id__in=device_ids).delete()
+    return redirect(reverse('adjust_stock'))    
+
 # invent/views.py
 
 
@@ -356,20 +370,24 @@ def reject_request(request, request_id):
 @permission_required('invent/list_device.html', raise_exception=True)
 def inventory_list_view(request):
     """
-    Displays a list of all IoT devices with search and pagination.
+    Displays a list of all IoT devices with search, status filtering, and pagination.
     """
     query = request.GET.get('q', '')
+    status = request.GET.get('status', 'all')  # <-- Add this line
 
     # Devices are the atomic unit of issuance
-    devices = Device.objects.all().order_by('id')  # removed box linkage
+    devices = Device.objects.all().order_by('id')
 
-    # Search functionality (IMEI, Serial, Category, Client) — Box removed
+    # Filter by status if provided
+    if status and status != 'all':
+        devices = devices.filter(status=status)
+
+    # Search functionality (IMEI, Serial, Category, Client)
     if query:
         devices = devices.filter(
-            Q(imei_no__icontains=query) |      # corrected to imei_no
-            Q(serial_no__icontains=query) |    # corrected to serial_no
+            Q(imei_no__icontains=query) |
+            Q(serial_no__icontains=query) |
             Q(category__icontains=query) |
-            # search by client name via related IssuanceRecord
             Q(issuancerecord__client__name__icontains=query)
         ).distinct()
 
@@ -393,9 +411,9 @@ def inventory_list_view(request):
     context = {
         'page_obj': page_obj,
         'query': query,
+        'status': status,             # <-- Add this for template awareness
     }
     return render(request, 'invent/list_device.html', context)
-
 
 @login_required
 @permission_required('invent.add_device', raise_exception=True)
@@ -602,46 +620,70 @@ def issue_item(request):
     return render(request, 'invent/issue_item.html', context)
 
  # IoT Device Issuance/Return Views
-
-
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
 def issue_device(request):
-    # Get all available devices (no box dependency anymore)
+    # Devices and clients for the form
     available_devices = Device.objects.filter(status='available')
     clients = Client.objects.all()
 
+    # Pending requests: ONLY 'Pending' status
+    pending_requests = DeviceRequest.objects.filter(
+        status='Pending'
+    ).select_related("requestor", "device", "client")
+    pending_requests_count = pending_requests.count()
+
+    # All requests: any status
+    all_requests = DeviceRequest.objects.select_related("requestor", "device", "client").all()
+
     if request.method == 'POST':
+        action = request.POST.get('action')
+        device_request_id = request.POST.get('device_request_id')
         device_id = request.POST.get('device_id')
         client_id = request.POST.get('client_id')
 
-        if not device_id or not client_id:
-            messages.error(request, "Please select a device and client.")
+        # Handle device request approval/rejection
+        if action in ['approve', 'reject'] and device_request_id:
+            device_request = get_object_or_404(DeviceRequest, id=device_request_id)
+            if action == 'approve' and device_request.status == 'Pending':
+                device_request.status = 'Approved'
+                device_request.save()
+                messages.success(request, f"Request {device_request.id} approved.")
+            elif action == 'reject' and device_request.status in ['Pending', 'Approved']:
+                device_request.status = 'Rejected'
+                device_request.save()
+                messages.success(request, f"Request {device_request.id} rejected.")
+            else:
+                messages.warning(request, "Invalid action or status.")
             return redirect('issue_device')
 
-        device = get_object_or_404(Device, id=device_id, status='available')
-        client = get_object_or_404(Client, id=client_id)
+        # Handle direct device issuance (not from a request)
+        if device_id and client_id:
+            device = get_object_or_404(Device, id=device_id, status='available')
+            client = get_object_or_404(Client, id=client_id)
+            with transaction.atomic():
+                device.status = 'issued'
+                device.save()
+                IssuanceRecord.objects.create(
+                    device=device,
+                    client=client,
+                    logistics_manager=request.user
+                )
+                messages.success(
+                    request,
+                    f"Device {device.imei_no} issued to {client.name}."
+                )
+            return redirect('issue_device')
 
-        with transaction.atomic():
-            device.status = 'issued'
-            device.save()
-
-            IssuanceRecord.objects.create(
-                device=device,
-                client=client,
-                logistics_manager=request.user
-            )
-
-            messages.success(
-                request,
-                f"Device {device.imei_no} issued to {client.name}."
-            )
-
+        messages.error(request, "Please select a device and client.")
         return redirect('issue_device')
 
     return render(request, 'invent/issue_device.html', {
         'available_devices': available_devices,
         'clients': clients,
+        'pending_requests': pending_requests,
+        'pending_requests_count': pending_requests_count,
+        'all_requests': all_requests,
     })
 
 
@@ -726,48 +768,60 @@ def request_summary(request):
 @login_required
 @permission_required('invent.change_inventoryitem', raise_exception=True)
 def adjust_stock(request):
-    if request.method == 'POST':
-        form = AdjustStockForm(request.POST)
-        if form.is_valid():
-            item = form.cleaned_data['item']
-            adjustment_quantity = form.cleaned_data['adjustment_quantity']
-            reason = form.cleaned_data['reason']
+    # Search query for devices
+    query = request.GET.get('q', '')
+    devices = Device.objects.all().order_by('id')
+    if query:
+        devices = devices.filter(
+            Q(imei_no__icontains=query) |
+            Q(serial_no__icontains=query) |
+            Q(name__icontains=query) |
+            Q(category__icontains=query) |
+            Q(issuancerecord__client__name__icontains=query)
+        ).distinct()
 
-            try:
-                with transaction.atomic():
-                    item.quantity_total = F(
-                        'quantity_total') + adjustment_quantity
-                    item.save(update_fields=['quantity_total'])
+    # Attach latest IssuanceRecord to each device for template access to client and issued_at
+    for device in devices:
+        last_issuance = (
+            IssuanceRecord.objects
+            .filter(device=device)
+            .order_by('-issued_at')
+            .select_related('client')
+            .first()
+        )
+        device.current_client = last_issuance.client if last_issuance else None
+        device.issued_at = last_issuance.issued_at if last_issuance else None
 
-                    # Adjusted transaction_type for clarity. 'Adjustment' is better.
-                    # quantity will be positive for adding, negative for removing.
-                    transaction_type = 'Adjustment'
-
-                    StockTransaction.objects.create(
-                        item=item,
-                        transaction_type=transaction_type,
-                        quantity=adjustment_quantity,  # Store actual adjustment value
-                        reason=reason,
-                        recorded_by=request.user
-                    )
-                messages.success(
-                    request, f'Stock for {item.name} adjusted by {adjustment_quantity}. New total: {item.quantity_total}.')
-                return redirect('adjust_stock')
-            except Exception as e:
-                messages.error(request, f"Error adjusting stock: {e}")
-        else:
-            messages.error(
-                request, "Please correct the errors in the adjustment form.")
-    else:
-        form = AdjustStockForm()
-
-    # Filter for 'Adjustment' transactions for this display, as 'Issue' and 'Return' will be handled elsewhere
+    # Recent transactions still shown, but not required for device search/delete
     recent_transactions = StockTransaction.objects.filter(
         transaction_type='Adjustment').order_by('-transaction_date')[:10]
 
     context = {
+        'devices': devices,
+        'query': query,
+        'recent_transactions': recent_transactions,
+        # 'form': form,  # Remove if not using AdjustStockForm
+    }
+    return render(request, 'invent/adjust_stock.html', context)
+
+    # ADD THIS BLOCK: fetch Device objects for deletion
+    devices = Device.objects.all().order_by('id')
+    # Attach client and issued_at info for each device
+    for device in devices:
+        last_issuance = (
+            IssuanceRecord.objects
+            .filter(device=device)
+            .order_by('-issued_at')
+            .select_related('client')
+            .first()
+        )
+        device.current_client = last_issuance.client if last_issuance else None
+        device.issued_at = last_issuance.issued_at if last_issuance else None
+
+    context = {
         'form': form,
         'recent_transactions': recent_transactions,
+        'devices': devices,  # <-- Pass devices to template!
     }
     return render(request, 'invent/adjust_stock.html', context)
 
@@ -1047,7 +1101,7 @@ def export_total_requests(request):
     ws = wb.active
     ws.title = "Device Requests"
 
-    # Define headers (removed Box column)
+    # Define headers 
     headers = [
         "Category",
         "IMEI",
@@ -1100,7 +1154,6 @@ def export_inventory_items(request):
     ws = wb.active
     ws.title = "Inventory Items"
 
-    # ✅ Removed Box column
     headers = ['Category', 'IMEI', 'Serial', 'Status', 'Client', 'Issued At']
     ws.append(headers)
 

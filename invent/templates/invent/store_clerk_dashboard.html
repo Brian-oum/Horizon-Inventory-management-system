@@ -16,34 +16,41 @@
     <a href="{% url 'add_supplier' %}" class="btn btn-info"><i class="fas fa-user-plus me-1"></i> Add Supplier</a>
 </div>
 
-<!-- IoT Device Stats -->
+<!-- IoT Device Stats (Clickable Cards) -->
 <div class="row text-center mb-4">
     <div class="col-sm-6 col-md-3 mb-3">
-        <div class="dashboard-card bg-info text-white p-3 rounded shadow-sm">
-            <h6>Total IoT Devices</h6>
-            <h3>{{ total_devices }}</h3>
-        </div>
+        <a href="{% url 'inventory_list' %}?status=all" style="text-decoration:none;">
+            <div class="dashboard-card bg-info text-white p-3 rounded shadow-sm">
+                <h6>Total IoT Devices</h6>
+                <h3>{{ total_devices }}</h3>
+            </div>
+        </a>
     </div>
     <div class="col-sm-6 col-md-3 mb-3">
-        <div class="dashboard-card bg-success text-white p-3 rounded shadow-sm">
-            <h6>Devices Available</h6>
-            <h3>{{ devices_available }}</h3>
-        </div>
+        <a href="{% url 'inventory_list' %}?status=available" style="text-decoration:none;">
+            <div class="dashboard-card bg-success text-white p-3 rounded shadow-sm">
+                <h6>Devices Available</h6>
+                <h3>{{ devices_available }}</h3>
+            </div>
+        </a>
     </div>
     <div class="col-sm-6 col-md-3 mb-3">
-        <div class="dashboard-card bg-warning text-dark p-3 rounded shadow-sm">
-            <h6>Devices Issued</h6>
-            <h3>{{ devices_issued }}</h3>
-        </div>
+        <a href="{% url 'inventory_list' %}?status=issued" style="text-decoration:none;">
+            <div class="dashboard-card bg-warning text-dark p-3 rounded shadow-sm">
+                <h6>Devices Issued</h6>
+                <h3>{{ devices_issued }}</h3>
+            </div>
+        </a>
     </div>
     <div class="col-sm-6 col-md-3 mb-3">
-        <div class="dashboard-card bg-secondary text-white p-3 rounded shadow-sm">
-            <h6>Devices Returned</h6>
-            <h3>{{ devices_returned }}</h3>
-        </div>
+        <a href="{% url 'inventory_list' %}?status=returned" style="text-decoration:none;">
+            <div class="dashboard-card bg-secondary text-white p-3 rounded shadow-sm">
+                <h6>Devices Returned</h6>
+                <h3>{{ devices_returned }}</h3>
+            </div>
+        </a>
     </div>
 </div>
-
 
 <!-- Recent Device Activity -->
 <div class="bg-white p-4 rounded shadow-sm mb-4">
@@ -106,55 +113,6 @@
         </table>
     </div>
 </div>
-
-<!-- Pending Device Requests with Client Info -->
-<div class="bg-white p-4 rounded shadow-sm mb-4">
-    <h5 class="mb-3">Pending Device Requests</h5>
-    <div class="table-responsive">
-        <table class="table table-striped">
-            <thead class="table-light">
-                <tr>
-                    <th>ID</th>
-                    <th>Requested By</th>
-                    <th>Device</th>
-                    <th>Client Name</th>
-                    <th>Client Phone</th>
-                    <th>Client Email</th>
-                    <th>Client Address</th>
-                    <th>Status</th>
-                    <th>Requested At</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for req in pending_device_requests %}
-                <tr>
-                    <td>{{ req.id }}</td>
-                    <td>{{ req.requestor.username }}</td>
-                    <td>{{ req.device.name }}</td>
-                    <td>{{ req.client.name }}</td>
-                    <td>{{ req.client.phone_no }}</td>
-                    <td>{{ req.client.email }}</td>
-                    <td>{{ req.client.address }}</td>
-                    <td>
-                        <span class="badge {% if req.status == 'Pending' %}bg-warning{% else %}bg-success{% endif %}">
-                            {{ req.status }}
-                        </span>
-                    </td>
-                    <td>{{ req.date_requested|date:"Y-m-d H:i" }}</td>
-                    <td>
-                        <a href="{% url 'approve_request' req.id %}" class="btn btn-sm btn-success">Approve</a>
-                        <a href="{% url 'reject_request' req.id %}" class="btn btn-sm btn-danger">Reject</a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="10" class="text-center text-muted">No pending requests.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
 {% endblock %}
 
 {% block extra_js %}

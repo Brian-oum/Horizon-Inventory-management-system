@@ -1,15 +1,20 @@
 {% extends 'invent/base_store_clerk.html' %}
 {% load static %}
 
+{% block title %}Adjust Stock{% endblock %}
+
 {% block content %}
 <div class="container-fluid mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0 text-primary"><i class="fas fa-sliders-h me-2"></i> Adjust Inventory Stock</h2>
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded">
+        <h2 class="fw-bold">Adjust Stock</h2>
         <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
         </a>
     </div>
 
+    <!-- Messages -->
     {% if messages %}
         <ul class="messages list-unstyled">
             {% for message in messages %}
@@ -21,59 +26,118 @@
         </ul>
     {% endif %}
 
+    <!-- Device Search Bar -->
+    <form method="get" action="{% url 'adjust_stock' %}" class="row g-3 align-items-center mb-4">
+        <div class="col-md-8">
+            <input type="text" name="q" class="form-control"
+                   placeholder="🔍 Search devices by IMEI, Serial, Name, Category, Client"
+                   value="{{ query }}">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-success w-100">Search</button>
+        </div>
+        <div class="col-md-2">
+            <a href="{% url 'adjust_stock' %}" class="btn btn-outline-secondary w-100">Reset</a>
+        </div>
+    </form>
+
+    <!-- Device List & Bulk Delete -->
     <div class="card shadow-sm mb-4">
-        <div class="card-header bg-primary text-white py-3">
-            <h4 class="mb-0">Adjustment Details</h4>
+        <div class="card-header bg-secondary text-white py-3 d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Device Inventory List</h4>
+            <form method="post" action="{% url 'delete_device' %}" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm"
+                        onclick="return confirm('Are you sure you want to delete selected devices?');">
+                    <i class="fas fa-trash-alt"></i> Delete Selected
+                </button>
+            </form>
         </div>
         <div class="card-body">
-            <form method="post">
+            <form method="post" action="{% url 'delete_device' %}">
                 {% csrf_token %}
-
-                <div class="row">
-                    <div class="col-md-12 mb-3">
-                        <label for="{{ form.item.id_for_label }}" class="form-label">Item to Adjust:</label>
-                        {{ form.item }} {# This is your <select> element #}
-                        {% if form.item.errors %}<div class="text-danger small">{{ form.item.errors }}</div>{% endif %}
-                    </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th><input type="checkbox" onclick="toggleAll(this)"></th>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>IMEI</th>
+                                <th>Serial</th>
+                                <th>Status</th>
+                                <th>Client</th>
+                                <th>Issued At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for device in devices %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="device_ids" value="{{ device.id }}">
+                                </td>
+                                <td>{{ device.id }}</td>
+                                <td>{{ device.name|default:device.category }}</td>
+                                <td>{{ device.imei_no|default:"-" }}</td>
+                                <td>{{ device.serial_no|default:"-" }}</td>
+                                <td>
+                                    <span class="badge
+                                        {% if device.status == 'available' %}bg-success
+                                        {% elif device.status == 'issued' %}bg-primary
+                                        {% elif device.status == 'returned' %}bg-secondary
+                                        {% elif device.status == 'faulty' %}bg-danger
+                                        {% else %}bg-dark{% endif %}">
+                                        {{ device.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if device.current_client %}
+                                        {{ device.current_client.name }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if device.issued_at %}
+                                         {{ device.issued_at|date:"Y-m-d H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="post" action="{% url 'delete_device' device.id %}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-danger btn-sm"
+                                            onclick="return confirm('Are you sure you want to delete this device?');"
+                                            title="Delete Device">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center text-muted">No devices found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.adjustment_quantity.id_for_label }}" class="form-label">Adjustment Quantity:</label>
-                        {{ form.adjustment_quantity }}
-                        <div class="form-text text-muted">{{ form.adjustment_quantity.help_text }}</div>
-                        {% if form.adjustment_quantity.errors %}<div class="text-danger small">{{ form.adjustment_quantity.errors }}</div>{% endif %}
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.reason.id_for_label }}" class="form-label">Reason for Adjustment:</label>
-                        {{ form.reason }}
-                        {% if form.reason.errors %}<div class="text-danger small">{{ form.reason.errors }}</div>{% endif %}
-                    </div>
-                </div>
-
-                {% if form.non_field_errors %}
-                    <div class="alert alert-danger mt-3">
-                        {{ form.non_field_errors }}
-                    </div>
-                {% endif %}
-
-                <button type="submit" class="btn btn-primary mt-3"><i class="fas fa-sync-alt me-2"></i> Adjust Stock</button>
-                <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-secondary mt-3 ms-2">Cancel</a>
+                <button type="submit" class="btn btn-danger mt-3">
+                    <i class="fas fa-trash-alt"></i> Delete Selected
+                </button>
             </form>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
-    $(document).ready(function() {
-        // Initialize Select2 on the 'item' dropdown
-        // Django form fields usually get an ID of 'id_' followed by the field name.
-        // So, for 'form.item', the ID will be 'id_item' .
-        $('#id_item').select2({
-            theme: 'bootstrap-5', // Apply Bootstrap 5 theme for consistent styling
-            width: '100%' // Ensure it takes full width of its parent container
-        });
-    });
+function toggleAll(source) {
+    checkboxes = document.getElementsByName('device_ids');
+    for(var i=0, n=checkboxes.length;i<n;i++) {
+        checkboxes[i].checked = source.checked;
+    }
+}
 </script>
 {% endblock %}

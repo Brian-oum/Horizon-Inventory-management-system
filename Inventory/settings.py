@@ -159,3 +159,5 @@ LOGOUT_REDIRECT_URL = 'login'
 # --- SESSION TIMEOUT SETTINGS ---
 SESSION_COOKIE_AGE = 600  # <-- 20 minutes (1200 seconds) -->
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False # Changed to False for persistent sessions until timeout
+
+STATIC_ROOT = BASE_DIR / "staticfiles"

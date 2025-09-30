@@ -235,7 +235,7 @@ class Meta:
         ("can_receive_stock", "Can receive new stock into inventory"),
     ]
 
-# --- BEGIN IoT/Box/Client/Supplier Models ---
+# --- BEGIN IoT/Client/Supplier Models ---
 
 
 class Office(models.Model):
