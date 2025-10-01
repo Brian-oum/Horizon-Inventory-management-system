@@ -25,16 +25,19 @@ from django.utils.dateparse import parse_date
 
 # --- Authentication/Registration ---
 
+
 def register(request):
     if request.method == 'POST':
         form = CustomCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            messages.success(request, "Registration successful. Please log in.")
+            messages.success(
+                request, "Registration successful. Please log in.")
             return redirect('login')
     else:
         form = CustomCreationForm()
     return render(request, 'invent/register.html', {'form': form})
+
 
 def custom_login(request):
     if request.method == 'POST':
@@ -52,6 +55,7 @@ def custom_login(request):
         form = AuthenticationForm()
     return render(request, 'invent/login.html', {'form': form})
 
+
 def logout_view(request):
     logout(request)
     messages.info(request, "You have been logged out.")
@@ -59,9 +63,11 @@ def logout_view(request):
 
 # --- Dashboard for Requestor ---
 
+
 @login_required
 def requestor_dashboard(request):
-    user_requests = DeviceRequest.objects.filter(requestor=request.user).order_by('id')
+    user_requests = DeviceRequest.objects.filter(
+        requestor=request.user).order_by('id')
     labeled_requests = []
     total_requests_count = user_requests.count()
     for idx, req in enumerate(user_requests, start=1):
@@ -76,8 +82,10 @@ def requestor_dashboard(request):
             total_approved=Count('id', filter=Q(status='Approved')),
             total_pending=Count('id', filter=Q(status='Pending')),
             total_issued=Count('id', filter=Q(status='Issued')),
-            total_fully_returned=Count('id', filter=Q(status='Fully Returned')),
-            total_partially_returned=Count('id', filter=Q(status='Partially Returned')),
+            total_fully_returned=Count(
+                'id', filter=Q(status='Fully Returned')),
+            total_partially_returned=Count(
+                'id', filter=Q(status='Partially Returned')),
         )
         .order_by('device__imei_no')
     )
@@ -95,6 +103,7 @@ def requestor_dashboard(request):
 
 # --- Device Request ---
 
+
 @login_required
 def request_device(request):
     device_id_from_get = request.GET.get('device')
@@ -104,7 +113,8 @@ def request_device(request):
         requested_quantity=Coalesce(
             Sum(
                 'requests__quantity',
-                filter=Q(requests__status__in=['Pending', 'Approved', 'Issued']),
+                filter=Q(requests__status__in=[
+                         'Pending', 'Approved', 'Issued']),
                 output_field=IntegerField()
             ),
             Value(0)
@@ -130,10 +140,12 @@ def request_device(request):
             "category": devices[0].category,
             "description": devices[0].description,
             "status": "available",
-            "available_count": sum(d.available_quantity for d in devices),  # ✅ accurate stock
+            # ✅ accurate stock
+            "available_count": sum(d.available_quantity for d in devices),
         })
 
-    categories = available_device_queryset.values_list('category', flat=True).distinct()
+    categories = available_device_queryset.values_list(
+        'category', flat=True).distinct()
 
     # ✅ handle POST
     if request.method == 'POST':
@@ -185,7 +197,8 @@ def request_device(request):
 
 @login_required
 def cancel_request(request, request_id):
-    device_request = get_object_or_404(DeviceRequest, id=request_id, requestor=request.user)
+    device_request = get_object_or_404(
+        DeviceRequest, id=request_id, requestor=request.user)
     if device_request.status == 'Pending':
         if request.method == 'POST':
             device_request.status = 'Cancelled'
@@ -204,6 +217,7 @@ def cancel_request(request, request_id):
         return redirect('requestor_dashboard')
 
 # --- Clerk Dashboard ---
+
 
 @login_required
 @permission_required('invent.view_device', raise_exception=True)
@@ -239,6 +253,7 @@ def store_clerk_dashboard(request):
     }
     return render(request, 'invent/store_clerk_dashboard.html', context)
 
+
 @require_POST
 def delete_device(request, device_id=None):
     if device_id:
@@ -251,6 +266,7 @@ def delete_device(request, device_id=None):
 
 # --- Device Request Approval/Reject ---
 
+
 @login_required
 @permission_required('invent.change_devicerequest', raise_exception=True)
 def approve_request(request, request_id):
@@ -260,6 +276,7 @@ def approve_request(request, request_id):
     messages.success(
         request, f"Request {device_request.id} approved successfully.")
     return redirect("store_clerk_dashboard")
+
 
 @login_required
 @permission_required('invent.change_devicerequest', raise_exception=True)
@@ -271,6 +288,7 @@ def reject_request(request, request_id):
     return redirect("store_clerk_dashboard")
 
 # --- Device Listing/Search ---
+
 
 @login_required
 def inventory_list_view(request):
@@ -308,6 +326,7 @@ def inventory_list_view(request):
 
 # --- Stock Management ---
 
+
 @login_required
 @permission_required('invent.add_device', raise_exception=True)
 def manage_stock(request):
@@ -321,6 +340,7 @@ def manage_stock(request):
         else:
             messages.error(request, "Please correct the errors below.")
     return render(request, 'invent/manage_stock.html', {'form': form})
+
 
 @login_required
 @permission_required('invent.change_device', raise_exception=True)
@@ -346,61 +366,143 @@ def edit_item(request, device_id):
 
 # --- Issue Device (Clerk) ---
 
+
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
 def issue_device(request):
+    # Devices and clients for the form (kept for direct issuance, if applicable)
     available_devices = Device.objects.filter(status='available')
     clients = Client.objects.all()
+
+    # Pending requests: ONLY 'Pending' status
     pending_requests = DeviceRequest.objects.filter(
         status='Pending'
     ).select_related("requestor", "device", "client")
     pending_requests_count = pending_requests.count()
-    all_requests = DeviceRequest.objects.select_related("requestor", "device", "client").all()
+
+    # All requests: any status
+    all_requests = DeviceRequest.objects.select_related(
+        "requestor", "device", "client").all()
+
     if request.method == 'POST':
         action = request.POST.get('action')
         device_request_id = request.POST.get('device_request_id')
-        device_id = request.POST.get('device_id')
-        client_id = request.POST.get('client_id')
-        if action in ['approve', 'reject'] and device_request_id:
-            device_request = get_object_or_404(DeviceRequest, id=device_request_id)
+
+        # Handle device request approval/rejection/issuance
+        if action in ['approve', 'reject', 'issue'] and device_request_id:
+            device_request = get_object_or_404(
+                DeviceRequest, id=device_request_id)
+            device = device_request.device  # The device linked to the request
+            # The client linked to the request (Can be None)
+            client = device_request.client
+
             if action == 'approve' and device_request.status == 'Pending':
+                # *** APPROVE ***
                 device_request.status = 'Approved'
                 device_request.save()
-                messages.success(request, f"Request {device_request.id} approved.")
+                messages.success(
+                    request, f"Request {device_request.id} for device {device.imei_no} has been **Approved**. Now, please finalize the issuance.")
+                return redirect('issue_device')
+
+            elif action == 'issue' and device_request.status == 'Approved':
+
+                # --- FIX FOR IntegrityError: NOT NULL constraint failed: invent_issuancerecord.client_id ---
+                if client is None:
+                    messages.error(
+                        request,
+                        f"Cannot issue Request {device_request.id}: **No client is linked** to this approved device request. Update the request first."
+                    )
+                    return redirect('issue_device')
+                # -------------------------------------------------------------------------------------------------
+
+                # *** ISSUE: Final step, move device status and create IssuanceRecord ***
+                if device.status == 'available':
+                    with transaction.atomic():
+                        # Update device status
+                        device.status = 'issued'
+                        device.save()
+
+                        # Create Issuance Record
+                        IssuanceRecord.objects.create(
+                            device=device,
+                            client=client,
+                            logistics_manager=request.user,
+                            device_request=device_request  # Link the issuance record back to the request
+                        )
+
+                        # Update request status to 'Issued' (or 'Completed')
+                        device_request.status = 'Issued'
+                        device_request.save()
+
+                        messages.success(
+                            request,
+                            f"Device {device.imei_no} successfully **Issued** to {client.name} (Request {device_request.id})."
+                        )
+                else:
+                    messages.error(
+                        request, f"Device {device.imei_no} is no longer available to be issued.")
+
+                return redirect('issue_device')
+
             elif action == 'reject' and device_request.status in ['Pending', 'Approved']:
+                # *** REJECT ***
                 device_request.status = 'Rejected'
                 device_request.save()
-                messages.success(request, f"Request {device_request.id} rejected.")
-            else:
-                messages.warning(request, "Invalid action or status.")
-            return redirect('issue_device')
-        if device_id and client_id:
-            device = get_object_or_404(Device, id=device_id, status='available')
-            client = get_object_or_404(Client, id=client_id)
-            with transaction.atomic():
-                device.status = 'issued'
-                device.save()
-                IssuanceRecord.objects.create(
-                    device=device,
-                    client=client,
-                    logistics_manager=request.user
-                )
                 messages.success(
-                    request,
-                    f"Device {device.imei_no} issued to {client.name}."
-                )
-            return redirect('issue_device')
-        messages.error(request, "Please select a device and client.")
+                    request, f"Request {device_request.id} **rejected**. Transaction ended.")
+                return redirect('issue_device')
+
+            else:
+                messages.warning(
+                    request, "Invalid action or status for this request.")
+                return redirect('issue_device')
+
+        # Handle direct device issuance (not from a request) - Keep this for flexibility
+        device_id = request.POST.get('device_id')
+        client_id = request.POST.get('client_id')
+        if device_id and client_id:
+            # Existing logic for direct issuance...
+            try:
+                device = get_object_or_404(
+                    Device, id=device_id, status='available')
+                client = get_object_or_404(Client, id=client_id)
+                with transaction.atomic():
+                    device.status = 'issued'
+                    device.save()
+                    IssuanceRecord.objects.create(
+                        device=device,
+                        client=client,
+                        logistics_manager=request.user
+                    )
+                    messages.success(
+                        request,
+                        f"Device {device.imei_no} issued to {client.name} (Direct Issuance)."
+                    )
+                return redirect('issue_device')
+            except Exception as e:
+                messages.error(request, f"Error during direct issuance: {e}")
+                return redirect('issue_device')
+
+        messages.error(
+            request, "Please provide valid inputs for issuance or request action.")
         return redirect('issue_device')
+
+    # Update context for the template to show 'Approved' requests too
+    approved_requests = DeviceRequest.objects.filter(
+        status='Approved'
+    ).select_related("requestor", "device", "client")
+
     return render(request, 'invent/issue_device.html', {
         'available_devices': available_devices,
         'clients': clients,
         'pending_requests': pending_requests,
+        'approved_requests': approved_requests,
         'pending_requests_count': pending_requests_count,
         'all_requests': all_requests,
     })
 
 # --- Return Device (Clerk) ---
+
 
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
@@ -426,6 +528,7 @@ def return_device(request):
         'clients': clients
     })
 
+
 # --- Request Summary for Requestor ---
 
 @login_required
@@ -436,8 +539,10 @@ def request_summary(request):
     approved_requests = user_requests.filter(status='Approved').count()
     issued_requests = user_requests.filter(status='Issued').count()
     rejected_requests = user_requests.filter(status='Rejected').count()
-    partially_returned_requests = user_requests.filter(status='Partially Returned').count()
-    fully_returned_requests = user_requests.filter(status='Fully Returned').count()
+    partially_returned_requests = user_requests.filter(
+        status='Partially Returned').count()
+    fully_returned_requests = user_requests.filter(
+        status='Fully Returned').count()
     total_returned_quantity_by_user = user_requests.aggregate(
         total_returned=Sum('quantity')
     )['total_returned'] or 0
@@ -464,6 +569,8 @@ def request_summary(request):
     return render(request, 'invent/request_summary.html', context)
 
 # --- Client List ---
+
+
 @login_required
 def client_list(request):
     # Get filter values
@@ -474,7 +581,8 @@ def client_list(request):
     date_to = request.GET.get('date_to', '')
 
     # Base queryset
-    requests_qs = DeviceRequest.objects.select_related('client', 'device').order_by('-date_requested')
+    requests_qs = DeviceRequest.objects.select_related(
+        'client', 'device').order_by('-date_requested')
 
     # Free text search
     if query:
@@ -495,9 +603,11 @@ def client_list(request):
 
     # Filter by date range
     if date_from:
-        requests_qs = requests_qs.filter(date_requested__date__gte=parse_date(date_from))
+        requests_qs = requests_qs.filter(
+            date_requested__date__gte=parse_date(date_from))
     if date_to:
-        requests_qs = requests_qs.filter(date_requested__date__lte=parse_date(date_to))
+        requests_qs = requests_qs.filter(
+            date_requested__date__lte=parse_date(date_to))
 
     # Pagination
     paginator = Paginator(requests_qs, 25)
@@ -548,6 +658,7 @@ def adjust_stock(request):
 
 # --- Supplier Management ---
 
+
 def add_supplier(request):
     if request.method == 'POST':
         form = SupplierForm(request.POST)
@@ -562,6 +673,7 @@ def add_supplier(request):
     return render(request, 'invent/add_supplier.html', {'form': form})
 
 # --- Reports and Export ---
+
 
 @login_required
 @permission_required('invent.view_device', raise_exception=True)
@@ -586,6 +698,7 @@ def reports_view(request):
     }
     return render(request, 'invent/reports.html', context)
 
+
 @login_required
 @permission_required('invent.add_device', raise_exception=True)
 def upload_inventory(request):
@@ -595,7 +708,8 @@ def upload_inventory(request):
             wb = openpyxl.load_workbook(excel_file)
             sheet = wb.active
         except Exception:
-            messages.error(request, "Invalid Excel file. Please upload a valid .xlsx file.")
+            messages.error(
+                request, "Invalid Excel file. Please upload a valid .xlsx file.")
             return redirect("upload_inventory")
         header = [str(cell.value).strip() for cell in sheet[1]]
         header_lower = [h.lower() for h in header]
@@ -624,11 +738,13 @@ def upload_inventory(request):
             price_tsh = row_data.get("selling price (tsh)") or 0
             status = (str(row_data.get("status") or "available")).lower()
             if status not in ["available", "issued", "returned", "faulty"]:
-                messages.warning(request, f"Invalid status '{status}' for product {product_id}. Skipped.")
+                messages.warning(
+                    request, f"Invalid status '{status}' for product {product_id}. Skipped.")
                 continue
             supplier = Supplier.objects.filter(supplier_id=supplier_id).first()
             if not supplier:
-                messages.warning(request, f"Supplier ID {supplier_id} not found. Skipped product {product_id}.")
+                messages.warning(
+                    request, f"Supplier ID {supplier_id} not found. Skipped product {product_id}.")
                 continue
             imeis = [i.strip() for i in imei_field.split(",") if i.strip()]
             try:
@@ -644,7 +760,8 @@ def upload_inventory(request):
                 total_qty = len(imeis)
             for imei in imeis:
                 if Device.objects.filter(imei_no=imei).exists():
-                    messages.warning(request, f"IMEI {imei} already exists. Skipped.")
+                    messages.warning(
+                        request, f"IMEI {imei} already exists. Skipped.")
                     continue
                 Device.objects.create(
                     supplier=supplier,
@@ -666,11 +783,13 @@ def upload_inventory(request):
 
 # --- Total Requests Table/Export (Reports) ---
 
+
 @login_required
 def total_requests(request):
     query = request.GET.get('q', '')
     status_filter = request.GET.get('status', '')
-    queryset = DeviceRequest.objects.select_related("device", "client", "requestor").order_by('-date_requested')
+    queryset = DeviceRequest.objects.select_related(
+        "device", "client", "requestor").order_by('-date_requested')
     if query:
         queryset = queryset.filter(
             Q(device__imei_no__icontains=query) |
@@ -689,10 +808,12 @@ def total_requests(request):
     }
     return render(request, 'invent/total_requests.html', context)
 
+
 @login_required
 def export_total_requests(request):
     status_filter = request.GET.get('status')
-    queryset = DeviceRequest.objects.select_related("device", "client", "requestor")
+    queryset = DeviceRequest.objects.select_related(
+        "device", "client", "requestor")
     if status_filter:
         queryset = queryset.filter(status=status_filter)
     wb = openpyxl.Workbook()
@@ -707,7 +828,8 @@ def export_total_requests(request):
         ws.append([
             device.category or "-", device.imei_no or "-", device.serial_no or "-",
             req.status, req.client.name if req.client else "-",
-            req.date_issued.strftime("%Y-%m-%d %H:%M") if req.date_issued else "-"
+            req.date_issued.strftime(
+                "%Y-%m-%d %H:%M") if req.date_issued else "-"
         ])
     for i, col in enumerate(headers, 1):
         ws.column_dimensions[get_column_letter(i)].width = 20
@@ -717,6 +839,7 @@ def export_total_requests(request):
     response["Content-Disposition"] = 'attachment; filename=total_requests.xlsx'
     wb.save(response)
     return response
+
 
 @login_required
 def export_inventory_items(request):
@@ -751,6 +874,8 @@ def export_inventory_items(request):
     return response
 
 # --- Return Logic: List of issued requests for return and process return ---
+
+
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
 def list_issued_requests_for_return(request):
@@ -762,6 +887,7 @@ def list_issued_requests_for_return(request):
         'title': 'Issued Devices for Return'
     }
     return render(request, 'invent/list_issued_requests_for_return.html', context)
+
 
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
@@ -791,12 +917,14 @@ def process_return_for_request(request, request_id):
                 client=device_request.client,
                 reason=reason
             )
-            messages.success(request, f"{returned_quantity} device(s) marked as returned.")
+            messages.success(
+                request, f"{returned_quantity} device(s) marked as returned.")
         return redirect('list_issued_requests_for_return')
     return render(request, 'invent/process_return_for_request.html', {
         'device_request': device_request
     })
-    
+
+
 @login_required
 def request_list(request, status):
     """List of requests by status for the logged-in user."""

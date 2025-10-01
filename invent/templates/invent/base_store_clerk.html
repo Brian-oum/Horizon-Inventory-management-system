@@ -240,11 +240,18 @@
                 </li>
                 
                 
-                <li class="nav-item mb-2">
+                <li class="nav-item mb-2 d-flex justify-content-between align-items-center">
                     <a class="nav-link {% if request.resolver_match.url_name == 'issue_device' %}active{% endif %}" href="{% url 'issue_device' %}">
                         <i class="fas fa-fw fa-box-open me-2"></i> Issue IoT Device
                     </a>
+                        {% if pending_requests_count_for_sidebar > 0 %}
+                        <span class="badge bg-danger ms-2">{{ pending_requests_count_for_sidebar }}</span>
+                        {% endif %}
                 </li>
+
+
+
+
                 <li class="nav-item mb-2">
                     <a class="nav-link {% if request.resolver_match.url_name == 'return_device' %}active{% endif %}" href="{% url 'return_device' %}">
                         <i class="fas fa-fw fa-arrow-left me-2"></i> Return IoT Device
@@ -277,7 +284,7 @@
                     </a>
                 </li>
             </ul>
-            <small class="text-muted">Horizon Limited</small>
+            <small class="text-muted">Horizon Company</small>
         </div>
     </nav>
 
@@ -305,4 +312,4 @@
     </script>
     {% block extra_js %}{% endblock %}
 </body>
-</html> 
+</html>

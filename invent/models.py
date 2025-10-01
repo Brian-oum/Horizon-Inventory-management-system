@@ -5,11 +5,13 @@ from django.core.mail import send_mail
 
 # --- BEGIN IoT/Client/Supplier Models ---
 
+
 class Office(models.Model):
     address = models.CharField(max_length=255)
 
     def __str__(self):
         return self.address
+
 
 class Supplier(models.Model):
     supplier_id = models.CharField(max_length=20, unique=True)
@@ -21,6 +23,7 @@ class Supplier(models.Model):
     def __str__(self):
         return f"{self.name} ({self.supplier_id})"
 
+
 class PurchaseOrder(models.Model):
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
     order_date = models.DateField()
@@ -30,6 +33,7 @@ class PurchaseOrder(models.Model):
     def __str__(self):
         return f"PO #{self.id} - {self.supplier.name}"
 
+
 class Client(models.Model):
     name = models.CharField(max_length=255)
     phone_no = models.CharField(max_length=50)
@@ -38,6 +42,7 @@ class Client(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class Device(models.Model):
     name = models.CharField(max_length=255, blank=True)  # Device name
@@ -52,12 +57,16 @@ class Device(models.Model):
         related_name='devices'
     )
     imei_no = models.CharField(max_length=50, unique=True)
-    serial_no = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    serial_no = models.CharField(
+        max_length=50, unique=True, null=True, blank=True)
     category = models.CharField(max_length=50)
     description = models.TextField(blank=True)
-    selling_price_usd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    selling_price_ksh = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    selling_price_tsh = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    selling_price_usd = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    selling_price_ksh = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    selling_price_tsh = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=(
@@ -71,6 +80,7 @@ class Device(models.Model):
 
     def __str__(self):
         return f"Device IMEI:{self.imei_no} Status:{self.status}"
+
 
 class DeviceRequest(models.Model):
     device = models.ForeignKey(
@@ -159,14 +169,27 @@ class DeviceRequest(models.Model):
     def __str__(self):
         return f"Request for {self.device} by {self.requestor.username}"
 
+
 class IssuanceRecord(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
-    client = models.ForeignKey(Client, on_delete=models.CASCADE)
+
+    # CHANGE: Allow null client if the IssuanceRecord is used for internal issues
+    client = models.ForeignKey(
+        Client, on_delete=models.CASCADE, null=True, blank=True)
+
     logistics_manager = models.ForeignKey(User, on_delete=models.CASCADE)
     issued_at = models.DateTimeField(auto_now_add=True)
+    device_request = models.ForeignKey(
+        'DeviceRequest',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='issuances'
+    )
 
     def __str__(self):
         return f"{self.device} issued to {self.client.name} by {self.logistics_manager.username}"
+
 
 class ReturnRecord(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
