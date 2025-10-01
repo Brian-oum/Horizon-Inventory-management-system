@@ -77,7 +77,7 @@
                                 <td>
                                     <input type="checkbox" name="device_ids" value="{{ device.id }}">
                                 </td>
-                                <td>{{ device.id }}</td>
+                                <td>{{ forloop.counter }}</td>
                                 <td>{{ device.name|default:device.category }}</td>
                                 <td>{{ device.imei_no|default:"-" }}</td>
                                 <td>{{ device.serial_no|default:"-" }}</td>
