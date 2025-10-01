@@ -20,6 +20,7 @@ from .models import (
 from .forms import (
     CustomCreationForm, SupplierForm, DeviceForm, DeviceRequestForm
 )
+from django.utils.dateparse import parse_date
 
 # --- Authentication/Registration ---
 
@@ -434,6 +435,58 @@ def request_summary(request):
         'requests_by_requestor': requests_by_requestor,
     }
     return render(request, 'invent/request_summary.html', context)
+
+# --- Client List ---
+@login_required
+def client_list(request):
+    # Get filter values
+    query = request.GET.get('q', '')
+    status_filter = request.GET.get('status', '')
+    client_filter = request.GET.get('client', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    # Base queryset
+    requests_qs = DeviceRequest.objects.select_related('client', 'device').order_by('-date_requested')
+
+    # Free text search
+    if query:
+        requests_qs = requests_qs.filter(
+            Q(client__name__icontains=query) |
+            Q(client__email__icontains=query) |
+            Q(client__phone__icontains=query) |
+            Q(device__name__icontains=query)
+        )
+
+    # Filter by status
+    if status_filter:
+        requests_qs = requests_qs.filter(status=status_filter)
+
+    # Filter by client name
+    if client_filter:
+        requests_qs = requests_qs.filter(client__name__icontains=client_filter)
+
+    # Filter by date range
+    if date_from:
+        requests_qs = requests_qs.filter(date_requested__date__gte=parse_date(date_from))
+    if date_to:
+        requests_qs = requests_qs.filter(date_requested__date__lte=parse_date(date_to))
+
+    # Pagination
+    paginator = Paginator(requests_qs, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_obj': page_obj,
+        'query': query,
+        'status_filter': status_filter,
+        'client_filter': client_filter,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
+    return render(request, 'invent/client_list.html', context)
+
 
 # --- Stock Adjustment/Search ---
 

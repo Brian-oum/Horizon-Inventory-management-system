@@ -302,6 +302,11 @@
             <i class="fas fa-chart-line"></i> <span>Request Summary</span>
           </a>
         </li>
+        <li class="nav-item mb-2">
+          <a class="nav-link {% if request.resolver_match.url_name == 'client_list' %}active{% endif %}" href="{% url 'client_list' %}">
+            <i class="fas fa-users"></i> <span>Client Details</span>
+          </a>
+        </li>
       </ul>
     </div>
 
@@ -411,7 +416,7 @@
               {% for req in requests %}
               <tr class="table-row-clickable" data-request-id="{{ req.id }}">
                 <td>#{{ req.id }}</td>
-                <td>{{ req.item.name }}</td>
+                <td>{{ req.device.name }}</td>
                 <td>
                   {% if req.status == "Approved" %}
                     <span class="badge badge-status-approved">Approved</span>

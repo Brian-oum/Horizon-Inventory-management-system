@@ -150,7 +150,7 @@
                                 <tbody>
                                     {% for device_data in requests_by_device %}
                                         <tr>
-                                            <td>{{ device_data.device__imei_no }}</td>
+                                            <td>{{ req.device.name }}</td>
                                             <td class="text-end">{{ device_data.total_requested }}</td>
                                         </tr>
                                     {% endfor %}
