@@ -658,19 +658,55 @@ def adjust_stock(request):
 
 # --- Supplier Management ---
 
-
 def add_supplier(request):
-    if request.method == 'POST':
+    edit_mode = False
+    supplier_to_edit = None
+
+    # Handle supplier deletion
+    if request.method == "POST" and "delete_supplier_id" in request.POST:
+        supplier = get_object_or_404(Supplier, id=request.POST.get("delete_supplier_id"))
+        supplier.delete()
+        messages.success(request, "Supplier deleted successfully!")
+        return redirect('add_supplier')
+
+    # Handle supplier edit (save changes)
+    if request.method == "POST" and "edit_supplier_id" in request.POST:
+        supplier_to_edit = get_object_or_404(Supplier, id=request.POST.get("edit_supplier_id"))
+        form = SupplierForm(request.POST, instance=supplier_to_edit)
+        edit_mode = True
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Supplier updated successfully!")
+            return redirect('add_supplier')
+        else:
+            messages.error(request, "Please correct the errors below.")
+
+    # Start editing (GET ?edit=id)
+    elif "edit" in request.GET:
+        supplier_to_edit = get_object_or_404(Supplier, id=request.GET.get("edit"))
+        form = SupplierForm(instance=supplier_to_edit)
+        edit_mode = True
+
+    # Handle supplier addition
+    elif request.method == 'POST':
         form = SupplierForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, "Supplier added successfully!")
-            return redirect('store_clerk_dashboard')
+            return redirect('add_supplier')
         else:
             messages.error(request, "Please correct the errors below.")
+
     else:
         form = SupplierForm()
-    return render(request, 'invent/add_supplier.html', {'form': form})
+
+    suppliers = Supplier.objects.all().order_by('-id')
+    return render(request, 'invent/add_supplier.html', {
+        'form': form,
+        'suppliers': suppliers,
+        'edit_mode': edit_mode,
+        'supplier_to_edit': supplier_to_edit,
+    })
 
 # --- Reports and Export ---
 
