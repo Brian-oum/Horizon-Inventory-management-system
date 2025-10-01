@@ -1,0 +1,51 @@
+{% extends 'invent/base.html' %}
+
+{% block title %}{{ status|title }} Requests{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">{{ status|title }} Requests</h2>
+        <!-- ✅ This button always points to the summary page -->
+        <a href="{% url 'request_summary' %}" class="btn btn-secondary">Back to Summary</a>
+    </div>
+
+    {% if requests %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Device</th>
+                        <th>Status</th>
+                        <th>Requested On</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in requests %}
+                        <tr>
+                            <td>{{ req.id }}</td>
+                            <td>{{ req.device }}</td>
+                            <td>
+                                <span class="badge 
+                                    {% if req.status == 'Pending' %} bg-warning 
+                                    {% elif req.status == 'Approved' %} bg-success
+                                    {% elif req.status == 'Issued' %} bg-info
+                                    {% elif req.status == 'Rejected' %} bg-danger
+                                    {% else %} bg-secondary {% endif %}">
+                                    {{ req.status }}
+                                </span>
+                            </td>
+                            <td>{{ req.created_at|date:"M d, Y H:i" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            Nothing to show for {{ status|title }} requests.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -716,3 +716,18 @@ def process_return_for_request(request, request_id):
     return render(request, 'invent/process_return_for_request.html', {
         'device_request': device_request
     })
+    
+@login_required
+def request_list(request, status):
+    """List of requests by status for the logged-in user."""
+    user_requests = DeviceRequest.objects.filter(requestor=request.user)
+
+    if status == "all":
+        requests = user_requests
+    else:
+        requests = user_requests.filter(status__iexact=status)
+
+    return render(request, 'invent/request_list.html', {
+        'status': status,
+        'requests': requests
+    })
