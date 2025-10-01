@@ -30,8 +30,18 @@
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="approved-tab" data-bs-toggle="tab" data-bs-target="#approved" type="button" role="tab">
+                Ready to Issue 
+                {% if approved_requests and approved_requests.count > 0 %}
+                    <span class="badge rounded-pill bg-success ms-1">
+                        {{ approved_requests.count }}
+                    </span>
+                {% endif %}
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link" id="issue-tab" data-bs-toggle="tab" data-bs-target="#issue" type="button" role="tab">
-                Issue Device
+                Issue Device (Direct)
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -42,7 +52,6 @@
     </ul>
 
     <div class="tab-content" id="deviceIssueTabsContent">
-        <!-- 1. Pending Requests Tab -->
         <div class="tab-pane fade show active" id="pending" role="tabpanel" aria-labelledby="pending-tab">
             <h5 class="mb-3">Pending Device Requests Awaiting Action</h5>
             <div class="table-responsive">
@@ -61,7 +70,7 @@
                     <tbody>
                         {% for req in pending_requests %}
                         <tr>
-                            <td>{{ forloop.counter }}</td>
+                            <td>{{ req.id }}</td>
                             <td>{{ req.requestor.username }}</td>
                             <td>
                                 IMEI: {{ req.device.imei_no }}
@@ -99,9 +108,64 @@
             </div>
         </div>
 
-        <!-- 2. Issue Device Tab -->
+        <div class="tab-pane fade" id="approved" role="tabpanel" aria-labelledby="approved-tab">
+            <h5 class="mb-3">Approved Requests Ready to be Issued</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Requestor</th>
+                            <th>Device</th>
+                            <th>Client</th>
+                            <th>Status</th>
+                            <th>Requested At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in approved_requests %}
+                        <tr>
+                            <td>{{ req.id }}</td>
+                            <td>{{ req.requestor.username }}</td>
+                            <td>
+                                IMEI: {{ req.device.imei_no }}
+                                {% if req.device.serial_no %}| Serial: {{ req.device.serial_no }}{% endif %}
+                            </td>
+                            <td>{{ req.client.name|default:"N/A" }}</td>
+                            <td>
+                                <span class="badge bg-success">
+                                    {{ req.status|capfirst }}
+                                </span>
+                            </td>
+                            <td>{{ req.requested_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <form action="{% url 'issue_device' %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="issue">
+                                    <input type="hidden" name="device_request_id" value="{{ req.id }}">
+                                    <button type="submit" class="btn btn-primary btn-sm me-1">Issue</button>
+                                </form>
+                                <form action="{% url 'issue_device' %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="reject">
+                                    <input type="hidden" name="device_request_id" value="{{ req.id }}">
+                                    <button type="submit" class="btn btn-danger btn-sm me-1">Reject</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">No approved requests ready for issuance.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="tab-pane fade" id="issue" role="tabpanel" aria-labelledby="issue-tab">
-            <h5 class="mb-3">Issue Device</h5>
+            <h5 class="mb-3">Issue Device Directly (No Request)</h5>
             <form method="post">
                 {% csrf_token %}
                 <div class="row mb-3">
@@ -132,7 +196,6 @@
                 </div>
             </form>
 
-            <!-- Available Devices Table -->
             <div class="table-responsive mt-4">
                 <table class="table table-hover table-striped">
                     <thead class="table-dark">
@@ -165,7 +228,6 @@
             </div>
         </div>
 
-        <!-- 3. All Requests Tab -->
         <div class="tab-pane fade" id="all" role="tabpanel" aria-labelledby="all-tab">
             <h5 class="mb-3">All Device Requests</h5>
             <div class="table-responsive">
@@ -183,7 +245,7 @@
                     <tbody>
                         {% for req in all_requests %}
                         <tr>
-                            <td>{{ forloop.counter }}</td>
+                            <td>{{ req.id }}</td>
                             <td>{{ req.requestor.username }}</td>
                             <td>
                                 IMEI: {{ req.device.imei_no }}
@@ -192,15 +254,15 @@
                             <td>{{ req.client.name|default:"N/A" }}</td>
                             <td>
                                 <span class="badge
-                                    {% if req.status == 'pending' %}bg-warning text-dark
-                                    {% elif req.status == 'approved' %}bg-success
-                                    {% elif req.status == 'issued' %}bg-primary
-                                    {% elif req.status == 'rejected' %}bg-danger
+                                    {% if req.status == 'Pending' %}bg-warning text-dark
+                                    {% elif req.status == 'Approved' %}bg-success
+                                    {% elif req.status == 'Issued' %}bg-primary
+                                    {% elif req.status == 'Rejected' %}bg-danger
                                     {% else %}bg-secondary{% endif %}">
                                     {{ req.status|capfirst }}
                                 </span>
                             </td>
-                            <td>{{ req.date_requested|date:"Y-m-d H:i" }}</td>
+                            <td>{{ req.requested_at|date:"Y-m-d H:i" }}</td>
                         </tr>
                         {% empty %}
                         <tr>
