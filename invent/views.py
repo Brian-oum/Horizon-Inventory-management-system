@@ -124,7 +124,8 @@ def request_device(request):
                 subject='Device Request Confirmation',
                 message=(
                     f"Dear {request.user.first_name or request.user.username},\n\n"
-                    f"Your request for device (IMEI: {device_request.device.imei_no}, "
+                    f"Your request for device (IMEI: {device_request.device}, "
+                    f"Name: {device_request.device.name}\n"
                     f"Model: {device_request.device.category}) has been submitted successfully.\n"
                     f"We will notify you once it is reviewed or issued.\n\n"
                     f"Thank you,\nInventory Management Team"
@@ -416,7 +417,7 @@ def request_summary(request):
     )['total_returned'] or 0
     requests_by_status = user_requests.values(
         'status').annotate(count=Count('id')).order_by('status')
-    requests_by_device = user_requests.values('device__imei_no').annotate(
+    requests_by_device = user_requests.values('device__name').annotate(
         total_requested=Sum('quantity')
     ).order_by('-total_requested')[:10]
     requests_by_requestor = user_requests.values(

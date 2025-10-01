@@ -322,7 +322,7 @@
       </div>
       
       <div class="mt-2">  <!-- Added margin-top -->
-        <small class="text-muted">Powered by HorizonIoT LtD</small>
+        <small class="text-muted">Horizon Limited</small>
       </div>
     </footer>
   </div>
@@ -415,7 +415,7 @@
             <tbody>
               {% for req in requests %}
               <tr class="table-row-clickable" data-request-id="{{ req.id }}">
-                <td>#{{ req.id }}</td>
+                <td>{{ forloop.counter }}</td>
                 <td>{{ req.device.name }}</td>
                 <td>
                   {% if req.status == "Approved" %}
