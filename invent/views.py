@@ -787,9 +787,14 @@ def upload_inventory(request):
 @login_required
 def total_requests(request):
     query = request.GET.get('q', '')
+    # Get the status filter from the URL. Defaults to '' (no filter).
     status_filter = request.GET.get('status', '')
+
+    # Start with the base queryset, optimizing with select_related
     queryset = DeviceRequest.objects.select_related(
         "device", "client", "requestor").order_by('-date_requested')
+
+    # 1. Apply Search Query Filter (if present)
     if query:
         queryset = queryset.filter(
             Q(device__imei_no__icontains=query) |
@@ -797,14 +802,25 @@ def total_requests(request):
             Q(device__category__icontains=query) |
             Q(client__name__icontains=query)
         )
-    if status_filter:
+
+    # 2. Apply Status Filter (if present)
+    # Filter by the literal status provided in the URL, except for 'all'.
+    if status_filter and status_filter.lower() != 'all':
+        # This will filter for the exact status string, e.g., 'Issued', 'Rejected', or 'Returned'.
+        # The special handling for combining 'Fully Returned' and 'Partially Returned' is now ignored.
         queryset = queryset.filter(status=status_filter)
+
+        # Note: If the status filter is 'all' or empty, no status filter is applied to the queryset.
+
+    # 3. Apply Pagination
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+
+    # 4. Prepare Context
     context = {
         'page_obj': page_obj,
-        'status_filter': status_filter,
+        'status_filter': status_filter,  # Pass filter to template for dynamic title/links
     }
     return render(request, 'invent/total_requests.html', context)
 

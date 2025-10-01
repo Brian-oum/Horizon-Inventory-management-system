@@ -1,97 +1,154 @@
 {% extends 'invent/base_store_clerk.html' %}
+{% load static %}
 
-{% block title %}All Requests{% endblock %}
+{% block title %}
+{# Dynamic Title Tag for the browser tab #}
+{% if status_filter and status_filter.lower != 'all' %}
+{{ status_filter }} Requests
+{% else %}
+All Requests
+{% endif %}
+{% endblock %}
 
 {% block content %}
+
 <div class="container mt-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="mb-0 text-primary"><i class="fas fa-microchip me-2"></i> All IoT Devices</h2>
-        <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
-    </div>
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h2 class="mb-0 text-primary">
+<i class="fas fa-list-alt me-2"></i>
+{# Dynamic Heading for the page content #}
+{% if status_filter and status_filter.lower != 'all' %}
+{{ status_filter }} Items
+{% else %}
+All Device Requests
+{% endif %}
+</h2>
+<a href="{% url 'store_clerk_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+</div>
 
-    <!-- Search and Export -->
-    <div class="d-flex justify-content-between mb-3 align-items-center">
-        <form method="get" class="d-flex align-items-center" style="gap: 10px;">
-            <div class="input-group">
-                <span class="input-group-text"><i class="fas fa-search"></i></span>
-                <input type="text" name="q" value="{{ request.GET.q }}" class="form-control"
-                       placeholder="Search by IMEI, Serial, Category, Client">
-            </div>
-            <button type="submit" class="btn btn-success">Search</button>
+<!-- Search and Export -->
+<div class="d-flex justify-content-between mb-3 align-items-center">
+    <form method="get" class="d-flex align-items-center" style="gap: 10px;">
+        <input type="hidden" name="status" value="{{ status_filter }}">
+        <div class="input-group">
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
+            <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control"
+                    placeholder="Search by IMEI, Serial, Category, Client">
+        </div>
+        <button type="submit" class="btn btn-success">Search</button>
+        
+        {# To ensure the 'Reset' button links back to the status filter if one is applied #}
+        {% if status_filter and status_filter != 'all' %}
+            <a href="{% url 'total_requests' %}?status={{ status_filter }}" class="btn btn-outline-secondary">Reset</a>
+        {% else %}
             <a href="{% url 'total_requests' %}" class="btn btn-outline-secondary">Reset</a>
-        </form>
+        {% endif %}
+    </form>
 
-        <a href="{% url 'export_total_requests' %}" class="btn btn-success">
-            <i class="fas fa-file-excel"></i> Export All
-        </a>
-    </div>
+    {# Pass the current status filter to the export view #}
+    <a href="{% url 'export_total_requests' %}?status={{ status_filter|default:'' }}" class="btn btn-success">
+        <i class="fas fa-file-excel"></i> Export All
+    </a>
+</div>
 
-    <!-- Table -->
-    <div class="table-responsive">
-        <table class="table table-bordered table-striped">
-            <thead class="table-light">
-                <tr>
-                    <th>Category</th>
-                    <th>IMEI</th>
-                    <th>Serial</th>
-                    <th>Status</th>
-                    <th>Client</th>
-                    <th>Issued At</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for device in page_obj %}
-                <tr>
-                    <td>{{ device.category }}</td>
-                    <td>{{ device.imei }}</td>
-                    <td>{{ device.serial }}</td>
-                    <td>
-                        {% if device.status == "Available" %}
-                            <span class="badge bg-success">Available</span>
-                        {% else %}
-                            <span class="badge bg-secondary">{{ device.status }}</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ device.client|default:"-" }}</td>
-                    <td>{{ device.issued_at|date:"Y-m-d H:i" }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="7" class="text-center">No devices found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<!-- Table -->
+<div class="table-responsive">
+    <table class="table table-bordered table-striped">
+        <thead class="table-light">
+            <tr>
+                <th>Category</th>
+                <th>IMEI</th>
+                <th>Serial</th>
+                <th>Status</th>
+                <th>Client</th>
+                <th>Request Qty</th>
+                <th>Returned Qty</th>
+                <th>Issued At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for req in page_obj %}
+            <tr>
+                {# Access device attributes via the foreign key 'req.device' #}
+                <td>{{ req.device.category }}</td>
+                <td>{{ req.device.imei_no }}</td>
+                <td>{{ req.device.serial_no|default:"-" }}</td>
+                
+                {# Access status and client directly from the DeviceRequest object 'req' #}
+                <td>
+                    {# Use a color-coded badge based on the exact status #}
+                    {% if req.status == "Issued" %}
+                        <span class="badge bg-info text-dark">{{ req.status }}</span>
+                    {% elif req.status == "Pending" %}
+                        <span class="badge bg-warning text-dark">{{ req.status }}</span>
+                    {% elif req.status == "Approved" %}
+                        <span class="badge bg-success">{{ req.status }}</span>
+                    {% elif req.status == "Rejected" %}
+                        <span class="badge bg-danger">{{ req.status }}</span>
+                    {% elif req.status == "Returned" %}
+                        <span class="badge bg-primary">{{ req.status }}</span>
+                    {% else %}
+                        {# Catches 'Cancelled' and any other unknown status #}
+                        <span class="badge bg-secondary">{{ req.status }}</span>
+                    {% endif %}
+                </td>
+                
+                {# Access client name via the foreign key 'req.client' #}
+                <td>{{ req.client.name|default:"-" }}</td>
+                
+                {# Display request and returned quantities #}
+                <td>{{ req.quantity }}</td>
+                <td>{{ req.returned_quantity }}</td>
 
-    <!-- Pagination -->
-    <div class="pagination mt-4 text-center">
-        <ul class="list-unstyled d-inline-flex gap-2">
-            {% if page_obj.has_previous %}
-                <li>
-                    <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-outline-secondary">
-                        <i class="fas fa-chevron-left"></i>
-                    </a>
-                </li>
-            {% endif %}
-
-            {% for num in page_obj.paginator.page_range %}
-                {% if page_obj.number == num %}
-                    <li><span class="btn btn-primary">{{ num }}</span></li>
-                {% else %}
-                    <li><a href="?page={{ num }}" class="btn btn-outline-secondary">{{ num }}</a></li>
-                {% endif %}
+                {# Access the date issued from the DeviceRequest object, format, and default to '-' #}
+                <td>{{ req.date_issued|date:"Y-m-d H:i"|default:"-" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="text-center">No device requests found.</td>
+            </tr>
             {% endfor %}
+        </tbody>
+    </table>
+</div>
 
-            {% if page_obj.has_next %}
+<!-- Pagination -->
+<div class="pagination mt-4 text-center">
+    <ul class="list-unstyled d-inline-flex gap-2">
+        {# Previous Page button #}
+        {% if page_obj.has_previous %}
+            <li>
+                {# Preserve search and status filters in the pagination links #}
+                <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            </li>
+        {% endif %}
+
+        {# Page numbers #}
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li><span class="btn btn-primary">{{ num }}</span></li>
+            {% else %}
                 <li>
-                    <a href="?page={{ page_obj.next_page_number }}" class="btn btn-outline-secondary">
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
+                    {# Preserve search and status filters in the pagination links #}
+                    <a href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="btn btn-outline-secondary">{{ num }}</a>
                 </li>
             {% endif %}
-        </ul>
-    </div>
+        {% endfor %}
+
+        {# Next Page button #}
+        {% if page_obj.has_next %}
+            <li>
+                {# Preserve search and status filters in the pagination links #}
+                <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+</div>
+
 </div>
 {% endblock %}
