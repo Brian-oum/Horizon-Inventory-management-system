@@ -10,14 +10,9 @@ urlpatterns = [
     path('', views.requestor_dashboard, name='requestor_dashboard'),
     path('request_device/', views.request_device, name='request_device'),
     path('request_summary/', views.request_summary, name='request_summary'),
+    path('client_list/', views.client_list, name='client_list'),
     path('requests/<str:status>/', views.request_list, name='request_list'),
-    path('cancel-request/<int:request_id>/',
-         views.cancel_request, name='cancel_request'),
-    
-    
-    
-   
-
+    path('cancel-request/<int:request_id>/', views.cancel_request, name='cancel_request'),
 
     # Store Clerk Paths
     path('store_clerk_dashboard/', views.store_clerk_dashboard,
