@@ -12,36 +12,39 @@
 
     {% if requests %}
         <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-light">
-                    <tr>
-                        <th>ID</th>
-                        <th>Device</th>
-                        <th>Status</th>
-                        <th>Requested On</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for req in requests %}
-                        <tr>
-                            <td>{{ req.id }}</td>
-                            <td>{{ req.device }}</td>
-                            <td>
-                                <span class="badge 
-                                    {% if req.status == 'Pending' %} bg-warning 
-                                    {% elif req.status == 'Approved' %} bg-success
-                                    {% elif req.status == 'Issued' %} bg-info
-                                    {% elif req.status == 'Rejected' %} bg-danger
-                                    {% else %} bg-secondary {% endif %}">
-                                    {{ req.status }}
-                                </span>
-                            </td>
-                            <td>{{ req.created_at|date:"M d, Y H:i" }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <table class="table table-bordered table-striped">
+        <thead class="table-light">
+            <tr>
+                <th>ID</th>
+                <th>Device</th>
+                <th>Quantity</th>
+                <th>Status</th>
+                <th>Requested On</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for req in requests %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ req.device.name }}</td>
+                    <td>{{ req.quantity}}</td>
+                    <td>
+                        <span class="badge 
+                            {% if req.status == 'Pending' %} bg-warning 
+                            {% elif req.status == 'Approved' %} bg-success
+                            {% elif req.status == 'Issued' %} bg-info
+                            {% elif req.status == 'Rejected' %} bg-danger
+                            {% else %} bg-secondary {% endif %}">
+                            {{ req.status }}
+                        </span>
+                    </td>
+                    <td>{{ req.date_requested|date:"M d, Y H:i" }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
     {% else %}
         <div class="alert alert-info">
             Nothing to show for {{ status|title }} requests.
