@@ -77,7 +77,7 @@
                     <tbody>
                         {% for device in page_obj %}
                         <tr>
-                            <td>{{ device.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td>{{ device.category }}</td>
                             <td>{{ device.imei_no|default:"-" }}</td>
                             <td>{{ device.serial_no|default:"-" }}</td>

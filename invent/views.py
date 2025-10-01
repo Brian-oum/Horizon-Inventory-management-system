@@ -3,7 +3,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
-from django.db.models import Q, F, Count, Sum
+from django.db.models import Q, F, Count, Sum, Value, IntegerField, Q
 from django.db import transaction
 from django.core.mail import send_mail
 from django.http import HttpResponse
@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 from collections import defaultdict
 import openpyxl
 from openpyxl.utils import get_column_letter
+from django.db.models.functions import Coalesce
 
 from .models import (
     Device, Supplier, DeviceRequest, Client, IssuanceRecord, ReturnRecord
@@ -97,11 +98,28 @@ def requestor_dashboard(request):
 @login_required
 def request_device(request):
     device_id_from_get = request.GET.get('device')
-    requested_device_ids = DeviceRequest.objects.filter(status='Pending').values_list('device_id', flat=True)
-    available_device_queryset = Device.objects.filter(status='available').exclude(id__in=requested_device_ids)
+
+    # ✅ annotate each device with "available_quantity"
+    available_device_queryset = Device.objects.filter(status='available').annotate(
+        requested_quantity=Coalesce(
+            Sum(
+                'requests__quantity',
+                filter=Q(requests__status__in=['Pending', 'Approved', 'Issued']),
+                output_field=IntegerField()
+            ),
+            Value(0)
+        )
+    ).annotate(
+        available_quantity=F('total_quantity') - F('requested_quantity')
+    ).filter(
+        available_quantity__gt=0
+    )
+
+    # ✅ group devices by name (like you had before)
     grouped_devices = defaultdict(list)
     for device in available_device_queryset:
         grouped_devices[device.name].append(device)
+
     available_devices = []
     for name, devices in grouped_devices.items():
         available_devices.append({
@@ -112,21 +130,25 @@ def request_device(request):
             "category": devices[0].category,
             "description": devices[0].description,
             "status": "available",
-            "available_count": len(devices),
+            "available_count": sum(d.available_quantity for d in devices),  # ✅ accurate stock
         })
+
     categories = available_device_queryset.values_list('category', flat=True).distinct()
+
+    # ✅ handle POST
     if request.method == 'POST':
         form = DeviceRequestForm(request.POST)
         form.fields['device'].queryset = available_device_queryset
         if form.is_valid():
             device_request = form.save(requestor=request.user)
+
             send_mail(
                 subject='Device Request Confirmation',
                 message=(
                     f"Dear {request.user.first_name or request.user.username},\n\n"
-                    f"Your request for device (IMEI: {device_request.device}, "
-                    f"Name: {device_request.device.name}\n"
-                    f"Model: {device_request.device.category}) has been submitted successfully.\n"
+                    f"Your request for device (IMEI: {device_request.device.imei_no}, "
+                    f"Name: {device_request.device.name}, "
+                    f"Category: {device_request.device.category}) has been submitted successfully.\n"
                     f"We will notify you once it is reviewed or issued.\n\n"
                     f"Thank you,\nInventory Management Team"
                 ),
@@ -139,6 +161,7 @@ def request_device(request):
         else:
             messages.error(request, "Please correct the errors below.")
     else:
+        # ✅ preselect device if ?device=id in URL
         initial_data = {}
         if device_id_from_get and device_id_from_get.isdigit():
             try:
@@ -147,13 +170,16 @@ def request_device(request):
                     initial_data['device'] = device.id
             except Device.DoesNotExist:
                 pass
+
         form = DeviceRequestForm(initial=initial_data)
         form.fields['device'].queryset = available_device_queryset
+
     return render(request, 'invent/request_item.html', {
         'form': form,
         'available_devices': available_devices,
         'categories': categories,
     })
+
 
 # --- Cancel Request ---
 
