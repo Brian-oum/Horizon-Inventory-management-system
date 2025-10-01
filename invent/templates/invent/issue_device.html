@@ -61,7 +61,7 @@
                     <tbody>
                         {% for req in pending_requests %}
                         <tr>
-                            <td>{{ req.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td>{{ req.requestor.username }}</td>
                             <td>
                                 IMEI: {{ req.device.imei_no }}
@@ -183,7 +183,7 @@
                     <tbody>
                         {% for req in all_requests %}
                         <tr>
-                            <td>{{ req.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td>{{ req.requestor.username }}</td>
                             <td>
                                 IMEI: {{ req.device.imei_no }}
@@ -200,7 +200,7 @@
                                     {{ req.status|capfirst }}
                                 </span>
                             </td>
-                            <td>{{ req.requested_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ req.date_requested|date:"Y-m-d H:i" }}</td>
                         </tr>
                         {% empty %}
                         <tr>
