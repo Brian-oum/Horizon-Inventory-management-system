@@ -1,4 +1,5 @@
 from django.contrib import admin
+from .models import Profile
 from .models import (
     Branch,
     OEM,
@@ -8,6 +9,7 @@ from .models import (
     IssuanceRecord,
     ReturnRecord,
     DeviceRequest,
+    Profile,
 )
 
 # Register your models so they appear in the Django admin interface.
@@ -19,3 +21,4 @@ admin.site.register(Client)
 admin.site.register(IssuanceRecord)
 admin.site.register(ReturnRecord)
 admin.site.register(DeviceRequest)
+admin.site.register(Profile)
