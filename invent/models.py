@@ -3,35 +3,50 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.mail import send_mail
 
-# --- BEGIN IoT/Client/Supplier Models ---
+# --- BEGIN IoT/Client/OEM/Branch Models ---
+
+CURRENCY_CHOICES = (
+    ('USD', 'US Dollar'),
+    ('TZS', 'Tanzanian Shilling'),
+    ('KES', 'Kenyan Shilling'),
+    # Add more as needed
+)
+
+COUNTRY_CHOICES = (
+    ('Tanzania', 'Tanzania'),
+    ('Kenya', 'Kenya'),
+    # Add more as needed
+)
 
 
-class Office(models.Model):
+class Branch(models.Model):  # Formerly Office
+    name = models.CharField(max_length=100)
     address = models.CharField(max_length=255)
+    country = models.CharField(max_length=100, choices=COUNTRY_CHOICES)
 
     def __str__(self):
-        return self.address
+        return f"{self.name}, {self.country}"
 
 
-class Supplier(models.Model):
-    supplier_id = models.CharField(max_length=20, unique=True)
+class OEM(models.Model):  # Formerly Supplier
+    oem_id = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=100)
     contact_person = models.CharField(max_length=100, blank=True)
     phone_email = models.CharField(max_length=100, blank=True)
     address = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
-        return f"{self.name} ({self.supplier_id})"
+        return f"{self.name} ({self.oem_id})"
 
 
 class PurchaseOrder(models.Model):
-    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
+    oem = models.ForeignKey(OEM, on_delete=models.CASCADE, default=1)  # was supplier
     order_date = models.DateField()
     expected_delivery = models.DateField()
     status = models.CharField(max_length=50)
 
     def __str__(self):
-        return f"PO #{self.id} - {self.supplier.name}"
+        return f"PO #{self.id} - {self.oem.name}"
 
 
 class Client(models.Model):
@@ -48,25 +63,31 @@ class Device(models.Model):
     name = models.CharField(max_length=255, blank=True)  # Device name
     total_quantity = models.PositiveIntegerField(default=1)
     product_id = models.CharField(max_length=30)
-    supplier = models.ForeignKey(
-        Supplier,
+    oem = models.ForeignKey(
+        OEM,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        to_field='supplier_id',
+        to_field='oem_id',
         related_name='devices'
     )
     imei_no = models.CharField(max_length=50, unique=True)
     serial_no = models.CharField(
         max_length=50, unique=True, null=True, blank=True)
     category = models.CharField(max_length=50)
+    manufacturer = models.CharField(max_length=100, blank=True)  # Add if needed
     description = models.TextField(blank=True)
-    selling_price_usd = models.DecimalField(
+    selling_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True)
-    selling_price_ksh = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True)
-    selling_price_tsh = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(
+        max_length=10, choices=CURRENCY_CHOICES, default='USD'
+    )
+    branch = models.ForeignKey(
+        Branch, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    country = models.CharField(
+        max_length=100, choices=COUNTRY_CHOICES, blank=True, null=True
+    )
     status = models.CharField(
         max_length=20,
         choices=(
@@ -104,6 +125,12 @@ class DeviceRequest(models.Model):
     quantity = models.PositiveIntegerField(default=1)
     reason = models.TextField(blank=True, null=True)
     application_date = models.DateField(default=timezone.now)
+    branch = models.ForeignKey(
+        Branch, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    country = models.CharField(
+        max_length=100, choices=COUNTRY_CHOICES, blank=True, null=True
+    )
     STATUS_CHOICES = [
         ('Pending', 'Pending'),
         ('Approved', 'Approved'),
@@ -173,11 +200,8 @@ class DeviceRequest(models.Model):
 
 class IssuanceRecord(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
-
-    # CHANGE: Allow null client if the IssuanceRecord is used for internal issues
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, null=True, blank=True)
-
     logistics_manager = models.ForeignKey(User, on_delete=models.CASCADE)
     issued_at = models.DateTimeField(auto_now_add=True)
     device_request = models.ForeignKey(
@@ -189,7 +213,7 @@ class IssuanceRecord(models.Model):
     )
 
     def __str__(self):
-        return f"{self.device} issued to {self.client.name} by {self.logistics_manager.username}"
+        return f"{self.device} issued to {self.client.name if self.client else 'N/A'} by {self.logistics_manager.username}"
 
 
 class ReturnRecord(models.Model):
@@ -201,10 +225,4 @@ class ReturnRecord(models.Model):
     def __str__(self):
         return f"{self.device} returned by {self.client.name} on {self.returned_at.strftime('%Y-%m-%d')}"
 
-class Branch(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-
-    def __str__(self):
-        return self.name
-
-# --- END IoT/Client/Supplier Models ---
+# --- END IoT/Client/OEM/Branch Models ---
