@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
-    Office,
-    Supplier,
+    Branch,
+    OEM,
     PurchaseOrder,
     Device,
     Client,
@@ -11,8 +11,8 @@ from .models import (
 )
 
 # Register your models so they appear in the Django admin interface.
-admin.site.register(Office)
-admin.site.register(Supplier)
+admin.site.register(Branch)
+admin.site.register(OEM)
 admin.site.register(PurchaseOrder)
 admin.site.register(Device)
 admin.site.register(Client)
