@@ -3,7 +3,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
-from django.db.models import Q, F, Count, Sum, Value, IntegerField, Q
+from django.db.models import Q, F, Count, Sum, Value, IntegerField
 from django.db import transaction
 from django.core.mail import send_mail
 from django.http import HttpResponse
@@ -16,7 +16,7 @@ from openpyxl.utils import get_column_letter
 from django.db.models.functions import Coalesce
 
 from .models import (
-    Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord, Branch
+    Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord, Branch, Profile
 )
 from .forms import (
     CustomCreationForm, OEMForm, DeviceForm, DeviceRequestForm
@@ -24,7 +24,6 @@ from .forms import (
 from django.utils.dateparse import parse_date
 
 # --- Authentication/Registration ---
-
 
 def register(request):
     if request.method == 'POST':
@@ -37,7 +36,6 @@ def register(request):
     else:
         form = CustomCreationForm()
     return render(request, 'invent/register.html', {'form': form})
-
 
 def custom_login(request):
     if request.method == 'POST':
@@ -55,14 +53,12 @@ def custom_login(request):
         form = AuthenticationForm()
     return render(request, 'invent/login.html', {'form': form})
 
-
 def logout_view(request):
     logout(request)
     messages.info(request, "You have been logged out.")
     return redirect('login')
 
 # --- Dashboard for Requestor ---
-
 
 @login_required
 def requestor_dashboard(request):
@@ -103,29 +99,47 @@ def requestor_dashboard(request):
 
 # --- Device Request ---
 
-
 @login_required
 def request_device(request):
     device_id_from_get = request.GET.get('device')
-
-    # ✅ annotate each device with "available_quantity"
-    available_device_queryset = Device.objects.filter(status='available').annotate(
-        requested_quantity=Coalesce(
-            Sum(
-                'requests__quantity',
-                filter=Q(requests__status__in=[
-                         'Pending', 'Approved', 'Issued']),
-                output_field=IntegerField()
-            ),
-            Value(0)
+    user = request.user
+    # COUNTRY FILTER: Restrict device queryset by user's country
+    if user.is_superuser:
+        available_device_queryset = Device.objects.filter(status='available').annotate(
+            requested_quantity=Coalesce(
+                Sum(
+                    'requests__quantity',
+                    filter=Q(requests__status__in=[
+                             'Pending', 'Approved', 'Issued']),
+                    output_field=IntegerField()
+                ),
+                Value(0)
+            )
+        ).annotate(
+            available_quantity=F('total_quantity') - F('requested_quantity')
+        ).filter(
+            available_quantity__gt=0
         )
-    ).annotate(
-        available_quantity=F('total_quantity') - F('requested_quantity')
-    ).filter(
-        available_quantity__gt=0
-    )
+    else:
+        user_country = getattr(user.profile, "country", None)
+        available_device_queryset = Device.objects.filter(
+            status='available', country=user_country
+        ).annotate(
+            requested_quantity=Coalesce(
+                Sum(
+                    'requests__quantity',
+                    filter=Q(requests__status__in=[
+                             'Pending', 'Approved', 'Issued']),
+                    output_field=IntegerField()
+                ),
+                Value(0)
+            )
+        ).annotate(
+            available_quantity=F('total_quantity') - F('requested_quantity')
+        ).filter(
+            available_quantity__gt=0
+        )
 
-    # ✅ group devices by name (like you had before)
     grouped_devices = defaultdict(list)
     for device in available_device_queryset:
         grouped_devices[device.name].append(device)
@@ -140,20 +154,17 @@ def request_device(request):
             "category": devices[0].category,
             "description": devices[0].description,
             "status": "available",
-            # ✅ accurate stock
             "available_count": sum(d.available_quantity for d in devices),
         })
 
     categories = available_device_queryset.values_list(
         'category', flat=True).distinct()
 
-    # ✅ handle POST
     if request.method == 'POST':
         form = DeviceRequestForm(request.POST)
         form.fields['device'].queryset = available_device_queryset
         if form.is_valid():
             device_request = form.save(requestor=request.user)
-
             send_mail(
                 subject='Device Request Confirmation',
                 message=(
@@ -173,7 +184,6 @@ def request_device(request):
         else:
             messages.error(request, "Please correct the errors below.")
     else:
-        # ✅ preselect device if ?device=id in URL
         initial_data = {}
         if device_id_from_get and device_id_from_get.isdigit():
             try:
@@ -190,9 +200,8 @@ def request_device(request):
         'form': form,
         'available_devices': available_devices,
         'categories': categories,
-        'branches': Branch.objects.all(),  #render branch in template
+        'branches': Branch.objects.all(),
     })
-
 
 # --- Cancel Request ---
 
@@ -219,19 +228,37 @@ def cancel_request(request, request_id):
 
 # --- Clerk Dashboard ---
 
-
 @login_required
 @permission_required('invent.view_device', raise_exception=True)
 def store_clerk_dashboard(request):
-    total_devices = Device.objects.count()
-    devices_available = Device.objects.filter(status='available').count()
-    devices_issued = Device.objects.filter(status='issued').count()
-    devices_returned = Device.objects.filter(status='returned').count()
-    recent_issuances = (
-        IssuanceRecord.objects
-        .select_related('device', 'client')
-        .order_by('-issued_at')[:10]
-    )
+    user = request.user
+    # COUNTRY FILTER: Restrict by user's country
+    if user.is_superuser:
+        total_devices = Device.objects.count()
+        devices_available = Device.objects.filter(status='available').count()
+        devices_issued = Device.objects.filter(status='issued').count()
+        devices_returned = Device.objects.filter(status='returned').count()
+        recent_issuances = (
+            IssuanceRecord.objects
+            .select_related('device', 'client')
+            .order_by('-issued_at')[:10]
+        )
+        pending_device_requests = DeviceRequest.objects.filter(
+            status="Pending").select_related("requestor", "device", "client")
+    else:
+        user_country = getattr(user.profile, "country", None)
+        total_devices = Device.objects.filter(country=user_country).count()
+        devices_available = Device.objects.filter(status='available', country=user_country).count()
+        devices_issued = Device.objects.filter(status='issued', country=user_country).count()
+        devices_returned = Device.objects.filter(status='returned', country=user_country).count()
+        recent_issuances = (
+            IssuanceRecord.objects
+            .filter(device__country=user_country)
+            .select_related('device', 'client')
+            .order_by('-issued_at')[:10]
+        )
+        pending_device_requests = DeviceRequest.objects.filter(
+            status="Pending", country=user_country).select_related("requestor", "device", "client")
     seen = set()
     recent_devices = []
     for record in recent_issuances:
@@ -242,8 +269,6 @@ def store_clerk_dashboard(request):
             seen.add(record.device.id)
         if len(recent_devices) >= 5:
             break
-    pending_device_requests = DeviceRequest.objects.filter(
-        status="Pending").select_related("requestor", "device", "client")
     context = {
         "total_devices": total_devices,
         "devices_available": devices_available,
@@ -253,7 +278,6 @@ def store_clerk_dashboard(request):
         "pending_device_requests": pending_device_requests,
     }
     return render(request, 'invent/store_clerk_dashboard.html', context)
-
 
 @require_POST
 def delete_device(request, device_id=None):
@@ -267,7 +291,6 @@ def delete_device(request, device_id=None):
 
 # --- Device Request Approval/Reject ---
 
-
 @login_required
 @permission_required('invent.change_devicerequest', raise_exception=True)
 def approve_request(request, request_id):
@@ -277,7 +300,6 @@ def approve_request(request, request_id):
     messages.success(
         request, f"Request {device_request.id} approved successfully.")
     return redirect("store_clerk_dashboard")
-
 
 @login_required
 @permission_required('invent.change_devicerequest', raise_exception=True)
@@ -296,7 +318,13 @@ def inventory_list_view(request):
     page = request.GET.get('page', 1)
     per_page = 10  # Set how many devices per page
 
-    devices = Device.objects.select_related('oem', 'branch').order_by('category', 'oem__name', 'id')
+    user = request.user
+    # COUNTRY FILTER: Restrict by user's country
+    if user.is_superuser:
+        devices = Device.objects.select_related('oem', 'branch').order_by('category', 'oem__name', 'id')
+    else:
+        user_country = getattr(user.profile, "country", None)
+        devices = Device.objects.select_related('oem', 'branch').filter(country=user_country).order_by('category', 'oem__name', 'id')
     
     if status and status != 'all':
         devices = devices.filter(status=status)
@@ -321,13 +349,11 @@ def inventory_list_view(request):
         device.current_client = last_issuance.client if last_issuance else None
         device.issued_at = last_issuance.issued_at if last_issuance else None
 
-    # Group by Category, then OEM name + OEM ID
     grouped_devices = defaultdict(lambda: defaultdict(list))
     for device in devices:
         oem_label = f"{device.oem.name or '-'} ({device.oem.oem_id or '-'})" if device.oem else "-"
         grouped_devices[device.category][oem_label].append(device)
 
-    # Paginate each OEM group
     paginated_grouped_devices = {}
     for category, oems in grouped_devices.items():
         paginated_grouped_devices[category] = {}
@@ -340,14 +366,14 @@ def inventory_list_view(request):
             paginated_grouped_devices[category][oem_label] = page_obj
 
     context = {
-        'grouped_devices': paginated_grouped_devices,  # now paginated!
+        'grouped_devices': paginated_grouped_devices,
         'query': query,
         'status': status,
         'page': page,
     }
     return render(request, 'invent/list_device_grouped.html', context)
-# --- Stock Management ---
 
+# --- Stock Management ---
 
 @login_required
 @permission_required('invent.add_device', raise_exception=True)
@@ -362,7 +388,6 @@ def manage_stock(request):
         else:
             messages.error(request, "Please correct the errors below.")
     return render(request, 'invent/manage_stock.html', {'form': form})
-
 
 @login_required
 @permission_required('invent.change_device', raise_exception=True)
@@ -388,38 +413,42 @@ def edit_item(request, device_id):
 
 # --- Issue Device (Clerk) ---
 
-
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
 def issue_device(request):
-    # Devices and clients for the form (kept for direct issuance, if applicable)
-    available_devices = Device.objects.filter(status='available')
-    clients = Client.objects.all()
+    user = request.user
+    # COUNTRY FILTER: Restrict by user's country
+    if user.is_superuser:
+        available_devices = Device.objects.filter(status='available')
+        clients = Client.objects.all()
+        pending_requests = DeviceRequest.objects.filter(
+            status='Pending'
+        ).select_related("requestor", "device", "client")
+        all_requests = DeviceRequest.objects.select_related(
+            "requestor", "device", "client").all()
+    else:
+        user_country = getattr(user.profile, "country", None)
+        available_devices = Device.objects.filter(status='available', country=user_country)
+        clients = Client.objects.all()
+        pending_requests = DeviceRequest.objects.filter(
+            status='Pending', country=user_country
+        ).select_related("requestor", "device", "client")
+        all_requests = DeviceRequest.objects.select_related(
+            "requestor", "device", "client").filter(country=user_country)
 
-    # Pending requests: ONLY 'Pending' status
-    pending_requests = DeviceRequest.objects.filter(
-        status='Pending'
-    ).select_related("requestor", "device", "client")
     pending_requests_count = pending_requests.count()
-
-    # All requests: any status
-    all_requests = DeviceRequest.objects.select_related(
-        "requestor", "device", "client").all()
 
     if request.method == 'POST':
         action = request.POST.get('action')
         device_request_id = request.POST.get('device_request_id')
 
-        # Handle device request approval/rejection/issuance
         if action in ['approve', 'reject', 'issue'] and device_request_id:
             device_request = get_object_or_404(
                 DeviceRequest, id=device_request_id)
-            device = device_request.device  # The device linked to the request
-            # The client linked to the request (Can be None)
+            device = device_request.device
             client = device_request.client
 
             if action == 'approve' and device_request.status == 'Pending':
-                # *** APPROVE ***
                 device_request.status = 'Approved'
                 device_request.save()
                 messages.success(
@@ -427,35 +456,25 @@ def issue_device(request):
                 return redirect('issue_device')
 
             elif action == 'issue' and device_request.status == 'Approved':
-
-                # --- FIX FOR IntegrityError: NOT NULL constraint failed: invent_issuancerecord.client_id ---
                 if client is None:
                     messages.error(
                         request,
                         f"Cannot issue Request {device_request.id}: **No client is linked** to this approved device request. Update the request first."
                     )
                     return redirect('issue_device')
-                # -------------------------------------------------------------------------------------------------
 
-                # *** ISSUE: Final step, move device status and create IssuanceRecord ***
                 if device.status == 'available':
                     with transaction.atomic():
-                        # Update device status
                         device.status = 'issued'
                         device.save()
-
-                        # Create Issuance Record
                         IssuanceRecord.objects.create(
                             device=device,
                             client=client,
                             logistics_manager=request.user,
-                            device_request=device_request  # Link the issuance record back to the request
+                            device_request=device_request
                         )
-
-                        # Update request status to 'Issued' (or 'Completed')
                         device_request.status = 'Issued'
                         device_request.save()
-
                         messages.success(
                             request,
                             f"Device {device.imei_no} successfully **Issued** to {client.name} (Request {device_request.id})."
@@ -467,7 +486,6 @@ def issue_device(request):
                 return redirect('issue_device')
 
             elif action == 'reject' and device_request.status in ['Pending', 'Approved']:
-                # *** REJECT ***
                 device_request.status = 'Rejected'
                 device_request.save()
                 messages.success(
@@ -479,11 +497,9 @@ def issue_device(request):
                     request, "Invalid action or status for this request.")
                 return redirect('issue_device')
 
-        # Handle direct device issuance (not from a request) - Keep this for flexibility
         device_id = request.POST.get('device_id')
         client_id = request.POST.get('client_id')
         if device_id and client_id:
-            # Existing logic for direct issuance...
             try:
                 device = get_object_or_404(
                     Device, id=device_id, status='available')
@@ -509,7 +525,6 @@ def issue_device(request):
             request, "Please provide valid inputs for issuance or request action.")
         return redirect('issue_device')
 
-    # Update context for the template to show 'Approved' requests too
     approved_requests = DeviceRequest.objects.filter(
         status='Approved'
     ).select_related("requestor", "device", "client")
@@ -525,11 +540,16 @@ def issue_device(request):
 
 # --- Return Device (Clerk) ---
 
-
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
 def return_device(request):
-    issued_devices = Device.objects.filter(status='issued')
+    user = request.user
+    # COUNTRY FILTER: Restrict by user's country
+    if user.is_superuser:
+        issued_devices = Device.objects.filter(status='issued')
+    else:
+        user_country = getattr(user.profile, "country", None)
+        issued_devices = Device.objects.filter(status='issued', country=user_country)
     clients = Client.objects.all()
     if request.method == 'POST':
         device_id = request.POST.get('device_id')
@@ -549,7 +569,6 @@ def return_device(request):
         'issued_devices': issued_devices,
         'clients': clients
     })
-
 
 # --- Request Summary for Requestor ---
 
@@ -592,38 +611,38 @@ def request_summary(request):
 
 # --- Client List ---
 
-
 @login_required
 def client_list(request):
-    # Get filter values
+    user = request.user
     query = request.GET.get('q', '')
     status_filter = request.GET.get('status', '')
     client_filter = request.GET.get('client', '')
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
 
-    # Base queryset
-    requests_qs = DeviceRequest.objects.select_related(
-        'client', 'device').order_by('-date_requested')
+    # COUNTRY FILTER: Restrict by user's country
+    if user.is_superuser:
+        requests_qs = DeviceRequest.objects.select_related(
+            'client', 'device').order_by('-date_requested')
+    else:
+        user_country = getattr(user.profile, "country", None)
+        requests_qs = DeviceRequest.objects.select_related(
+            'client', 'device').filter(country=user_country).order_by('-date_requested')
 
-    # Free text search
     if query:
         requests_qs = requests_qs.filter(
             Q(client__name__icontains=query) |
             Q(client__email__icontains=query) |
-            Q(client__phone__icontains=query) |
+            Q(client__phone_no__icontains=query) |
             Q(device__name__icontains=query)
         )
 
-    # Filter by status
     if status_filter:
         requests_qs = requests_qs.filter(status=status_filter)
 
-    # Filter by client name
     if client_filter:
         requests_qs = requests_qs.filter(client__name__icontains=client_filter)
 
-    # Filter by date range
     if date_from:
         requests_qs = requests_qs.filter(
             date_requested__date__gte=parse_date(date_from))
@@ -631,7 +650,6 @@ def client_list(request):
         requests_qs = requests_qs.filter(
             date_requested__date__lte=parse_date(date_to))
 
-    # Pagination
     paginator = Paginator(requests_qs, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -646,14 +664,19 @@ def client_list(request):
     }
     return render(request, 'invent/client_list.html', context)
 
-
 # --- Stock Adjustment/Search ---
 
 @login_required
 @permission_required('invent.change_device', raise_exception=True)
 def adjust_stock(request):
     query = request.GET.get('q', '')
-    devices = Device.objects.all().order_by('id')
+    user = request.user
+    # COUNTRY FILTER: Restrict by user's country
+    if user.is_superuser:
+        devices = Device.objects.all().order_by('id')
+    else:
+        user_country = getattr(user.profile, "country", None)
+        devices = Device.objects.filter(country=user_country).order_by('id')
     if query:
         devices = devices.filter(
             Q(imei_no__icontains=query) |
@@ -732,30 +755,59 @@ def add_oem(request):
 
 # --- Reports and Export ---
 
-
 @login_required
 @permission_required('invent.view_device', raise_exception=True)
 def reports_view(request):
-    context = {
-        'total_items': Device.objects.aggregate(total=Sum('total_quantity'))['total'] or 0,
-        'total_requests': DeviceRequest.objects.count(),
-        'pending_count': DeviceRequest.objects.filter(status='Pending').count(),
-        'approved_count': DeviceRequest.objects.filter(status='Approved').count(),
-        'issued_count': DeviceRequest.objects.filter(status='Issued').count(),
-        'rejected_count': DeviceRequest.objects.filter(status='Rejected').count(),
-        'fully_returned_count': DeviceRequest.objects.filter(status='Fully Returned').count(),
-        'partially_returned_count': DeviceRequest.objects.filter(status='Partially Returned').count(),
-        'total_returned_quantity_all_items': DeviceRequest.objects.aggregate(
+    user = request.user
+    # COUNTRY FILTER: Restrict by user's country
+    if user.is_superuser:
+        total_items = Device.objects.aggregate(total=Sum('total_quantity'))['total'] or 0
+        total_requests = DeviceRequest.objects.count()
+        pending_count = DeviceRequest.objects.filter(status='Pending').count()
+        approved_count = DeviceRequest.objects.filter(status='Approved').count()
+        issued_count = DeviceRequest.objects.filter(status='Issued').count()
+        rejected_count = DeviceRequest.objects.filter(status='Rejected').count()
+        fully_returned_count = DeviceRequest.objects.filter(status='Fully Returned').count()
+        partially_returned_count = DeviceRequest.objects.filter(status='Partially Returned').count()
+        total_returned_quantity_all_items = DeviceRequest.objects.aggregate(
             total_returned=Sum('returned_quantity')
-        )['total_returned'] or 0,
-        'top_requested_items': (
+        )['total_returned'] or 0
+        top_requested_items = (
             DeviceRequest.objects.values('device__name')
             .annotate(request_count=Count('id'))
             .order_by('-request_count')[:2]
         )
+    else:
+        user_country = getattr(user.profile, "country", None)
+        total_items = Device.objects.filter(country=user_country).aggregate(total=Sum('total_quantity'))['total'] or 0
+        total_requests = DeviceRequest.objects.filter(country=user_country).count()
+        pending_count = DeviceRequest.objects.filter(status='Pending', country=user_country).count()
+        approved_count = DeviceRequest.objects.filter(status='Approved', country=user_country).count()
+        issued_count = DeviceRequest.objects.filter(status='Issued', country=user_country).count()
+        rejected_count = DeviceRequest.objects.filter(status='Rejected', country=user_country).count()
+        fully_returned_count = DeviceRequest.objects.filter(status='Fully Returned', country=user_country).count()
+        partially_returned_count = DeviceRequest.objects.filter(status='Partially Returned', country=user_country).count()
+        total_returned_quantity_all_items = DeviceRequest.objects.filter(country=user_country).aggregate(
+            total_returned=Sum('returned_quantity')
+        )['total_returned'] or 0
+        top_requested_items = (
+            DeviceRequest.objects.filter(country=user_country).values('device__name')
+            .annotate(request_count=Count('id'))
+            .order_by('-request_count')[:2]
+        )
+    context = {
+        'total_items': total_items,
+        'total_requests': total_requests,
+        'pending_count': pending_count,
+        'approved_count': approved_count,
+        'issued_count': issued_count,
+        'rejected_count': rejected_count,
+        'fully_returned_count': fully_returned_count,
+        'partially_returned_count': partially_returned_count,
+        'total_returned_quantity_all_items': total_returned_quantity_all_items,
+        'top_requested_items': top_requested_items,
     }
     return render(request, 'invent/reports.html', context)
-
 
 @login_required
 @permission_required('invent.add_device', raise_exception=True)
@@ -830,7 +882,6 @@ def upload_inventory(request):
 
             # --- Unified price/currency logic ---
             if "selling price" in row_data and "currency" in row_data:
-                # New format
                 selling_price = row_data.get("selling price") or 0
                 currency = str(row_data.get("currency") or "USD").upper()
                 if not selling_price:
@@ -838,7 +889,6 @@ def upload_inventory(request):
                 if currency not in ["USD", "KSH", "TSH"]:
                     currency = "USD"
             else:
-                # Old format fallback
                 price_usd = row_data.get("selling price (usd)") or 0
                 price_ksh = row_data.get("selling price (ksh)") or 0
                 price_tsh = row_data.get("selling price (tsh)") or 0
@@ -879,18 +929,19 @@ def upload_inventory(request):
 
 # --- Total Requests Table/Export (Reports) ---
 
-
 @login_required
 def total_requests(request):
     query = request.GET.get('q', '')
-    # Get the status filter from the URL. Defaults to '' (no filter).
     status_filter = request.GET.get('status', '')
-
-    # Start with the base queryset, optimizing with select_related
-    queryset = DeviceRequest.objects.select_related(
-        "device", "client", "requestor").order_by('-date_requested')
-
-    # 1. Apply Search Query Filter (if present)
+    user = request.user
+    # COUNTRY FILTER: Restrict by user's country
+    if user.is_superuser:
+        queryset = DeviceRequest.objects.select_related(
+            "device", "client", "requestor").order_by('-date_requested')
+    else:
+        user_country = getattr(user.profile, "country", None)
+        queryset = DeviceRequest.objects.select_related(
+            "device", "client", "requestor").filter(country=user_country).order_by('-date_requested')
     if query:
         queryset = queryset.filter(
             Q(device__imei_no__icontains=query) |
@@ -898,34 +949,29 @@ def total_requests(request):
             Q(device__category__icontains=query) |
             Q(client__name__icontains=query)
         )
-
-    # 2. Apply Status Filter (if present)
-    # Filter by the literal status provided in the URL, except for 'all'.
     if status_filter and status_filter.lower() != 'all':
-        # This will filter for the exact status string, e.g., 'Issued', 'Rejected', or 'Returned'.
-        # The special handling for combining 'Fully Returned' and 'Partially Returned' is now ignored.
         queryset = queryset.filter(status=status_filter)
-
-        # Note: If the status filter is 'all' or empty, no status filter is applied to the queryset.
-
-    # 3. Apply Pagination
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-
-    # 4. Prepare Context
     context = {
         'page_obj': page_obj,
-        'status_filter': status_filter,  # Pass filter to template for dynamic title/links
+        'status_filter': status_filter,
     }
     return render(request, 'invent/total_requests.html', context)
-
 
 @login_required
 def export_total_requests(request):
     status_filter = request.GET.get('status')
-    queryset = DeviceRequest.objects.select_related(
-        "device", "client", "requestor")
+    user = request.user
+    # COUNTRY FILTER: Restrict by user's country
+    if user.is_superuser:
+        queryset = DeviceRequest.objects.select_related(
+            "device", "client", "requestor")
+    else:
+        user_country = getattr(user.profile, "country", None)
+        queryset = DeviceRequest.objects.select_related(
+            "device", "client", "requestor").filter(country=user_country)
     if status_filter:
         queryset = queryset.filter(status=status_filter)
     wb = openpyxl.Workbook()
@@ -952,11 +998,16 @@ def export_total_requests(request):
     wb.save(response)
     return response
 
-
 @login_required
 def export_inventory_items(request):
     status_filter = request.GET.get('status')
-    queryset = Device.objects.all()
+    user = request.user
+    # COUNTRY FILTER: Restrict by user's country
+    if user.is_superuser:
+        queryset = Device.objects.all()
+    else:
+        user_country = getattr(user.profile, "country", None)
+        queryset = Device.objects.filter(country=user_country)
     if status_filter:
         queryset = queryset.filter(status=status_filter)
     wb = openpyxl.Workbook()
@@ -987,19 +1038,25 @@ def export_inventory_items(request):
 
 # --- Return Logic: List of issued requests for return and process return ---
 
-
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
 def list_issued_requests_for_return(request):
-    issued_requests = DeviceRequest.objects.filter(
-        status='Issued'
-    ).select_related('device', 'client', 'requestor').order_by('-date_issued')
+    user = request.user
+    # COUNTRY FILTER: Restrict by user's country
+    if user.is_superuser:
+        issued_requests = DeviceRequest.objects.filter(
+            status='Issued'
+        ).select_related('device', 'client', 'requestor').order_by('-date_issued')
+    else:
+        user_country = getattr(user.profile, "country", None)
+        issued_requests = DeviceRequest.objects.filter(
+            status='Issued', country=user_country
+        ).select_related('device', 'client', 'requestor').order_by('-date_issued')
     context = {
         'issued_requests': issued_requests,
         'title': 'Issued Devices for Return'
     }
     return render(request, 'invent/list_issued_requests_for_return.html', context)
-
 
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
@@ -1010,7 +1067,6 @@ def process_return_for_request(request, request_id):
     if request.method == 'POST':
         returned_quantity = int(request.POST.get('returned_quantity', 1))
         reason = request.POST.get('reason', '')
-        # Don't return more than issued
         if returned_quantity > (device_request.quantity - device_request.returned_quantity):
             messages.error(request, "Cannot return more than what was issued.")
             return redirect('list_issued_requests_for_return')
@@ -1036,17 +1092,13 @@ def process_return_for_request(request, request_id):
         'device_request': device_request
     })
 
-
 @login_required
 def request_list(request, status):
-    """List of requests by status for the logged-in user."""
     user_requests = DeviceRequest.objects.filter(requestor=request.user)
-
     if status == "all":
         requests = user_requests
     else:
         requests = user_requests.filter(status__iexact=status)
-
     return render(request, 'invent/request_list.html', {
         'status': status,
         'requests': requests

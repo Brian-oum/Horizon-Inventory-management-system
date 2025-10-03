@@ -225,4 +225,13 @@ class ReturnRecord(models.Model):
     def __str__(self):
         return f"{self.device} returned by {self.client.name} on {self.returned_at.strftime('%Y-%m-%d')}"
 
+# Profile model to extend User with branch and country
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    country = models.CharField(max_length=100, choices=COUNTRY_CHOICES, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s profile"
+        
+
 # --- END IoT/Client/OEM/Branch Models ---
