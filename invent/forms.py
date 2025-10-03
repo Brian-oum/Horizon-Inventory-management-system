@@ -1,37 +1,40 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from .models import Profile
+from .models import Profile, Country
 from django.db.models import F  # Import F expression for queryset filtering
 from .models import Device, OEM
 from .models import DeviceRequest, Client, Branch
 
-
 class CustomCreationForm(UserCreationForm):
     email = forms.EmailField(required=True)
+    country = forms.ModelChoiceField(
+        queryset=Country.objects.all(),
+        required=True,
+        label='Country'
+    )
+    branch = forms.ModelChoiceField(
+        queryset=Branch.objects.all(),
+        required=True,
+        label='Branch'
+    )
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password1', 'password2']
+        fields = ['username', 'email', 'password1', 'password2', 'country', 'branch']
 
-
-
-    def clean(self):
-        cleaned_data = super().clean()
-        quantity_total = cleaned_data.get('quantity_total')
-        quantity_issued = cleaned_data.get('quantity_issued')
-        quantity_returned = cleaned_data.get('quantity_returned')
-
-        if quantity_issued is not None and quantity_total is not None and quantity_issued > quantity_total:
-            self.add_error(
-                'quantity_issued', 'Quantity issued cannot be greater than total quantity.')
-
-        if quantity_returned is not None and quantity_issued is not None and quantity_returned > quantity_issued:
-            self.add_error(
-                'quantity_returned', 'Quantity returned cannot be greater than quantity issued.')
-
-        return cleaned_data
-
-
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data['email']
+        if commit:
+            user.save()
+            # Update the auto-created profile
+            profile = user.profile
+            profile.country = self.cleaned_data['country']
+            profile.branch = self.cleaned_data['branch']
+            profile.save()
+        return user
 # --- NEW FORMS FOR RETURN LOGIC ---
 
 class OEMForm(forms.ModelForm):
@@ -46,7 +49,6 @@ class OEMForm(forms.ModelForm):
             'phone_email': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone or Email'}),
             'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Address'}),
         }
-
 
 class DeviceForm(forms.ModelForm):
     class Meta:
@@ -63,6 +65,7 @@ class DeviceForm(forms.ModelForm):
             'selling_price',
             'currency',
             'status',
+            'country',  # <-- Add this so superusers can select it
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name'}),
@@ -76,7 +79,16 @@ class DeviceForm(forms.ModelForm):
             'selling_price': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Selling Price'}),
             'currency': forms.Select(attrs={'class': 'form-select'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
+            'country': forms.Select(attrs={'class': 'form-select'}),  # Add a widget for country
         }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        # Only show or allow editing country for superuser
+        if user and not user.is_superuser:
+            self.fields['country'].disabled = True
+            self.fields['country'].widget = forms.HiddenInput()
 
 
 class DeviceRequestForm(forms.ModelForm):
