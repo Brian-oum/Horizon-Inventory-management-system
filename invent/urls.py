@@ -47,8 +47,8 @@ urlpatterns = [
     path('issue_device/', views.issue_device, name='issue_device'),
     path('return_device/', views.return_device, name='return_device'),
 
-    # Supplier Management
-    path('add-supplier/', views.add_supplier, name='add_supplier'),
+    # OEM Management
+    path('add-oem/', views.add_oem, name='add_oem'),
 
     # Device Request Management
     path('approve-request/<int:request_id>/',

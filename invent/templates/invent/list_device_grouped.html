@@ -1,0 +1,91 @@
+{% extends 'invent/base_store_clerk.html' %}
+{% load static %}
+
+{% block title %}Grouped IoT Devices{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <h2 class="mb-4 text-primary"><i class="fas fa-layer-group me-2"></i> Devices Grouped by Category & OEM</h2>
+
+    {% for category, oems in grouped_devices.items %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    {{ category|default:"Uncategorized" }} 
+                    <span class="badge bg-light text-dark ms-3">{{ oems|length }} OEMs</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                {% for oem_label, devices in oems.items %}
+                    <h6 class="mb-3 text-secondary">
+                        {{ oem_label|default:"[No OEM]" }} 
+                        <span class="badge bg-success ms-2">{{ devices|length }} Devices</span>
+                    </h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Name</th>
+                                    <th>OEM</th>
+                                    <th>OEM ID</th>
+                                    <th>Branch</th>
+                                    <th>IMEI</th>
+                                    <th>Status</th>
+                                    <th>Price</th>
+                                    <th>Currency</th>
+                                    <th>Client</th>
+                                    <th>Issued At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for device in devices %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{ device.name }}</td>
+                                    <td>{{ device.oem.name|default:"-" }}</td>
+                                    <td>{{ device.oem.oem_id|default:"-" }}</td>
+                                    <td>{{ device.branch.name|default:"-" }}</td>
+                                    <td>{{ device.imei_no|default:"-" }}</td>
+                                    <td>
+                                        <span class="badge
+                                            {% if device.status == 'available' %}bg-success
+                                            {% elif device.status == 'issued' %}bg-primary
+                                            {% elif device.status == 'returned' %}bg-secondary
+                                            {% elif device.status == 'faulty' %}bg-danger
+                                            {% else %}bg-dark{% endif %}">
+                                            {{ device.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if device.selling_price %}
+                                            {{ device.selling_price|floatformat:2 }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if device.currency %}
+                                            <span class="badge bg-info text-dark">{{ device.currency }}</span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{% if device.current_client %}{{ device.current_client.name }}{% else %}-{% endif %}</td>
+                                    <td>{% if device.issued_at %}{{ device.issued_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% empty %}
+        <div class="alert alert-info text-center py-4" role="alert">
+            <i class="fas fa-info-circle fa-2x mb-3"></i>
+            <p class="mb-0">No devices found.</p>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
