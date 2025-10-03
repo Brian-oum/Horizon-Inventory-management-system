@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.db.models import F  # Import F expression for queryset filtering
-from .models import Device, Supplier
+from .models import Device, OEM
 from .models import DeviceRequest, Client
 
 
@@ -34,14 +34,14 @@ class CustomCreationForm(UserCreationForm):
 
 # --- NEW FORMS FOR RETURN LOGIC ---
 
-class SupplierForm(forms.ModelForm):
+class OEMForm(forms.ModelForm):
     class Meta:
-        model = Supplier
-        fields = ['supplier_id', 'name',
+        model = OEM
+        fields = ['oem_id', 'name',
                   'contact_person', 'phone_email', 'address']
         widgets = {
-            'supplier_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Supplier ID'}),
-            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Supplier Name'}),
+            'oem_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'OEM ID'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'OEM Name'}),
             'contact_person': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Contact Person'}),
             'phone_email': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone or Email'}),
             'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Address'}),
@@ -55,28 +55,26 @@ class DeviceForm(forms.ModelForm):
             'name',
             'total_quantity',
             'product_id',
-            'supplier',
+            'oem',
             'imei_no',
             'serial_no',
             'category',
             'description',
-            'selling_price_usd',
-            'selling_price_ksh',
-            'selling_price_tsh',
+            'selling_price',
+            'currency',
             'status',
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name'}),
             'total_quantity': forms.NumberInput(attrs={'min': 1}),
             'product_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Product ID'}),
-            'supplier': forms.Select(attrs={'class': 'form-select'}),
+            'oem': forms.Select(attrs={'class': 'form-select'}),
             'imei_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'IMEI Number'}),
             'serial_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Serial Number'}),
             'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Category'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Description', 'rows': 2}),
-            'selling_price_usd': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price in USD'}),
-            'selling_price_ksh': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price in KSH'}),
-            'selling_price_tsh': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price in TSH'}),
+            'selling_price': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Selling Price'}),
+            'currency': forms.Select(attrs={'class': 'form-select'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
         }
 

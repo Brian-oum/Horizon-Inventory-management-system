@@ -64,11 +64,15 @@
                 <table class="table table-striped table-hover">
                     <thead class="table-light">
                         <tr>
-                            <th>ID</th>
+                            <th>#</th>
                             <th>Category</th>
+                            <th>Manufacturer</th>
+                            <th>OEM</th>
+                            <th>Branch</th>
                             <th>IMEI</th>
                             <th>Serial</th>
                             <th>Status</th>
+                            <th>Price</th>
                             <th>Client</th>
                             <th>Issued At</th>
                             <th>Actions</th>
@@ -78,7 +82,10 @@
                         {% for device in page_obj %}
                         <tr>
                             <td>{{ forloop.counter }}</td>
-                            <td>{{ device.category }}</td>
+                            <td>{{ device.category|default:"-" }}</td>
+                            <td>{{ device.manufacturer|default:"-" }}</td>
+                            <td>{{ device.oem.name|default:"-" }}</td>
+                            <td>{{ device.branch.name|default:"-" }}</td>
                             <td>{{ device.imei_no|default:"-" }}</td>
                             <td>{{ device.serial_no|default:"-" }}</td>
                             <td>
@@ -90,6 +97,14 @@
                                     {% else %}bg-dark{% endif %}">
                                     {{ device.get_status_display }}
                                 </span>
+                            </td>
+                            <td>
+                                {% if device.selling_price %}
+                                    {{ device.selling_price|floatformat:2 }}
+                                    <span class="badge bg-info text-dark ms-1">{{ device.currency }}</span>
+                                {% else %}
+                                    -
+                                {% endif %}
                             </td>
                             <td>
                                 {% if device.current_client %}

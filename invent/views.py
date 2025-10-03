@@ -16,10 +16,10 @@ from openpyxl.utils import get_column_letter
 from django.db.models.functions import Coalesce
 
 from .models import (
-    Device, Supplier, DeviceRequest, Client, IssuanceRecord, ReturnRecord
+    Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord
 )
 from .forms import (
-    CustomCreationForm, SupplierForm, DeviceForm, DeviceRequestForm
+    CustomCreationForm, OEMForm, DeviceForm, DeviceRequestForm
 )
 from django.utils.dateparse import parse_date
 
@@ -288,13 +288,14 @@ def reject_request(request, request_id):
     return redirect("store_clerk_dashboard")
 
 # --- Device Listing/Search ---
-
-
 @login_required
 def inventory_list_view(request):
     query = request.GET.get('q', '')
     status = request.GET.get('status', 'all')
-    devices = Device.objects.all().order_by('id')
+    devices = Device.objects.select_related('oem', 'branch').order_by('category', 'oem__name', 'id')
+
+    print("DEBUG Search query:", query, "| Status filter:", status)
+    
     if status and status != 'all':
         devices = devices.filter(status=status)
     if query:
@@ -302,8 +303,18 @@ def inventory_list_view(request):
             Q(imei_no__icontains=query) |
             Q(serial_no__icontains=query) |
             Q(category__icontains=query) |
+            Q(oem__name__icontains=query) |
+            Q(oem__oem_id__icontains=query) |
             Q(issuancerecord__client__name__icontains=query)
         ).distinct()
+    
+    print("DEBUG Device queryset count:", devices.count())
+    for d in devices:
+        print(
+            f"    Device: {d} | Category: {d.category} | OEM: {d.oem} | "
+            f"OEM name: {getattr(d.oem, 'name', None)} | OEM id: {getattr(d.oem, 'oem_id', None)}"
+        )
+    
     for device in devices:
         last_issuance = (
             IssuanceRecord.objects
@@ -314,15 +325,27 @@ def inventory_list_view(request):
         )
         device.current_client = last_issuance.client if last_issuance else None
         device.issued_at = last_issuance.issued_at if last_issuance else None
-    paginator = Paginator(devices, 50)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+
+    # Group by Category, then OEM name + OEM ID
+    grouped_devices = defaultdict(lambda: defaultdict(list))
+    for device in devices:
+        oem_label = f"{device.oem.name or '-'} ({device.oem.oem_id or '-'})" if device.oem else "-"
+        grouped_devices[device.category][oem_label].append(device)
+
+    # --- FIX: convert to regular dicts for template ---
+    grouped_devices = {cat: dict(oems) for cat, oems in grouped_devices.items()}
+    print("DEBUG grouped_devices dict (converted):", grouped_devices)
+    for category, oems in grouped_devices.items():
+        print(f"DEBUG Category: {category} | OEMs: {oems}")
+        for oem_label, devices_list in oems.items():
+            print(f"    OEM Label: {oem_label} | Has devices: {len(devices_list)}")
+    
     context = {
-        'page_obj': page_obj,
+        'grouped_devices': grouped_devices,  # now a nested regular dict!
         'query': query,
         'status': status,
     }
-    return render(request, 'invent/list_device.html', context)
+    return render(request, 'invent/list_device_grouped.html', context)
 
 # --- Stock Management ---
 
@@ -656,56 +679,56 @@ def adjust_stock(request):
     }
     return render(request, 'invent/adjust_stock.html', context)
 
-# --- Supplier Management ---
+# --- OEM Management ---
 
-def add_supplier(request):
+def add_oem(request):
     edit_mode = False
-    supplier_to_edit = None
+    oem_to_edit = None
 
-    # Handle supplier deletion
-    if request.method == "POST" and "delete_supplier_id" in request.POST:
-        supplier = get_object_or_404(Supplier, id=request.POST.get("delete_supplier_id"))
-        supplier.delete()
-        messages.success(request, "Supplier deleted successfully!")
-        return redirect('add_supplier')
+    # Handle OEM deletion
+    if request.method == "POST" and "delete_oem_id" in request.POST:
+        oem = get_object_or_404(OEM, id=request.POST.get("delete_oem_id"))
+        oem.delete()
+        messages.success(request, "OEM deleted successfully!")
+        return redirect('add_oem')
 
-    # Handle supplier edit (save changes)
-    if request.method == "POST" and "edit_supplier_id" in request.POST:
-        supplier_to_edit = get_object_or_404(Supplier, id=request.POST.get("edit_supplier_id"))
-        form = SupplierForm(request.POST, instance=supplier_to_edit)
+    # Handle OEM edit (save changes)
+    if request.method == "POST" and "edit_oem_id" in request.POST:
+        oem_to_edit = get_object_or_404(OEM, id=request.POST.get("edit_oem_id"))
+        form = OEMForm(request.POST, instance=oem_to_edit)
         edit_mode = True
         if form.is_valid():
             form.save()
-            messages.success(request, "Supplier updated successfully!")
-            return redirect('add_supplier')
+            messages.success(request, "OEM updated successfully!")
+            return redirect('add_oem')
         else:
             messages.error(request, "Please correct the errors below.")
 
     # Start editing (GET ?edit=id)
     elif "edit" in request.GET:
-        supplier_to_edit = get_object_or_404(Supplier, id=request.GET.get("edit"))
-        form = SupplierForm(instance=supplier_to_edit)
+        oem_to_edit = get_object_or_404(OEM, id=request.GET.get("edit"))
+        form = OEMForm(instance=oem_to_edit)
         edit_mode = True
 
-    # Handle supplier addition
+    # Handle OEM addition
     elif request.method == 'POST':
-        form = SupplierForm(request.POST)
+        form = OEMForm(request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, "Supplier added successfully!")
-            return redirect('add_supplier')
+            messages.success(request, "OEM added successfully!")
+            return redirect('add_oem')
         else:
             messages.error(request, "Please correct the errors below.")
 
     else:
-        form = SupplierForm()
+        form = OEMForm()
 
-    suppliers = Supplier.objects.all().order_by('-id')
-    return render(request, 'invent/add_supplier.html', {
+    oems = OEM.objects.all().order_by('-id')
+    return render(request, 'invent/add_oem.html', {
         'form': form,
-        'suppliers': suppliers,
+        'oems': oems,
         'edit_mode': edit_mode,
-        'supplier_to_edit': supplier_to_edit,
+        'oem_to_edit': oem_to_edit,
     })
 
 # --- Reports and Export ---
@@ -749,19 +772,33 @@ def upload_inventory(request):
             return redirect("upload_inventory")
         header = [str(cell.value).strip() for cell in sheet[1]]
         header_lower = [h.lower() for h in header]
+
+        # Support both new and old formats
+        supports_new = "selling price" in header_lower and "currency" in header_lower
+        supports_old = (
+            "selling price (usd)" in header_lower
+            or "selling price (ksh)" in header_lower
+            or "selling price (tsh)" in header_lower
+        )
+
+        if not (supports_new or supports_old):
+            messages.error(request, "Missing required columns for price and currency.")
+            return redirect("upload_inventory")
+
         required_columns = [
-            "Supplier ID", "Product ID", "IMEI No", "Serial No", "Category",
-            "Description", "Name", "Quantity", "Selling Price (USD)",
-            "Selling Price (KSH)", "Selling Price (TSH)", "Status"
+            "OEM ID", "Product ID", "IMEI No", "Serial No", "Category",
+            "Description", "Name", "Quantity", "Status"
         ]
         for col in required_columns:
             if col.lower() not in header_lower:
                 messages.error(request, f"Missing required column: {col}")
                 return redirect("upload_inventory")
+
         header_index_map = {h.lower(): i for i, h in enumerate(header)}
+
         for row in sheet.iter_rows(min_row=2, values_only=True):
             row_data = {h.lower(): row[i] for h, i in header_index_map.items()}
-            supplier_id = row_data.get("supplier id")
+            oem_id = row_data.get("oem id")
             product_id = row_data.get("product id")
             imei_field = str(row_data.get("imei no") or "").strip()
             serial_no = row_data.get("serial no")
@@ -769,18 +806,15 @@ def upload_inventory(request):
             description = row_data.get("description")
             name = row_data.get("name")
             qty_field = row_data.get("quantity")
-            price_usd = row_data.get("selling price (usd)") or 0
-            price_ksh = row_data.get("selling price (ksh)") or 0
-            price_tsh = row_data.get("selling price (tsh)") or 0
             status = (str(row_data.get("status") or "available")).lower()
             if status not in ["available", "issued", "returned", "faulty"]:
                 messages.warning(
                     request, f"Invalid status '{status}' for product {product_id}. Skipped.")
                 continue
-            supplier = Supplier.objects.filter(supplier_id=supplier_id).first()
-            if not supplier:
+            oem = OEM.objects.filter(oem_id=oem_id).first()
+            if not oem:
                 messages.warning(
-                    request, f"Supplier ID {supplier_id} not found. Skipped product {product_id}.")
+                    request, f"OEM ID {oem_id} not found. Skipped product {product_id}.")
                 continue
             imeis = [i.strip() for i in imei_field.split(",") if i.strip()]
             try:
@@ -794,13 +828,41 @@ def upload_inventory(request):
                     f"but {len(imeis)} IMEIs provided. Using IMEI count."
                 )
                 total_qty = len(imeis)
+
+            # --- Unified price/currency logic ---
+            if "selling price" in row_data and "currency" in row_data:
+                # New format
+                selling_price = row_data.get("selling price") or 0
+                currency = str(row_data.get("currency") or "USD").upper()
+                if not selling_price:
+                    selling_price = 0
+                if currency not in ["USD", "KSH", "TSH"]:
+                    currency = "USD"
+            else:
+                # Old format fallback
+                price_usd = row_data.get("selling price (usd)") or 0
+                price_ksh = row_data.get("selling price (ksh)") or 0
+                price_tsh = row_data.get("selling price (tsh)") or 0
+                if price_usd and float(price_usd) > 0:
+                    selling_price = price_usd
+                    currency = "USD"
+                elif price_ksh and float(price_ksh) > 0:
+                    selling_price = price_ksh
+                    currency = "KSH"
+                elif price_tsh and float(price_tsh) > 0:
+                    selling_price = price_tsh
+                    currency = "TSH"
+                else:
+                    selling_price = 0
+                    currency = "USD"
+
             for imei in imeis:
                 if Device.objects.filter(imei_no=imei).exists():
                     messages.warning(
                         request, f"IMEI {imei} already exists. Skipped.")
                     continue
                 Device.objects.create(
-                    supplier=supplier,
+                    oem=oem,
                     product_id=product_id,
                     imei_no=imei,
                     serial_no=serial_no,
@@ -808,9 +870,8 @@ def upload_inventory(request):
                     description=description,
                     name=name,
                     total_quantity=total_qty,
-                    selling_price_usd=price_usd,
-                    selling_price_ksh=price_ksh,
-                    selling_price_tsh=price_tsh,
+                    selling_price=selling_price,
+                    currency=currency,
                     status=status,
                 )
         messages.success(request, "Inventory uploaded successfully.")
