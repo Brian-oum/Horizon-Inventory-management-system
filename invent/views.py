@@ -293,9 +293,10 @@ def reject_request(request, request_id):
 def inventory_list_view(request):
     query = request.GET.get('q', '')
     status = request.GET.get('status', 'all')
-    devices = Device.objects.select_related('oem', 'branch').order_by('category', 'oem__name', 'id')
+    page = request.GET.get('page', 1)
+    per_page = 10  # Set how many devices per page
 
-    print("DEBUG Search query:", query, "| Status filter:", status)
+    devices = Device.objects.select_related('oem', 'branch').order_by('category', 'oem__name', 'id')
     
     if status and status != 'all':
         devices = devices.filter(status=status)
@@ -308,13 +309,6 @@ def inventory_list_view(request):
             Q(oem__oem_id__icontains=query) |
             Q(issuancerecord__client__name__icontains=query)
         ).distinct()
-    
-    print("DEBUG Device queryset count:", devices.count())
-    for d in devices:
-        print(
-            f"    Device: {d} | Category: {d.category} | OEM: {d.oem} | "
-            f"OEM name: {getattr(d.oem, 'name', None)} | OEM id: {getattr(d.oem, 'oem_id', None)}"
-        )
     
     for device in devices:
         last_issuance = (
@@ -333,21 +327,25 @@ def inventory_list_view(request):
         oem_label = f"{device.oem.name or '-'} ({device.oem.oem_id or '-'})" if device.oem else "-"
         grouped_devices[device.category][oem_label].append(device)
 
-    # --- FIX: convert to regular dicts for template ---
-    grouped_devices = {cat: dict(oems) for cat, oems in grouped_devices.items()}
-    print("DEBUG grouped_devices dict (converted):", grouped_devices)
+    # Paginate each OEM group
+    paginated_grouped_devices = {}
     for category, oems in grouped_devices.items():
-        print(f"DEBUG Category: {category} | OEMs: {oems}")
-        for oem_label, devices_list in oems.items():
-            print(f"    OEM Label: {oem_label} | Has devices: {len(devices_list)}")
-    
+        paginated_grouped_devices[category] = {}
+        for oem_label, device_list in oems.items():
+            paginator = Paginator(device_list, per_page)
+            try:
+                page_obj = paginator.page(page)
+            except Exception:
+                page_obj = paginator.page(1)
+            paginated_grouped_devices[category][oem_label] = page_obj
+
     context = {
-        'grouped_devices': grouped_devices,  # now a nested regular dict!
+        'grouped_devices': paginated_grouped_devices,  # now paginated!
         'query': query,
         'status': status,
+        'page': page,
     }
     return render(request, 'invent/list_device_grouped.html', context)
-
 # --- Stock Management ---
 
 

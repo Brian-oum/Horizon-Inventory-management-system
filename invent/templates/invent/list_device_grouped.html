@@ -5,87 +5,133 @@
 
 {% block content %}
 <div class="container-fluid mt-4">
-    <h2 class="mb-4 text-primary"><i class="fas fa-layer-group me-2"></i> Devices Grouped by Category & OEM</h2>
+    <h2 class="mb-4 text-primary">
+        <i class="fas fa-layer-group me-2"></i> Devices Grouped by Category & OEM
+    </h2>
 
-    {% for category, oems in grouped_devices.items %}
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0">
-                    {{ category|default:"Uncategorized" }} 
+    <!-- Search form -->
+    <form method="get" class="mb-4" style="max-width:400px;">
+      <div class="input-group">
+        <input type="text" class="form-control" name="q" placeholder="Search devices (IMEI, Serial, OEM, Client...)" value="{{ query|default_if_none:'' }}">
+        <button class="btn btn-primary" type="submit">
+          <i class="fas fa-search"></i> Search
+        </button>
+        {% if query %}
+          <a href="{% url 'inventory_list' %}" class="btn btn-outline-secondary">Reset</a>
+        {% endif %}
+      </div>
+    </form>
+
+    <div class="accordion" id="categoryAccordion">
+        {% for category, oems in grouped_devices.items %}
+        <div class="accordion-item mb-3">
+            <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ forloop.counter }}">
+                    {{ category|default:"Uncategorized" }}
                     <span class="badge bg-light text-dark ms-3">{{ oems|length }} OEMs</span>
-                </h5>
-            </div>
-            <div class="card-body">
-                {% for oem_label, devices in oems.items %}
-                    <h6 class="mb-3 text-secondary">
-                        {{ oem_label|default:"[No OEM]" }} 
-                        <span class="badge bg-success ms-2">{{ devices|length }} Devices</span>
-                    </h6>
-                    <div class="table-responsive mb-4">
-                        <table class="table table-striped table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>#</th>
-                                    <th>Name</th>
-                                    <th>OEM</th>
-                                    <th>OEM ID</th>
-                                    <th>Branch</th>
-                                    <th>IMEI</th>
-                                    <th>Status</th>
-                                    <th>Price</th>
-                                    <th>Currency</th>
-                                    <th>Client</th>
-                                    <th>Issued At</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for device in devices %}
-                                <tr>
-                                    <td>{{ forloop.counter }}</td>
-                                    <td>{{ device.name }}</td>
-                                    <td>{{ device.oem.name|default:"-" }}</td>
-                                    <td>{{ device.oem.oem_id|default:"-" }}</td>
-                                    <td>{{ device.branch.name|default:"-" }}</td>
-                                    <td>{{ device.imei_no|default:"-" }}</td>
-                                    <td>
-                                        <span class="badge
-                                            {% if device.status == 'available' %}bg-success
-                                            {% elif device.status == 'issued' %}bg-primary
-                                            {% elif device.status == 'returned' %}bg-secondary
-                                            {% elif device.status == 'faulty' %}bg-danger
-                                            {% else %}bg-dark{% endif %}">
-                                            {{ device.get_status_display }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {% if device.selling_price %}
-                                            {{ device.selling_price|floatformat:2 }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if device.currency %}
-                                            <span class="badge bg-info text-dark">{{ device.currency }}</span>
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>{% if device.current_client %}{{ device.current_client.name }}{% else %}-{% endif %}</td>
-                                    <td>{% if device.issued_at %}{{ device.issued_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
-                                </tr>
+                </button>
+            </h2>
+            <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#categoryAccordion">
+                <div class="accordion-body">
+                    {% for oem_label, devices in oems.items %}
+                        <h6 class="mb-3 text-secondary">
+                            {{ oem_label|default:"[No OEM]" }}
+                            <span class="badge bg-success ms-2">{{ devices|length }} Devices</span>
+                        </h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Name</th>
+                                        <th>OEM</th>
+                                        <th>OEM ID</th>
+                                        <th>Branch</th>
+                                        <th>IMEI</th>
+                                        <th>Status</th>
+                                        <th>Price</th>
+                                        <th>Currency</th>
+                                        <th>Client</th>
+                                        <th>Issued At</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for device in devices %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ device.name }}</td>
+                                        <td>{{ device.oem.name|default:"-" }}</td>
+                                        <td>{{ device.oem.oem_id|default:"-" }}</td>
+                                        <td>{{ device.branch.name|default:"-" }}</td>
+                                        <td>{{ device.imei_no|default:"-" }}</td>
+                                        <td>
+                                            <span class="badge
+                                                {% if device.status == 'available' %}bg-success
+                                                {% elif device.status == 'issued' %}bg-primary
+                                                {% elif device.status == 'returned' %}bg-secondary
+                                                {% elif device.status == 'faulty' %}bg-danger
+                                                {% else %}bg-dark{% endif %}">
+                                                {{ device.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if device.selling_price %}
+                                                {{ device.selling_price|floatformat:2 }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if device.currency %}
+                                                <span class="badge bg-info text-dark">{{ device.currency }}</span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>{% if device.current_client %}{{ device.current_client.name }}{% else %}-{% endif %}</td>
+                                        <td>{% if device.issued_at %}{{ device.issued_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% if devices.has_other_pages %}
+                            <nav>
+                              <ul class="pagination">
+                                {% if devices.has_previous %}
+                                  <li class="page-item">
+                                    <a class="page-link" href="?q={{ query }}&page={{ devices.previous_page_number }}">Previous</a>
+                                  </li>
+                                {% else %}
+                                  <li class="page-item disabled"><span class="page-link">Previous</span></li>
+                                {% endif %}
+                                {% for i in devices.paginator.page_range %}
+                                  {% if devices.number == i %}
+                                    <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+                                  {% else %}
+                                    <li class="page-item"><a class="page-link" href="?q={{ query }}&page={{ i }}">{{ i }}</a></li>
+                                  {% endif %}
                                 {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% endfor %}
+                                {% if devices.has_next %}
+                                  <li class="page-item">
+                                    <a class="page-link" href="?q={{ query }}&page={{ devices.next_page_number }}">Next</a>
+                                  </li>
+                                {% else %}
+                                  <li class="page-item disabled"><span class="page-link">Next</span></li>
+                                {% endif %}
+                              </ul>
+                            </nav>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
-    {% empty %}
+        {% empty %}
         <div class="alert alert-info text-center py-4" role="alert">
             <i class="fas fa-info-circle fa-2x mb-3"></i>
             <p class="mb-0">No devices found.</p>
         </div>
-    {% endfor %}
+        {% endfor %}
+    </div>
 </div>
 {% endblock %}
