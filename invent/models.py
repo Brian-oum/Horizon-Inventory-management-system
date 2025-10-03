@@ -121,6 +121,7 @@ class DeviceRequest(models.Model):
         null=True,
         blank=True
     )
+    branch = models.ForeignKey("Branch", on_delete=models.CASCADE, related_name="requests")
     quantity = models.PositiveIntegerField(default=1)
     reason = models.TextField(blank=True, null=True)
     application_date = models.DateField(default=timezone.now)
