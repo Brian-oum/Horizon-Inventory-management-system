@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.mail import send_mail
 
-# --- BEGIN IoT/Client/OEM/Branch Models ---
+# --- BEGIN IoT/Client/OEM/Branch/Country Models ---
 
 CURRENCY_CHOICES = (
     ('USD', 'US Dollar'),
@@ -12,21 +12,21 @@ CURRENCY_CHOICES = (
     # Add more as needed
 )
 
-COUNTRY_CHOICES = (
-    ('Tanzania', 'Tanzania'),
-    ('Kenya', 'Kenya'),
-    # Add more as needed
-)
-
-
-class Branch(models.Model):  # Formerly Office
-    name = models.CharField(max_length=100)
-    address = models.CharField(max_length=255)
-    country = models.CharField(max_length=100, choices=COUNTRY_CHOICES)
+# ---  Country Model ---
+class Country(models.Model):
+    name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
-        return f"{self.name}, {self.country}"
+        return self.name
 
+# --- Updated Branch: relates to Country ---
+class Branch(models.Model):  
+    name = models.CharField(max_length=100)
+    address = models.CharField(max_length=255)
+    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name}, {self.country.name if self.country else ''}"
 
 class OEM(models.Model):  # Formerly Supplier
     oem_id = models.CharField(max_length=20, unique=True)
@@ -38,7 +38,6 @@ class OEM(models.Model):  # Formerly Supplier
     def __str__(self):
         return f"{self.name} ({self.oem_id})"
 
-
 class PurchaseOrder(models.Model):
     oem = models.ForeignKey(OEM, on_delete=models.CASCADE, default=1)  # was supplier
     order_date = models.DateField()
@@ -48,7 +47,6 @@ class PurchaseOrder(models.Model):
     def __str__(self):
         return f"PO #{self.id} - {self.oem.name}"
 
-
 class Client(models.Model):
     name = models.CharField(max_length=255)
     phone_no = models.CharField(max_length=50)
@@ -57,7 +55,6 @@ class Client(models.Model):
 
     def __str__(self):
         return self.name
-
 
 class Device(models.Model):
     name = models.CharField(max_length=255, blank=True)  # Device name
@@ -85,8 +82,8 @@ class Device(models.Model):
     branch = models.ForeignKey(
         Branch, on_delete=models.SET_NULL, null=True, blank=True
     )
-    country = models.CharField(
-        max_length=100, choices=COUNTRY_CHOICES, blank=True, null=True
+    country = models.ForeignKey(
+        Country, on_delete=models.SET_NULL, null=True, blank=True
     )
     status = models.CharField(
         max_length=20,
@@ -101,7 +98,6 @@ class Device(models.Model):
 
     def __str__(self):
         return f"Device IMEI:{self.imei_no} Status:{self.status}"
-
 
 class DeviceRequest(models.Model):
     device = models.ForeignKey(
@@ -121,16 +117,11 @@ class DeviceRequest(models.Model):
         null=True,
         blank=True
     )
-    branch = models.ForeignKey("Branch", on_delete=models.CASCADE, related_name="requests")
+    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests")
+    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
     quantity = models.PositiveIntegerField(default=1)
     reason = models.TextField(blank=True, null=True)
     application_date = models.DateField(default=timezone.now)
-    branch = models.ForeignKey(
-        Branch, on_delete=models.SET_NULL, null=True, blank=True
-    )
-    country = models.CharField(
-        max_length=100, choices=COUNTRY_CHOICES, blank=True, null=True
-    )
     STATUS_CHOICES = [
         ('Pending', 'Pending'),
         ('Approved', 'Approved'),
@@ -197,7 +188,6 @@ class DeviceRequest(models.Model):
     def __str__(self):
         return f"Request for {self.device} by {self.requestor.username}"
 
-
 class IssuanceRecord(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     client = models.ForeignKey(
@@ -215,7 +205,6 @@ class IssuanceRecord(models.Model):
     def __str__(self):
         return f"{self.device} issued to {self.client.name if self.client else 'N/A'} by {self.logistics_manager.username}"
 
-
 class ReturnRecord(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     client = models.ForeignKey(Client, on_delete=models.CASCADE)
@@ -228,10 +217,10 @@ class ReturnRecord(models.Model):
 # Profile model to extend User with branch and country
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    country = models.CharField(max_length=100, choices=COUNTRY_CHOICES, blank=True, null=True)
+    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True)
+    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.username}'s profile"
-        
 
-# --- END IoT/Client/OEM/Branch Models ---
+# --- END IoT/Client/OEM/Branch/Country Models ---

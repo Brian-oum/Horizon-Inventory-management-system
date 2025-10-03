@@ -10,6 +10,7 @@ from .models import (
     ReturnRecord,
     DeviceRequest,
     Profile,
+    Country,
 )
 
 # Register your models so they appear in the Django admin interface.
@@ -22,3 +23,4 @@ admin.site.register(IssuanceRecord)
 admin.site.register(ReturnRecord)
 admin.site.register(DeviceRequest)
 admin.site.register(Profile)
+admin.site.register(Country)

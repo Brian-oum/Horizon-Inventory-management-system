@@ -58,6 +58,34 @@
                         {% endif %}
                     </div>
 
+                    <!-- Country selection -->
+                    <div class="form-group">
+                        <label for="{{ form.country.id_for_label }}" class="label-styles">Country*</label>
+                        {{ form.country }}
+                        {% if form.country.errors %}
+                            <ul class="errorlist">
+                                {% for error in form.country.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                    <!-- End country selection -->
+
+                    <!-- Branch selection -->
+                    <div class="form-group">
+                        <label for="{{ form.branch.id_for_label }}" class="label-styles">Branch*</label>
+                        {{ form.branch }}
+                        {% if form.branch.errors %}
+                            <ul class="errorlist">
+                                {% for error in form.branch.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                    <!-- End branch selection -->
+
                     <div class="form-group">
                         <label for="{{ form.password1.id_for_label }}" class="label-styles">Password*</label>
                         {{ form.password1 }}

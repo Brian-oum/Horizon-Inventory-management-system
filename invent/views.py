@@ -109,7 +109,7 @@ def request_device(request):
             requested_quantity=Coalesce(
                 Sum(
                     'requests__quantity',
-                    filter=Q(requests__status__in=[
+                    filter=Q(requests_status_in=[
                              'Pending', 'Approved', 'Issued']),
                     output_field=IntegerField()
                 ),
@@ -128,7 +128,7 @@ def request_device(request):
             requested_quantity=Coalesce(
                 Sum(
                     'requests__quantity',
-                    filter=Q(requests__status__in=[
+                    filter=Q(requests_status_in=[
                              'Pending', 'Approved', 'Issued']),
                     output_field=IntegerField()
                 ),
@@ -333,9 +333,9 @@ def inventory_list_view(request):
             Q(imei_no__icontains=query) |
             Q(serial_no__icontains=query) |
             Q(category__icontains=query) |
-            Q(oem__name__icontains=query) |
-            Q(oem__oem_id__icontains=query) |
-            Q(issuancerecord__client__name__icontains=query)
+            Q(oem_name_icontains=query) |
+            Q(oem_oem_id_icontains=query) |
+            Q(issuancerecord_clientname_icontains=query)
         ).distinct()
     
     for device in devices:
@@ -378,11 +378,16 @@ def inventory_list_view(request):
 @login_required
 @permission_required('invent.add_device', raise_exception=True)
 def manage_stock(request):
+    user = request.user
     form = DeviceForm()
     if request.method == "POST":
         form = DeviceForm(request.POST)
         if form.is_valid():
-            form.save()
+            device = form.save(commit=False)
+            # Only set country for non-superusers (superuser can set any)
+            if not user.is_superuser:
+                device.country = user.profile.country
+            device.save()
             messages.success(request, "Device added successfully.")
             return redirect('manage_stock')
         else:
@@ -452,14 +457,14 @@ def issue_device(request):
                 device_request.status = 'Approved'
                 device_request.save()
                 messages.success(
-                    request, f"Request {device_request.id} for device {device.imei_no} has been **Approved**. Now, please finalize the issuance.")
+                    request, f"Request {device_request.id} for device {device.imei_no} has been *Approved*. Now, please finalize the issuance.")
                 return redirect('issue_device')
 
             elif action == 'issue' and device_request.status == 'Approved':
                 if client is None:
                     messages.error(
                         request,
-                        f"Cannot issue Request {device_request.id}: **No client is linked** to this approved device request. Update the request first."
+                        f"Cannot issue Request {device_request.id}: *No client is linked* to this approved device request. Update the request first."
                     )
                     return redirect('issue_device')
 
@@ -477,7 +482,7 @@ def issue_device(request):
                         device_request.save()
                         messages.success(
                             request,
-                            f"Device {device.imei_no} successfully **Issued** to {client.name} (Request {device_request.id})."
+                            f"Device {device.imei_no} successfully *Issued* to {client.name} (Request {device_request.id})."
                         )
                 else:
                     messages.error(
@@ -489,7 +494,7 @@ def issue_device(request):
                 device_request.status = 'Rejected'
                 device_request.save()
                 messages.success(
-                    request, f"Request {device_request.id} **rejected**. Transaction ended.")
+                    request, f"Request {device_request.id} *rejected*. Transaction ended.")
                 return redirect('issue_device')
 
             else:
@@ -631,24 +636,24 @@ def client_list(request):
 
     if query:
         requests_qs = requests_qs.filter(
-            Q(client__name__icontains=query) |
-            Q(client__email__icontains=query) |
-            Q(client__phone_no__icontains=query) |
-            Q(device__name__icontains=query)
+            Q(client_name_icontains=query) |
+            Q(client_email_icontains=query) |
+            Q(client_phone_no_icontains=query) |
+            Q(device_name_icontains=query)
         )
 
     if status_filter:
         requests_qs = requests_qs.filter(status=status_filter)
 
     if client_filter:
-        requests_qs = requests_qs.filter(client__name__icontains=client_filter)
+        requests_qs = requests_qs.filter(client_name_icontains=client_filter)
 
     if date_from:
         requests_qs = requests_qs.filter(
-            date_requested__date__gte=parse_date(date_from))
+            date_requested_date_gte=parse_date(date_from))
     if date_to:
         requests_qs = requests_qs.filter(
-            date_requested__date__lte=parse_date(date_to))
+            date_requested_date_lte=parse_date(date_to))
 
     paginator = Paginator(requests_qs, 25)
     page_number = request.GET.get('page')
@@ -683,7 +688,7 @@ def adjust_stock(request):
             Q(serial_no__icontains=query) |
             Q(name__icontains=query) |
             Q(category__icontains=query) |
-            Q(issuancerecord__client__name__icontains=query)
+            Q(issuancerecord_clientname_icontains=query)
         ).distinct()
     for device in devices:
         last_issuance = (
@@ -910,7 +915,12 @@ def upload_inventory(request):
                     messages.warning(
                         request, f"IMEI {imei} already exists. Skipped.")
                     continue
-                Device.objects.create(
+                if Device.objects.filter(serial_no=serial_no).exists():
+                    messages.warning(
+                        request, f"Serial No {serial_no} already exists. Skipped.")
+                    continue
+
+                device_kwargs = dict(
                     oem=oem,
                     product_id=product_id,
                     imei_no=imei,
@@ -923,6 +933,13 @@ def upload_inventory(request):
                     currency=currency,
                     status=status,
                 )
+                # COUNTRY FILTER: Set country based on user profile for non-superusers
+                if not request.user.is_superuser:
+                    device_kwargs["country"] = request.user.profile.country
+                else:
+                    # For superusers, optionally, let them pick a country or leave blank
+                    device_kwargs["country"] = None
+                Device.objects.create(**device_kwargs)
         messages.success(request, "Inventory uploaded successfully.")
         return redirect("inventory_list")
     return render(request, "invent/upload_inventory.html")
@@ -944,10 +961,10 @@ def total_requests(request):
             "device", "client", "requestor").filter(country=user_country).order_by('-date_requested')
     if query:
         queryset = queryset.filter(
-            Q(device__imei_no__icontains=query) |
-            Q(device__serial_no__icontains=query) |
-            Q(device__category__icontains=query) |
-            Q(client__name__icontains=query)
+            Q(device_imei_no_icontains=query) |
+            Q(device_serial_no_icontains=query) |
+            Q(device_category_icontains=query) |
+            Q(client_name_icontains=query)
         )
     if status_filter and status_filter.lower() != 'all':
         queryset = queryset.filter(status=status_filter)
