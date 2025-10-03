@@ -3,7 +3,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.db.models import F  # Import F expression for queryset filtering
 from .models import Device, Supplier
-from .models import DeviceRequest, Client
+from .models import DeviceRequest, Client, Branch
 
 
 class CustomCreationForm(UserCreationForm):
@@ -89,7 +89,12 @@ class DeviceRequestForm(forms.ModelForm):
     client_email = forms.EmailField(required=True, label="Client Email")
     client_address = forms.CharField(
         max_length=255, required=True, label="Client Address")
-
+    branch = forms.ModelChoiceField(
+        queryset=Branch.objects.all(),
+        required=True,
+        label="Branch",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    )
     class Meta:
         model = DeviceRequest
         fields = ['device', 'quantity', 'reason']  # client fields are extra

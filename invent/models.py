@@ -100,6 +100,7 @@ class DeviceRequest(models.Model):
         null=True,
         blank=True
     )
+    branch = models.ForeignKey("Branch", on_delete=models.CASCADE, related_name="requests")
     quantity = models.PositiveIntegerField(default=1)
     reason = models.TextField(blank=True, null=True)
     application_date = models.DateField(default=timezone.now)
@@ -199,5 +200,11 @@ class ReturnRecord(models.Model):
 
     def __str__(self):
         return f"{self.device} returned by {self.client.name} on {self.returned_at.strftime('%Y-%m-%d')}"
+
+class Branch(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
 
 # --- END IoT/Client/Supplier Models ---
