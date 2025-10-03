@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.db.models import F  # Import F expression for queryset filtering
-from .models import Device, Supplier
+from .models import Device, OEM
 from .models import DeviceRequest, Client, Branch
 
 

@@ -16,7 +16,7 @@ from openpyxl.utils import get_column_letter
 from django.db.models.functions import Coalesce
 
 from .models import (
-    Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord
+    Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord, Branch
 )
 from .forms import (
     CustomCreationForm, OEMForm, DeviceForm, DeviceRequestForm
@@ -190,7 +190,7 @@ def request_device(request):
         'form': form,
         'available_devices': available_devices,
         'categories': categories,
-        'branches': Branch.objects.all(),
+        'branches': Branch.objects.all(),  #render branch in template
     })
 
 
