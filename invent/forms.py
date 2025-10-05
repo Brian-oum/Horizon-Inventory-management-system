@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from .models import Profile
 from .models import Profile, Country
 from django.db.models import F  # Import F expression for queryset filtering
-from .models import Device, OEM
+from .models import Device, OEM,PurchaseOrder
 from .models import DeviceRequest, Client, Branch
 
 class CustomCreationForm(UserCreationForm):
@@ -127,3 +127,42 @@ class DeviceRequestForm(forms.ModelForm):
         if commit:
             device_request.save()
         return device_request
+
+   #Purchase order with document upload
+class PurchaseOrderForm(forms.ModelForm):
+    oem = forms.ModelChoiceField(
+        queryset=OEM.objects.all(),
+        required=True,
+        label='OEM (Supplier)',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    order_date = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        required=True,
+        label='Order Date'
+    )
+    expected_delivery = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        required=True,
+        label='Expected Delivery'
+    )
+    status = forms.ChoiceField(
+        choices=[
+            ('Pending', 'Pending'),
+            ('Completed', 'Completed'),
+            ('Delivered', 'Delivered'),
+            ('Cancelled', 'Cancelled'),
+        ],
+        required=True,
+        label='Status',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    document = forms.FileField(
+        required=False,
+        label='Purchase Order Document',
+        widget=forms.ClearableFileInput(attrs={'class': 'form-control'})
+    )
+
+    class Meta:
+        model = PurchaseOrder
+        fields = ['oem', 'order_date', 'expected_delivery', 'status', 'document']

@@ -14,7 +14,8 @@ from collections import defaultdict
 import openpyxl
 from openpyxl.utils import get_column_letter
 from django.db.models.functions import Coalesce
-
+from .models import PurchaseOrder
+from .forms import PurchaseOrderForm
 from .models import (
     Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord, Branch, Profile
 )
@@ -1119,4 +1120,82 @@ def request_list(request, status):
     return render(request, 'invent/request_list.html', {
         'status': status,
         'requests': requests
+    })
+
+@login_required
+@permission_required('invent.add_purchaseorder', raise_exception=True)
+def purchase_orders(request):
+    user = request.user
+
+    # Determine country for filtering (assuming via user profile)
+    if user.is_superuser:
+        country = None  # Superuser can see all
+    else:
+        country = getattr(user.profile, 'country', None)
+        if not country:
+            messages.error(request, "No country assigned to your profile. Contact admin.")
+            return redirect("store_clerk_dashboard")
+
+    # Handle Add/Edit mode
+    edit_mode = False
+    po_to_edit = None
+
+    # --- Handle Edit Mode ---
+    edit_id = request.GET.get('edit')
+    if edit_id:
+        po_to_edit = get_object_or_404(PurchaseOrder, id=edit_id)
+        # Only allow editing if PO is in user's country
+        if not user.is_superuser and po_to_edit.oem.country != country:
+            messages.error(request, "You do not have permission to edit this purchase order.")
+            return redirect('purchase_orders')
+        edit_mode = True
+
+    # --- Handle Delete ---
+    if request.method == "POST" and 'delete_po_id' in request.POST:
+        po_id = request.POST.get("delete_po_id")
+        po = get_object_or_404(PurchaseOrder, id=po_id)
+        if user.is_superuser or (po.oem.country == country):
+            po.delete()
+            messages.success(request, "Purchase Order deleted.")
+            return redirect('purchase_orders')
+        else:
+            messages.error(request, "You do not have permission to delete this purchase order.")
+            return redirect('purchase_orders')
+
+    # --- Handle Form Submission (Add or Edit) ---
+    if request.method == "POST" and 'delete_po_id' not in request.POST:
+        if edit_mode:
+            form = PurchaseOrderForm(request.POST, request.FILES, instance=po_to_edit)
+        else:
+            form = PurchaseOrderForm(request.POST, request.FILES)
+        # Restrict OEM choices by country for non-superusers
+        if not user.is_superuser:
+            form.fields['oem'].queryset = OEM.objects.filter(country=country)
+        if form.is_valid():
+            po = form.save(commit=False)
+            # (Optional) Set country if your PurchaseOrder model has a country field
+            # if hasattr(po, 'country'):
+            #     po.country = country
+            po.save()
+            messages.success(request, f"Purchase Order {'updated' if edit_mode else 'created'} successfully!")
+            return redirect('purchase_orders')
+    else:
+        if edit_mode:
+            form = PurchaseOrderForm(instance=po_to_edit)
+        else:
+            form = PurchaseOrderForm()
+        if not user.is_superuser:
+            form.fields['oem'].queryset = OEM.objects.filter(country=country)
+
+    # --- List POs for current country ---
+    if user.is_superuser:
+        purchase_orders = PurchaseOrder.objects.all().order_by('-order_date')
+    else:
+        purchase_orders = PurchaseOrder.objects.filter(oem__country=country).order_by('-order_date')
+
+    return render(request, 'invent/purchase_orders.html', {
+        'form': form,
+        'purchase_orders': purchase_orders,
+        'edit_mode': edit_mode,
+        'po_to_edit': po_to_edit,
     })

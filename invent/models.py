@@ -43,6 +43,8 @@ class PurchaseOrder(models.Model):
     order_date = models.DateField()
     expected_delivery = models.DateField()
     status = models.CharField(max_length=50)
+    document = models.FileField(upload_to='purchase_orders/', null=True, blank=True)  # Optional
+
 
     def __str__(self):
         return f"PO #{self.id} - {self.oem.name}"
