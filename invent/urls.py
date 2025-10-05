@@ -21,7 +21,7 @@ urlpatterns = [
     path('edit_item/<int:item_id>/', views.edit_item, name='edit_item'),
     path('delete-device/<int:device_id>/', views.delete_device, name='delete_device'),
     path('delete-device/', views.delete_device, name='delete_device'),  # For bulk deletion
-
+    path('purchase-orders/', views.purchase_orders, name='purchase_orders'),
     # Reports
     path('reports/', views.reports_view, name='reports'),
     path('reports/export/inventory-items/',
