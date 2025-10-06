@@ -3,19 +3,41 @@
 
 {% block title %}Issue IoT Device{% endblock %}
 
+{% block extra_css %}
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<style>
+/* Match Bootstrap 5 look */
+.select2-container--default .select2-selection--single {
+    height: 38px;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+}
+.select2-selection__rendered {
+    padding-left: 10px !important;
+}
+.select2-container {
+    width: 100% !important;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
     <h2 class="mb-4">Issue IoT Device</h2>
 
     {% if messages %}
-        <div class="messages mb-3">
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endfor %}
+    <div class="messages mb-3">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
+        {% endfor %}
+    </div>
     {% endif %}
 
     <ul class="nav nav-tabs mb-4" id="deviceIssueTabs" role="tablist">
@@ -23,9 +45,7 @@
             <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
                 Pending Requests
                 {% if pending_requests_count > 0 %}
-                    <span class="badge rounded-pill bg-danger ms-1">
-                        {{ pending_requests_count }}
-                    </span>
+                <span class="badge rounded-pill bg-danger ms-1">{{ pending_requests_count }}</span>
                 {% endif %}
             </button>
         </li>
@@ -33,9 +53,7 @@
             <button class="nav-link" id="approved-tab" data-bs-toggle="tab" data-bs-target="#approved" type="button" role="tab">
                 Ready to Issue 
                 {% if approved_requests and approved_requests.count > 0 %}
-                    <span class="badge rounded-pill bg-success ms-1">
-                        {{ approved_requests.count }}
-                    </span>
+                <span class="badge rounded-pill bg-success ms-1">{{ approved_requests.count }}</span>
                 {% endif %}
             </button>
         </li>
@@ -52,6 +70,8 @@
     </ul>
 
     <div class="tab-content" id="deviceIssueTabsContent">
+
+        <!-- Pending Requests -->
         <div class="tab-pane fade show active" id="pending" role="tabpanel" aria-labelledby="pending-tab">
             <h5 class="mb-3">Pending Device Requests Awaiting Action</h5>
             <div class="table-responsive">
@@ -72,16 +92,9 @@
                         <tr>
                             <td>{{ req.id }}</td>
                             <td>{{ req.requestor.username }}</td>
-                            <td>
-                                IMEI: {{ req.device.imei_no }}
-                                {% if req.device.serial_no %}| Serial: {{ req.device.serial_no }}{% endif %}
-                            </td>
+                            <td>IMEI: {{ req.device.imei_no }} {% if req.device.serial_no %}| Serial: {{ req.device.serial_no }}{% endif %}</td>
                             <td>{{ req.client.name|default:"N/A" }}</td>
-                            <td>
-                                <span class="badge bg-warning text-dark">
-                                    {{ req.status|capfirst }}
-                                </span>
-                            </td>
+                            <td><span class="badge bg-warning text-dark">{{ req.status|capfirst }}</span></td>
                             <td>{{ req.requested_at|date:"Y-m-d H:i" }}</td>
                             <td>
                                 <form action="{% url 'issue_device' %}" method="post" class="d-inline">
@@ -99,15 +112,14 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center text-muted">No pending device requests found.</td>
-                        </tr>
+                        <tr><td colspan="7" class="text-center text-muted">No pending device requests found.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
 
+        <!-- Approved Requests -->
         <div class="tab-pane fade" id="approved" role="tabpanel" aria-labelledby="approved-tab">
             <h5 class="mb-3">Approved Requests Ready to be Issued</h5>
             <div class="table-responsive">
@@ -128,16 +140,9 @@
                         <tr>
                             <td>{{ req.id }}</td>
                             <td>{{ req.requestor.username }}</td>
-                            <td>
-                                IMEI: {{ req.device.imei_no }}
-                                {% if req.device.serial_no %}| Serial: {{ req.device.serial_no }}{% endif %}
-                            </td>
+                            <td>IMEI: {{ req.device.imei_no }} {% if req.device.serial_no %}| Serial: {{ req.device.serial_no }}{% endif %}</td>
                             <td>{{ req.client.name|default:"N/A" }}</td>
-                            <td>
-                                <span class="badge bg-success">
-                                    {{ req.status|capfirst }}
-                                </span>
-                            </td>
+                            <td><span class="badge bg-success">{{ req.status|capfirst }}</span></td>
                             <td>{{ req.requested_at|date:"Y-m-d H:i" }}</td>
                             <td>
                                 <form action="{% url 'issue_device' %}" method="post" class="d-inline">
@@ -155,15 +160,14 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center text-muted">No approved requests ready for issuance.</td>
-                        </tr>
+                        <tr><td colspan="7" class="text-center text-muted">No approved requests ready for issuance.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
 
+        <!-- Direct Issue Section -->
         <div class="tab-pane fade" id="issue" role="tabpanel" aria-labelledby="issue-tab">
             <h5 class="mb-3">Issue Device Directly (No Request)</h5>
             <form method="post">
@@ -175,12 +179,12 @@
                             <option value="" disabled selected>-- Select Device (IMEI/Serial) --</option>
                             {% for device in available_devices %}
                             <option value="{{ device.id }}">
-                                IMEI: {{ device.imei_no }} | Name: {{ device.name }}
-                                | Status: {{ device.status|capfirst }}
+                                IMEI: {{ device.imei_no }} | Name: {{ device.name }} | Status: {{ device.status|capfirst }}
                             </option>
                             {% endfor %}
                         </select>
                     </div>
+
                     <div class="col-md-5 mb-2">
                         <label for="client_id" class="form-label"><strong>Select Client</strong></label>
                         <select name="client_id" id="client_id" class="form-select" required>
@@ -190,6 +194,7 @@
                             {% endfor %}
                         </select>
                     </div>
+
                     <div class="col-md-2 d-flex align-items-end">
                         <button type="submit" class="btn btn-primary w-100">Issue Device</button>
                     </div>
@@ -219,15 +224,14 @@
                             <td><span class="badge bg-success">{{ device.status|capfirst }}</span></td>
                         </tr>
                         {% empty %}
-                        <tr>
-                            <td colspan="6" class="text-center text-muted">No available devices for issuance.</td>
-                        </tr>
+                        <tr><td colspan="6" class="text-center text-muted">No available devices for issuance.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
 
+        <!-- All Requests -->
         <div class="tab-pane fade" id="all" role="tabpanel" aria-labelledby="all-tab">
             <h5 class="mb-3">All Device Requests</h5>
             <div class="table-responsive">
@@ -247,10 +251,7 @@
                         <tr>
                             <td>{{ req.id }}</td>
                             <td>{{ req.requestor.username }}</td>
-                            <td>
-                                IMEI: {{ req.device.imei_no }}
-                                {% if req.device.serial_no %}| Serial: {{ req.device.serial_no }}{% endif %}
-                            </td>
+                            <td>IMEI: {{ req.device.imei_no }} {% if req.device.serial_no %}| Serial: {{ req.device.serial_no }}{% endif %}</td>
                             <td>{{ req.client.name|default:"N/A" }}</td>
                             <td>
                                 <span class="badge
@@ -265,9 +266,7 @@
                             <td>{{ req.requested_at|date:"Y-m-d H:i" }}</td>
                         </tr>
                         {% empty %}
-                        <tr>
-                            <td colspan="6" class="text-center text-muted">No device requests found.</td>
-                        </tr>
+                        <tr><td colspan="6" class="text-center text-muted">No device requests found.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -278,5 +277,23 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    $('#device_id').select2({
+        placeholder: "-- Select Device (IMEI/Serial) --",
+        allowClear: true,
+        width: '100%'
+    });
+
+    $('#client_id').select2({
+        placeholder: "-- Select Client --",
+        allowClear: true,
+        width: '100%'
+    });
+});
+</script>
 {% endblock %}
