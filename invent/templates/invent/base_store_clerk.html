@@ -60,11 +60,30 @@
 
         /* Sidebar Content Area (scrollable) */
         .sidebar-content {
-            flex-grow: 1; /* Allows this part to take up all available space */
-            overflow-y: auto; /* Enable vertical scrolling for the menu items */
+            flex-grow: 1;
+            overflow-y: auto;
             padding-top: 1rem;
-            padding-bottom: 1rem; /* Adjust as needed */
+            padding-bottom: 1rem;
+            max-height: calc(100vh - 120px); /* sidebar scroll area minus top & bottom */
+            scrollbar-width: thin; /* for Firefox */
+            scrollbar-color: var(--bs-primary) #f1f1f1; /* for Firefox */
         }
+
+        /* Optional: nice scrollbar for WebKit browsers (Chrome, Edge, Safari) */
+        .sidebar-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .sidebar-content::-webkit-scrollbar-thumb {
+            background-color: var(--bs-primary);
+            border-radius: 3px;
+        }
+        .sidebar-content::-webkit-scrollbar-thumb:hover {
+            background-color: #157347;
+        }
+
 
         .sidebar-wrapper .nav-link {
             color: var(--sidebar-text); /* Use variable for consistency */
@@ -264,15 +283,29 @@
                     </a>
                 </li>
                 <li class="nav-item mb-2">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'upload_inventory' %}active{% endif %}" href="{% url 'upload_inventory' %}">
-                        <i class="fas fa-fw fa-upload me-2"></i> Upload Inventory
-                    </a>
-                </li>
-                <li class="nav-item mb-2">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" href="{% url 'reports' %}"> {# Changed to reports to match urls.py name #}
-                        <i class="fas fa-fw fa-chart-line me-2"></i> Reports
-                    </a>
-                </li>
+    <a class="nav-link {% if request.resolver_match.url_name == 'upload_inventory' %}active{% endif %}" href="{% url 'upload_inventory' %}">
+        <i class="fas fa-fw fa-upload me-2"></i> Upload Inventory
+    </a>
+</li>
+
+<li class="nav-item mb-2">
+    <a class="nav-link {% if request.resolver_match.url_name == 'add_oem' %}active{% endif %}" href="{% url 'add_oem' %}">
+        <i class="fas fa-fw fa-user-plus me-2"></i> Add OEM
+    </a>
+</li>
+
+<li class="nav-item mb-2">
+    <a class="nav-link {% if request.resolver_match.url_name == 'purchase_orders' %}active{% endif %}" href="{% url 'purchase_orders' %}">
+        <i class="fas fa-fw fa-file-invoice me-2"></i> Purchase Orders
+    </a>
+</li>
+
+<li class="nav-item mb-2">
+    <a class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" href="{% url 'reports' %}">
+        <i class="fas fa-fw fa-chart-line me-2"></i> Reports
+    </a>
+</li>
+
             </ul>
         </div>
         {# Sidebar Bottom Section (Logout & Copyright) #}
