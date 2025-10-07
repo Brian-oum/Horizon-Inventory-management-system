@@ -40,6 +40,7 @@ class OEM(models.Model):  # Formerly Supplier
 
 class PurchaseOrder(models.Model):
     oem = models.ForeignKey(OEM, on_delete=models.CASCADE, default=1)  # was supplier
+    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True)
     order_date = models.DateField()
     expected_delivery = models.DateField()
     status = models.CharField(max_length=50)
@@ -62,6 +63,7 @@ class Device(models.Model):
     name = models.CharField(max_length=255, blank=True)  # Device name
     total_quantity = models.PositiveIntegerField(default=1)
     product_id = models.CharField(max_length=30)
+    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True)
     oem = models.ForeignKey(
         OEM,
         on_delete=models.SET_NULL,
