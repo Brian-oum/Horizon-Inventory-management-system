@@ -6,6 +6,7 @@
 {% block content %}
 <div class="container mt-4">
     <h2 class="mb-4">Return IoT Device</h2>
+
     {% if messages %}
         <div class="messages mb-3">
             {% for message in messages %}
@@ -25,29 +26,34 @@
                 <select name="device_id" id="device_id" class="form-select" required>
                     <option value="" disabled selected>-- Select Device (IMEI/Serial) --</option>
                     {% for device in issued_devices %}
-                    <option value="{{ device.id }}">
-                        IMEI: {{ device.imei_no }}
-                        {% if device.serial_no %} | Serial: {{ device.serial_no }}{% endif %}
-                        | Client: 
-                        {% for record in device.issuancerecord_set.all %}{{ record.client.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
-                    </option>
+                        <option value="{{ device.id }}">
+                            IMEI: {{ device.imei_no }}
+                            {% if device.serial_no %}| Serial: {{ device.serial_no }}{% endif %}
+                            | Client: 
+                            {% for record in device.issuancerecord_set.all %}
+                                {{ record.client.name }}{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        </option>
                     {% endfor %}
                 </select>
             </div>
+
             <div class="col-md-5 mb-2">
                 <label for="client_id" class="form-label"><strong>Select Client</strong></label>
                 <select name="client_id" id="client_id" class="form-select" required>
                     <option value="" disabled selected>-- Select Client --</option>
                     {% for client in clients %}
-                    <option value="{{ client.id }}">{{ client.name }} ({{ client.phone_no }})</option>
+                        <option value="{{ client.id }}">{{ client.name }} ({{ client.phone_no }})</option>
                     {% endfor %}
                 </select>
             </div>
+
             <div class="col-md-2 mb-2">
                 <label for="reason" class="form-label"><strong>Reason</strong></label>
                 <input type="text" class="form-control" name="reason" id="reason" placeholder="Optional">
             </div>
         </div>
+
         <div class="row mb-3">
             <div class="col-md-2 offset-md-10">
                 <button type="submit" class="btn btn-info w-100">Return Device</button>
@@ -88,4 +94,41 @@
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+.select2-container--default .select2-selection--single {
+    height: 38px;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+}
+.select2-selection__rendered {
+    padding-left: 10px !important;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    $('#device_id').select2({
+        placeholder: "-- Select Device (IMEI/Serial) --",
+        allowClear: true,
+        width: '100%'
+    });
+
+    $('#client_id').select2({
+        placeholder: "-- Select Client --",
+        allowClear: true,
+        width: '100%'
+    });
+});
+</script>
 {% endblock %}
