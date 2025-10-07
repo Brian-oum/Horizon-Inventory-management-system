@@ -61,6 +61,7 @@ class DeviceForm(forms.ModelForm):
             'imei_no',
             'serial_no',
             'category',
+            'manufacturer',
             'description',
             'selling_price',
             'currency',
@@ -75,6 +76,7 @@ class DeviceForm(forms.ModelForm):
             'imei_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'IMEI Number'}),
             'serial_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Serial Number'}),
             'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Category'}),
+            'manufacturer': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Manufacturer'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Description', 'rows': 2}),
             'selling_price': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Selling Price'}),
             'currency': forms.Select(attrs={'class': 'form-select'}),
@@ -123,6 +125,10 @@ class DeviceRequestForm(forms.ModelForm):
         if requestor:
             device_request.requestor = requestor
         device_request.client = client
+
+        device_request.branch = self.cleaned_data['branch']
+        if device_request.branch and device_request.branch.country:
+            device_request.country = device_request.branch.country
 
         if commit:
             device_request.save()

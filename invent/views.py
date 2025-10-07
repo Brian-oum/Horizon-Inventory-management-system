@@ -110,7 +110,7 @@ def request_device(request):
             requested_quantity=Coalesce(
                 Sum(
                     'requests__quantity',
-                    filter=Q(requests_status_in=[
+                    filter=Q(requests__status__in=[
                              'Pending', 'Approved', 'Issued']),
                     output_field=IntegerField()
                 ),
@@ -124,12 +124,12 @@ def request_device(request):
     else:
         user_country = getattr(user.profile, "country", None)
         available_device_queryset = Device.objects.filter(
-            status='available', country=user_country
+            status='available', branch__country=user_country
         ).annotate(
             requested_quantity=Coalesce(
                 Sum(
                     'requests__quantity',
-                    filter=Q(requests_status_in=[
+                    filter=Q(requests__status__in=[
                              'Pending', 'Approved', 'Issued']),
                     output_field=IntegerField()
                 ),
@@ -165,7 +165,12 @@ def request_device(request):
         form = DeviceRequestForm(request.POST)
         form.fields['device'].queryset = available_device_queryset
         if form.is_valid():
-            device_request = form.save(requestor=request.user)
+            device_request = form.save(commit=False)
+            # Assign country from branch if present
+            if device_request.branch and device_request.branch.country:
+                device_request.country = device_request.branch.country
+            device_request.requestor = request.user
+            device_request.save()
             send_mail(
                 subject='Device Request Confirmation',
                 message=(
@@ -248,18 +253,18 @@ def store_clerk_dashboard(request):
             status="Pending").select_related("requestor", "device", "client")
     else:
         user_country = getattr(user.profile, "country", None)
-        total_devices = Device.objects.filter(country=user_country).count()
-        devices_available = Device.objects.filter(status='available', country=user_country).count()
-        devices_issued = Device.objects.filter(status='issued', country=user_country).count()
-        devices_returned = Device.objects.filter(status='returned', country=user_country).count()
+        total_devices = Device.objects.filter(branch__country=user_country).count()
+        devices_available = Device.objects.filter(status='available', branch__country=user_country).count()
+        devices_issued = Device.objects.filter(status='issued', branch__country=user_country).count()
+        devices_returned = Device.objects.filter(status='returned', branch__country=user_country).count()
         recent_issuances = (
             IssuanceRecord.objects
-            .filter(device__country=user_country)
+            .filter(device__branch__country=user_country)
             .select_related('device', 'client')
             .order_by('-issued_at')[:10]
         )
         pending_device_requests = DeviceRequest.objects.filter(
-            status="Pending", country=user_country).select_related("requestor", "device", "client")
+            status="Pending", branch__country=user_country).select_related("requestor", "device", "client")
     seen = set()
     recent_devices = []
     for record in recent_issuances:
@@ -325,7 +330,7 @@ def inventory_list_view(request):
         devices = Device.objects.select_related('oem', 'branch').order_by('category', 'oem__name', 'id')
     else:
         user_country = getattr(user.profile, "country", None)
-        devices = Device.objects.select_related('oem', 'branch').filter(country=user_country).order_by('category', 'oem__name', 'id')
+        devices = Device.objects.select_related('oem', 'branch').filter(branch__country=user_country).order_by('category', 'oem__name', 'id')
     
     if status and status != 'all':
         devices = devices.filter(status=status)
@@ -387,6 +392,7 @@ def manage_stock(request):
             device = form.save(commit=False)
             # Only set country for non-superusers (superuser can set any)
             if not user.is_superuser:
+                device.branch = user.profile.branch
                 device.country = user.profile.country
             device.save()
             messages.success(request, "Device added successfully.")
@@ -434,13 +440,13 @@ def issue_device(request):
             "requestor", "device", "client").all()
     else:
         user_country = getattr(user.profile, "country", None)
-        available_devices = Device.objects.filter(status='available', country=user_country)
+        available_devices = Device.objects.filter(status='available', branch__country=user_country)
         clients = Client.objects.all()
         pending_requests = DeviceRequest.objects.filter(
-            status='Pending', country=user_country
+            status='Pending', branch__country=user_country
         ).select_related("requestor", "device", "client")
         all_requests = DeviceRequest.objects.select_related(
-            "requestor", "device", "client").filter(country=user_country)
+            "requestor", "device", "client").filter(branch__country=user_country)
 
     pending_requests_count = pending_requests.count()
 
@@ -531,9 +537,14 @@ def issue_device(request):
             request, "Please provide valid inputs for issuance or request action.")
         return redirect('issue_device')
 
-    approved_requests = DeviceRequest.objects.filter(
-        status='Approved'
-    ).select_related("requestor", "device", "client")
+    if user.is_superuser:
+        approved_requests = DeviceRequest.objects.filter(
+            status='Approved'
+        ).select_related("requestor", "device", "client")
+    else:
+        approved_requests = DeviceRequest.objects.filter(
+            status='Approved', branch__country=user_country
+        ).select_related("requestor", "device", "client")
 
     return render(request, 'invent/issue_device.html', {
         'available_devices': available_devices,
@@ -555,7 +566,7 @@ def return_device(request):
         issued_devices = Device.objects.filter(status='issued')
     else:
         user_country = getattr(user.profile, "country", None)
-        issued_devices = Device.objects.filter(status='issued', country=user_country)
+        issued_devices = Device.objects.filter(status='issued', branch__country=user_country)
     clients = Client.objects.all()
     if request.method == 'POST':
         device_id = request.POST.get('device_id')
@@ -633,7 +644,7 @@ def client_list(request):
     else:
         user_country = getattr(user.profile, "country", None)
         requests_qs = DeviceRequest.objects.select_related(
-            'client', 'device').filter(country=user_country).order_by('-date_requested')
+            'client', 'device').filter(branch__country=user_country).order_by('-date_requested')
 
     if query:
         requests_qs = requests_qs.filter(
@@ -682,7 +693,7 @@ def adjust_stock(request):
         devices = Device.objects.all().order_by('id')
     else:
         user_country = getattr(user.profile, "country", None)
-        devices = Device.objects.filter(country=user_country).order_by('id')
+        devices = Device.objects.filter(branch__country=user_country).order_by('id')
     if query:
         devices = devices.filter(
             Q(imei_no__icontains=query) |
@@ -785,19 +796,19 @@ def reports_view(request):
         )
     else:
         user_country = getattr(user.profile, "country", None)
-        total_items = Device.objects.filter(country=user_country).aggregate(total=Sum('total_quantity'))['total'] or 0
-        total_requests = DeviceRequest.objects.filter(country=user_country).count()
-        pending_count = DeviceRequest.objects.filter(status='Pending', country=user_country).count()
-        approved_count = DeviceRequest.objects.filter(status='Approved', country=user_country).count()
-        issued_count = DeviceRequest.objects.filter(status='Issued', country=user_country).count()
-        rejected_count = DeviceRequest.objects.filter(status='Rejected', country=user_country).count()
-        fully_returned_count = DeviceRequest.objects.filter(status='Fully Returned', country=user_country).count()
-        partially_returned_count = DeviceRequest.objects.filter(status='Partially Returned', country=user_country).count()
-        total_returned_quantity_all_items = DeviceRequest.objects.filter(country=user_country).aggregate(
+        total_items = Device.objects.filter(branch__country=user_country).aggregate(total=Sum('total_quantity'))['total'] or 0
+        total_requests = DeviceRequest.objects.filter(branch__country=user_country).count()
+        pending_count = DeviceRequest.objects.filter(status='Pending', branch__country=user_country).count()
+        approved_count = DeviceRequest.objects.filter(status='Approved', branch__country=user_country).count()
+        issued_count = DeviceRequest.objects.filter(status='Issued', branch__country=user_country).count()
+        rejected_count = DeviceRequest.objects.filter(status='Rejected', branch__country=user_country).count()
+        fully_returned_count = DeviceRequest.objects.filter(status='Fully Returned', branch__country=user_country).count()
+        partially_returned_count = DeviceRequest.objects.filter(status='Partially Returned', branch__country=user_country).count()
+        total_returned_quantity_all_items = DeviceRequest.objects.filter(branch__country=user_country).aggregate(
             total_returned=Sum('returned_quantity')
         )['total_returned'] or 0
         top_requested_items = (
-            DeviceRequest.objects.filter(country=user_country).values('device__name')
+            DeviceRequest.objects.filter(branch__country=user_country).values('device__name')
             .annotate(request_count=Count('id'))
             .order_by('-request_count')[:2]
         )
@@ -936,6 +947,7 @@ def upload_inventory(request):
                 )
                 # COUNTRY FILTER: Set country based on user profile for non-superusers
                 if not request.user.is_superuser:
+                    device_kwargs["branch"] = request.user.profile.branch
                     device_kwargs["country"] = request.user.profile.country
                 else:
                     # For superusers, optionally, let them pick a country or leave blank
@@ -959,7 +971,7 @@ def total_requests(request):
     else:
         user_country = getattr(user.profile, "country", None)
         queryset = DeviceRequest.objects.select_related(
-            "device", "client", "requestor").filter(country=user_country).order_by('-date_requested')
+            "device", "client", "requestor").filter(branch__country=user_country).order_by('-date_requested')
     if query:
         queryset = queryset.filter(
             Q(device_imei_no_icontains=query) |
@@ -989,7 +1001,7 @@ def export_total_requests(request):
     else:
         user_country = getattr(user.profile, "country", None)
         queryset = DeviceRequest.objects.select_related(
-            "device", "client", "requestor").filter(country=user_country)
+            "device", "client", "requestor").filter(branch__country=user_country)
     if status_filter:
         queryset = queryset.filter(status=status_filter)
     wb = openpyxl.Workbook()
@@ -1025,7 +1037,7 @@ def export_inventory_items(request):
         queryset = Device.objects.all()
     else:
         user_country = getattr(user.profile, "country", None)
-        queryset = Device.objects.filter(country=user_country)
+        queryset = Device.objects.filter(branch__country=user_country)
     if status_filter:
         queryset = queryset.filter(status=status_filter)
     wb = openpyxl.Workbook()
@@ -1068,7 +1080,7 @@ def list_issued_requests_for_return(request):
     else:
         user_country = getattr(user.profile, "country", None)
         issued_requests = DeviceRequest.objects.filter(
-            status='Issued', country=user_country
+            status='Issued', branch__country=user_country
         ).select_related('device', 'client', 'requestor').order_by('-date_issued')
     context = {
         'issued_requests': issued_requests,
@@ -1170,7 +1182,7 @@ def purchase_orders(request):
             form = PurchaseOrderForm(request.POST, request.FILES)
         # Restrict OEM choices by country for non-superusers
         if not user.is_superuser:
-            form.fields['oem'].queryset = OEM.objects.filter(country=country)
+            form.fields['oem'].queryset = OEM.objects.all()
         if form.is_valid():
             po = form.save(commit=False)
             # (Optional) Set country if your PurchaseOrder model has a country field
@@ -1185,13 +1197,13 @@ def purchase_orders(request):
         else:
             form = PurchaseOrderForm()
         if not user.is_superuser:
-            form.fields['oem'].queryset = OEM.objects.filter(country=country)
+            form.fields['oem'].queryset = OEM.objects.all()
 
     # --- List POs for current country ---
     if user.is_superuser:
         purchase_orders = PurchaseOrder.objects.all().order_by('-order_date')
     else:
-        purchase_orders = PurchaseOrder.objects.filter(oem__country=country).order_by('-order_date')
+        purchase_orders = PurchaseOrder.objects.filter(branch__country=country).order_by('-order_date')
 
     return render(request, 'invent/purchase_orders.html', {
         'form': form,
