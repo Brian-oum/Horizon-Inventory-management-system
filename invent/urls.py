@@ -12,15 +12,18 @@ urlpatterns = [
     path('request_summary/', views.request_summary, name='request_summary'),
     path('client_list/', views.client_list, name='client_list'),
     path('requests/<str:status>/', views.request_list, name='request_list'),
-    path('cancel-request/<int:request_id>/', views.cancel_request, name='cancel_request'),
+    path('cancel-request/<int:request_id>/',
+         views.cancel_request, name='cancel_request'),
 
     # Store Clerk Paths
     path('store_clerk_dashboard/', views.store_clerk_dashboard,
          name='store_clerk_dashboard'),
     path('manage_stock/', views.manage_stock, name='manage_stock'),
     path('edit_item/<int:item_id>/', views.edit_item, name='edit_item'),
-    path('delete-device/<int:device_id>/', views.delete_device, name='delete_device'),
-    path('delete-device/', views.delete_device, name='delete_device'),  # For bulk deletion
+    path('delete-device/<int:device_id>/',
+         views.delete_device, name='delete_device'),
+    path('delete-device/', views.delete_device,
+         name='delete_device'),  # For bulk deletion
     path('purchase-orders/', views.purchase_orders, name='purchase_orders'),
     # Reports
     path('reports/', views.reports_view, name='reports'),

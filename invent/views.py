@@ -1182,7 +1182,7 @@ def purchase_orders(request):
             form = PurchaseOrderForm(request.POST, request.FILES)
         # Restrict OEM choices by country for non-superusers
         if not user.is_superuser:
-            form.fields['oem'].queryset = OEM.objects.all()
+            form.fields['oem'].queryset = OEM.objects.filter(country=country)
         if form.is_valid():
             po = form.save(commit=False)
             # (Optional) Set country if your PurchaseOrder model has a country field
@@ -1197,7 +1197,7 @@ def purchase_orders(request):
         else:
             form = PurchaseOrderForm()
         if not user.is_superuser:
-            form.fields['oem'].queryset = OEM.objects.all()
+            form.fields['oem'].queryset = OEM.objects.filter(country=country)
 
     # --- List POs for current country ---
     if user.is_superuser:
