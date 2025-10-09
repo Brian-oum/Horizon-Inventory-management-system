@@ -7,8 +7,8 @@
 <div class="container-fluid mt-4">
 
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded">
-        <h2 class="fw-bold">Adjust Stock</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded shadow-sm">
+        <h2 class="fw-bold text-primary mb-0">Adjust Stock</h2>
         <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
         </a>
@@ -16,44 +16,43 @@
 
     <!-- Messages -->
     {% if messages %}
-        <ul class="messages list-unstyled">
-            {% for message in messages %}
-                <li{% if message.tags %} class="alert alert-{{ message.tags }} alert-dismissible fade show"{% endif %} role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </li>
-            {% endfor %}
-        </ul>
+    <div class="mb-3">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
     {% endif %}
 
-    <!-- Device Search Bar -->
+    <!-- Search Bar -->
     <form method="get" action="{% url 'adjust_stock' %}" class="row g-3 align-items-center mb-4">
         <div class="col-md-8">
             <input type="text" name="q" class="form-control"
-                   placeholder="🔍 Search devices by IMEI, Serial, Name, Category, Client"
-                   value="{{ query }}">
+                placeholder="🔍 Search devices by IMEI, Serial, Name, Category, or Client"
+                value="{{ query }}">
         </div>
         <div class="col-md-2">
-            <button type="submit" class="btn btn-success w-100">Search</button>
+            <button type="submit" class="btn btn-success w-100">
+                <i class="fas fa-search me-1"></i> Search
+            </button>
         </div>
         <div class="col-md-2">
-            <a href="{% url 'adjust_stock' %}" class="btn btn-outline-secondary w-100">Reset</a>
+            <a href="{% url 'adjust_stock' %}" class="btn btn-outline-secondary w-100">
+                <i class="fas fa-sync-alt me-1"></i> Reset
+            </a>
         </div>
     </form>
 
-    <!-- Device List & Bulk Delete -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-secondary text-white py-3 d-flex justify-content-between align-items-center">
-            <h4 class="mb-0">Device Inventory List</h4>
-            <form method="post" action="{% url 'delete_device' %}" class="mb-0">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger btn-sm"
-                        onclick="return confirm('Are you sure you want to delete selected devices?');">
-                    <i class="fas fa-trash-alt"></i> Delete Selected
-                </button>
-            </form>
+    <!-- Device List -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-3">
+            <h4 class="mb-0"><i class="fas fa-microchip me-2"></i>Device Inventory List</h4>
         </div>
+
         <div class="card-body">
+            <!-- Bulk Delete Form -->
             <form method="post" action="{% url 'delete_device' %}">
                 {% csrf_token %}
                 <div class="table-responsive">
@@ -61,7 +60,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th><input type="checkbox" onclick="toggleAll(this)"></th>
-                                <th>ID</th>
+                                <th>#</th>
                                 <th>Name</th>
                                 <th>IMEI</th>
                                 <th>Serial</th>
@@ -74,9 +73,7 @@
                         <tbody>
                             {% for device in devices %}
                             <tr>
-                                <td>
-                                    <input type="checkbox" name="device_ids" value="{{ device.id }}">
-                                </td>
+                                <td><input type="checkbox" name="device_ids" value="{{ device.id }}"></td>
                                 <td>{{ forloop.counter }}</td>
                                 <td>{{ device.name|default:device.category }}</td>
                                 <td>{{ device.imei_no|default:"-" }}</td>
@@ -91,22 +88,11 @@
                                         {{ device.get_status_display }}
                                     </span>
                                 </td>
+                                <td>{{ device.current_client.name|default:"-" }}</td>
+                                <td>{{ device.issued_at|date:"Y-m-d H:i"|default:"-" }}</td>
                                 <td>
-                                    {% if device.current_client %}
-                                        {{ device.current_client.name }}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if device.issued_at %}
-                                         {{ device.issued_at|date:"Y-m-d H:i" }}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <form method="post" action="{% url 'delete_device' device.id %}" style="display:inline;">
+                                    <!-- Single Delete Form -->
+                                    <form method="post" action="{% url 'delete_device' device.id %}" class="d-inline">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-danger btn-sm"
                                             onclick="return confirm('Are you sure you want to delete this device?');"
@@ -118,24 +104,30 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="9" class="text-center text-muted">No devices found.</td>
+                                <td colspan="9" class="text-center text-muted py-4">No devices found.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
-                <button type="submit" class="btn btn-danger mt-3">
-                    <i class="fas fa-trash-alt"></i> Delete Selected
-                </button>
+
+                <!-- Bulk Delete Button -->
+                <div class="mt-3 text-end">
+                    <button type="submit" class="btn btn-danger"
+                        onclick="return confirm('Are you sure you want to delete selected devices?');">
+                        <i class="fas fa-trash-alt me-2"></i>Delete Selected
+                    </button>
+                </div>
             </form>
         </div>
     </div>
 </div>
 
+<!-- Checkbox Select All Script -->
 <script>
 function toggleAll(source) {
-    checkboxes = document.getElementsByName('device_ids');
-    for(var i=0, n=checkboxes.length;i<n;i++) {
+    const checkboxes = document.getElementsByName('device_ids');
+    for (let i = 0; i < checkboxes.length; i++) {
         checkboxes[i].checked = source.checked;
     }
 }
