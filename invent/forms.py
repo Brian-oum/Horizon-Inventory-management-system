@@ -4,8 +4,9 @@ from django.contrib.auth.models import User
 from .models import Profile
 from .models import Profile, Country
 from django.db.models import F  # Import F expression for queryset filtering
-from .models import Device, OEM,PurchaseOrder
+from .models import Device, OEM, PurchaseOrder
 from .models import DeviceRequest, Client, Branch
+
 
 class CustomCreationForm(UserCreationForm):
     email = forms.EmailField(required=True)
@@ -22,7 +23,8 @@ class CustomCreationForm(UserCreationForm):
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password1', 'password2', 'country', 'branch']
+        fields = ['username', 'email', 'password1',
+                  'password2', 'country', 'branch']
 
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -37,6 +39,7 @@ class CustomCreationForm(UserCreationForm):
         return user
 # --- NEW FORMS FOR RETURN LOGIC ---
 
+
 class OEMForm(forms.ModelForm):
     class Meta:
         model = OEM
@@ -50,46 +53,55 @@ class OEMForm(forms.ModelForm):
             'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Address'}),
         }
 
+
 class DeviceForm(forms.ModelForm):
+    branch = forms.ModelChoiceField(
+        queryset=Branch.objects.all(),
+        required=True,
+        label="Branch",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
     class Meta:
         model = Device
         fields = [
             'name',
-            'total_quantity',
             'product_id',
             'oem',
             'imei_no',
             'serial_no',
             'category',
-            'manufacturer',
             'description',
             'selling_price',
             'currency',
             'status',
-            'country',  # <-- Add this so superusers can select it
+            'branch',
+            'country'
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name'}),
-            'total_quantity': forms.NumberInput(attrs={'min': 1}),
             'product_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Product ID'}),
             'oem': forms.Select(attrs={'class': 'form-select'}),
             'imei_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'IMEI Number'}),
             'serial_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Serial Number'}),
             'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Category'}),
-            'manufacturer': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Manufacturer'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Description', 'rows': 2}),
             'selling_price': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Selling Price'}),
             'currency': forms.Select(attrs={'class': 'form-select'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
-            'country': forms.Select(attrs={'class': 'form-select'}),  # Add a widget for country
+            'branch': forms.Select(attrs={'class': 'form-select'}),
+            'country': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        # Only show or allow editing country for superuser
         if user and not user.is_superuser:
-            self.fields['country'].disabled = True
+            branch = user.profile.branch
+            country = user.profile.country
+            self.fields['branch'].initial = branch
+            self.fields['branch'].widget = forms.HiddenInput()
+            self.fields['country'].initial = country
             self.fields['country'].widget = forms.HiddenInput()
 
 
@@ -107,6 +119,7 @@ class DeviceRequestForm(forms.ModelForm):
         label="Branch",
         widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
     )
+
     class Meta:
         model = DeviceRequest
         fields = ['device', 'quantity', 'reason']  # client fields are extra
@@ -134,7 +147,9 @@ class DeviceRequestForm(forms.ModelForm):
             device_request.save()
         return device_request
 
-   #Purchase order with document upload
+   # Purchase order with document upload
+
+
 class PurchaseOrderForm(forms.ModelForm):
     oem = forms.ModelChoiceField(
         queryset=OEM.objects.all(),
@@ -142,13 +157,21 @@ class PurchaseOrderForm(forms.ModelForm):
         label='OEM (Supplier)',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    branch = forms.ModelChoiceField(
+        queryset=Branch.objects.all(),
+        required=True,
+        label='Branch',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
     order_date = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(
+            attrs={'type': 'date', 'class': 'form-control'}),
         required=True,
         label='Order Date'
     )
     expected_delivery = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(
+            attrs={'type': 'date', 'class': 'form-control'}),
         required=True,
         label='Expected Delivery'
     )
@@ -171,4 +194,5 @@ class PurchaseOrderForm(forms.ModelForm):
 
     class Meta:
         model = PurchaseOrder
-        fields = ['oem', 'order_date', 'expected_delivery', 'status', 'document']
+        fields = ['oem', 'branch', 'order_date',
+                  'expected_delivery', 'status', 'document']

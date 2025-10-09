@@ -30,6 +30,9 @@
         <div class="card-body">
             <form method="post">
                 {% csrf_token %}
+                {# -- hidden branch/country fields for non-superusers (needed for POST) -- #}
+                {{ form.branch }}
+                {{ form.country }}
                 <div class="row">
                     <div class="col-md-6 mb-3">
                        <label for="{{ form.name.id_for_label }}" class="form-label">Device Name:</label>
@@ -66,11 +69,6 @@
                         <label for="{{ form.category.id_for_label }}" class="form-label">Category:</label>
                         {{ form.category }}
                         {% if form.category.errors %}<div class="text-danger small">{{ form.category.errors }}</div>{% endif %}
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.manufacturer.id_for_label }}" class="form-label">Manufacturer:</label>
-                        {{ form.manufacturer }}
-                        {% if form.manufacturer.errors %}<div class="text-danger small">{{ form.manufacturer.errors }}</div>{% endif %}
                     </div>
                 </div>
                 <div class="row">

@@ -21,6 +21,7 @@
                 Upload IoT Devices via Excel
             </h4>
         </div>
+
         <div class="card-body">
 
             <form method="post" enctype="multipart/form-data">
@@ -29,35 +30,33 @@
                     <label for="excel_file" class="form-label fw-bold">Select Excel File (.xlsx only)</label>
                     <input type="file" name="excel_file" id="excel_file" class="form-control" accept=".xlsx" required>
 
-                    <small class="form-text text-muted d-block mt-2">
-                        <strong>You may use either format:</strong>
+                    <small class="form-text text-muted d-block mt-3">
+                        <strong>Accepted Excel Columns:</strong>
+                        <ul class="small mt-2 mb-0">
+                            <li><code>Product ID</code> (optional)</li>
+                            <li><code>Name</code> (optional)</li>
+                            <li><code>IMEI No</code> <strong>(required)</strong></li>
+                            <li><code>Serial No</code> (optional)</li>
+                            <li><code>Category</code> (optional)</li>
+                            <li><code>Description</code> (optional)</li>
+                            <li><code>Selling Price</code> <strong>(required)</strong></li>
+                            <li><code>Currency</code> <strong>(required, e.g. USD, KSH, TSH)</strong></li>
+                            <li><code>Status</code> <strong>(required)</strong></li>
+                            <li><code>Quantity</code> (optional)</li>
+                        </ul>
+                    </small>
+
+                    <small class="form-text text-muted d-block mt-3">
+                        <strong>Legacy Price Format (also supported):</strong>
                         <ul class="small mt-2 mb-0">
                             <li>
-                                <span class="fw-bold">Preferred (future-proof) format:</span>
-                                <ul>
-                                    <li><code>OEM ID</code> <strong>(required)</strong></li>
-                                    <li><code>Product ID</code> (optional)</li>
-                                    <li><code>Name</code> (optional)</li>
-                                    <li><code>IMEI No</code> <strong>(required)</strong></li>
-                                    <li><code>Serial No</code> (optional)</li>
-                                    <li><code>Category</code> (optional)</li>
-                                    <li><code>Description</code> (optional)</li>
-                                    <li><code>Selling Price</code> <strong>(required)</strong></li>
-                                    <li><code>Currency</code> <strong>(required, e.g. USD, KSH, TSH)</strong></li>
-                                    <li><code>Status</code> (see below)</li>
-                                    <li><code>Quantity</code> (optional)</li>
-                                </ul>
-                            </li>
-                            <li class="mt-2">
-                                <span class="fw-bold">Legacy format (also supported):</span>
-                                <ul>
-                                    <li><code>Selling Price (USD)</code>, <code>Selling Price (KSH)</code>, <code>Selling Price (TSH)</code> (at least one, used to fill <code>Selling Price</code> and <code>Currency</code>)</li>
-                                </ul>
+                                You may use <code>Selling Price (USD)</code>, <code>Selling Price (KSH)</code>, or
+                                <code>Selling Price (TSH)</code>. The system will automatically detect the correct currency.
                             </li>
                         </ul>
                     </small>
 
-                    <small class="form-text text-muted d-block mt-2">
+                    <small class="form-text text-muted d-block mt-3">
                         <strong>Status must be one of:</strong>
                         <span class="badge bg-success">available</span>,
                         <span class="badge bg-info">issued</span>,
@@ -65,16 +64,17 @@
                         <span class="badge bg-danger">faulty</span>
                     </small>
 
-                    <small class="form-text text-muted d-block mt-2">
+                    <small class="form-text text-muted d-block mt-3">
                         <strong>Notes:</strong><br>
-                        - <code>OEM ID</code> must exist in the system. Devices without a matching OEM will be skipped.<br>
                         - <code>IMEI No</code> must be unique.<br>
-                        - If multiple IMEIs are provided in one row, separate devices will be created, and <code>Quantity</code> will default to their count.<br>
-                        - For legacy format, if multiple price fields are filled, <code>USD</code> takes precedence, then <code>KSH</code>, then <code>TSH</code>.
+                        - If multiple IMEIs are listed in one row, separate devices will be created automatically.<br>
+                        - If <code>Quantity</code> is not provided, it defaults to the number of IMEIs.<br>
+                        - For legacy pricing, if multiple price fields are present, the order of priority is:
+                          <strong>USD → KSH → TSH</strong>.
                     </small>
                 </div>
 
-                <div class="mt-3">
+                <div class="mt-4">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-upload me-2"></i> Upload Devices
                     </button>
