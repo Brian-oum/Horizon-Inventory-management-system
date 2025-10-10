@@ -5,89 +5,121 @@
 
 {% block content %}
 <div class="container-fluid mt-4">
+
+    <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0 text-primary"><i class="fas fa-microchip me-2"></i> Add Device</h2>
+        <h2 class="text-success mb-0">
+            <i class="fas fa-microchip me-2"></i> Manage Devices
+        </h2>
         <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
         </a>
     </div>
 
+    <!-- Django Messages -->
     {% if messages %}
-        <ul class="messages list-unstyled">
-            {% for message in messages %}
-                <li{% if message.tags %} class="alert alert-{{ message.tags }} alert-dismissible fade show"{% endif %} role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </li>
-            {% endfor %}
-        </ul>
+    <div class="mb-3">
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {% if message.tags == 'success' %}
+                    <i class="fas fa-check-circle me-2"></i>
+                {% elif message.tags == 'error' %}
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                {% else %}
+                    <i class="fas fa-info-circle me-2"></i>
+                {% endif %}
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    </div>
     {% endif %}
 
-    <div class="card shadow-sm mb-5">
-        <div class="card-header bg-primary text-white py-3">
-            <h4 class="mb-0"><i class="fas fa-plus-circle me-2"></i> Add New Device</h4>
+    <!-- Add Device Card -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i> Add New Device</h5>
         </div>
-        <div class="card-body">
-            <form method="post">
+        <div class="card-body bg-light">
+            <form method="post" novalidate>
                 {% csrf_token %}
-                {# -- hidden branch/country fields for non-superusers (needed for POST) -- #}
                 {{ form.branch }}
                 {{ form.country }}
+
+                <!-- Device Basic Info -->
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                       <label for="{{ form.name.id_for_label }}" class="form-label">Device Name:</label>
-                       {{ form.name }}
-                       {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.product_id.id_for_label }}" class="form-label">Product ID:</label>
-                        {{ form.product_id }}
-                        {% if form.product_id.errors %}<div class="text-danger small">{{ form.product_id.errors }}</div>{% endif %}
+                        <label for="{{ form.name.id_for_label }}" class="form-label fw-semibold">Device Name</label>
+                        {{ form.name }}
+                        <div class="form-text text-muted">
+                            Example: <em>HP</em>, <em>Cisco Router</em>, <em>Samsung Tablet</em>
+                        </div>
+                        {% if form.name.errors %}
+                            <div class="text-danger small">{{ form.name.errors }}</div>
+                        {% endif %}
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label for="{{ form.oem.id_for_label }}" class="form-label">OEM:</label>
+                        <label for="{{ form.oem.id_for_label }}" class="form-label fw-semibold">OEM</label>
                         {{ form.oem }}
-                        {% if form.oem.errors %}<div class="text-danger small">{{ form.oem.errors }}</div>{% endif %}
+                        {% if form.oem.errors %}
+                            <div class="text-danger small">{{ form.oem.errors }}</div>
+                        {% endif %}
                     </div>
                 </div>
+
+                <!-- Category -->
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label for="{{ form.imei_no.id_for_label }}" class="form-label">IMEI No:</label>
-                        {{ form.imei_no }}
-                        {% if form.imei_no.errors %}<div class="text-danger small">{{ form.imei_no.errors }}</div>{% endif %}
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.serial_no.id_for_label }}" class="form-label">Serial No:</label>
-                        {{ form.serial_no }}
-                        {% if form.serial_no.errors %}<div class="text-danger small">{{ form.serial_no.errors }}</div>{% endif %}
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.category.id_for_label }}" class="form-label">Category:</label>
+                        <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">Category</label>
                         {{ form.category }}
-                        {% if form.category.errors %}<div class="text-danger small">{{ form.category.errors }}</div>{% endif %}
+                        <div class="form-text text-muted">
+                            Example: <em>Laptop</em>, <em>Router</em>
+                        </div>
+                        {% if form.category.errors %}
+                            <div class="text-danger small">{{ form.category.errors }}</div>
+                        {% endif %}
                     </div>
                 </div>
+
+                <!-- Identifiers -->
                 <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label for="{{ form.selling_price.id_for_label }}" class="form-label">Price:</label>
-                        {{ form.selling_price }}
-                        {% if form.selling_price.errors %}<div class="text-danger small">{{ form.selling_price.errors }}</div>{% endif %}
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.imei_no.id_for_label }}" class="form-label fw-semibold">
+                            IMEI Number <small class="text-muted">(optional)</small>
+                        </label>
+                        {{ form.imei_no }}
+                        {% if form.imei_no.errors %}
+                            <div class="text-danger small">{{ form.imei_no.errors }}</div>
+                        {% endif %}
                     </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="{{ form.currency.id_for_label }}" class="form-label">Currency:</label>
-                        {{ form.currency }}
-                        {% if form.currency.errors %}<div class="text-danger small">{{ form.currency.errors }}</div>{% endif %}
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="{{ form.status.id_for_label }}" class="form-label">Status:</label>
-                        {{ form.status }}
-                        {% if form.status.errors %}<div class="text-danger small">{{ form.status.errors }}</div>{% endif %}
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.serial_no.id_for_label }}" class="form-label fw-semibold">
+                            Serial Number <small class="text-muted">(optional)</small>
+                        </label>
+                        {{ form.serial_no }}
+                        {% if form.serial_no.errors %}
+                            <div class="text-danger small">{{ form.serial_no.errors }}</div>
+                        {% endif %}
                     </div>
                 </div>
+
+                <!-- MAC Address (Optional) -->
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="mac_address" class="form-label fw-semibold">
+                            MAC Address <small class="text-muted">(optional)</small>
+                        </label>
+                        <input type="text" name="mac_address" id="mac_address" class="form-control" placeholder="e.g. 00:1A:2B:3C:4D:5E">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.status.id_for_label }}" class="form-label fw-semibold">Status</label>
+                        {{ form.status }}
+                        {% if form.status.errors %}
+                            <div class="text-danger small">{{ form.status.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
                 {% if form.non_field_errors %}
                     <div class="alert alert-danger mt-3">
                         {% for error in form.non_field_errors %}
@@ -95,9 +127,27 @@
                         {% endfor %}
                     </div>
                 {% endif %}
-                <button type="submit" class="btn btn-primary mt-3"><i class="fas fa-save me-2"></i> Save Device</button>
+
+                <!-- Submit -->
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary px-4 mt-3">
+                        <i class="fas fa-save me-2"></i> Save Device
+                    </button>
+                </div>
             </form>
         </div>
     </div>
 </div>
+
+<!-- Auto-hide messages -->
+<script>
+    setTimeout(() => {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        });
+    }, 4000);
+</script>
+
 {% endblock %}

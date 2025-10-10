@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container mt-4">
 
-    {# Django messages feedback #}
+    <!-- Django messages -->
     {% if messages %}
         {% for message in messages %}
             <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
@@ -15,13 +15,9 @@
     {% endif %}
 
     <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white">
-            <h4 class="mb-0">
-                <i class="fas fa-file-excel me-2"></i>
-                Upload IoT Devices via Excel
-            </h4>
+        <div class="card-header bg-success text-white">
+            <h4 class="mb-0"><i class="fas fa-file-excel me-2"></i> Upload IoT Devices via Excel</h4>
         </div>
-
         <div class="card-body">
 
             <form method="post" enctype="multipart/form-data">
@@ -33,49 +29,26 @@
                     <small class="form-text text-muted d-block mt-3">
                         <strong>Accepted Excel Columns:</strong>
                         <ul class="small mt-2 mb-0">
-                            <li><code>Product ID</code> (optional)</li>
-                            <li><code>Name</code> (optional)</li>
-                            <li><code>IMEI No</code> <strong>(required)</strong></li>
+                            <li><code>OEM</code> (required)</li>
+                            <li><code>Name</code> (required)</li>
+                            <li><code>Category</code> (required)</li>
+                            <li><code>IMEI No</code> (optional)</li>
                             <li><code>Serial No</code> (optional)</li>
-                            <li><code>Category</code> (optional)</li>
-                            <li><code>Description</code> (optional)</li>
-                            <li><code>Selling Price</code> <strong>(required)</strong></li>
-                            <li><code>Currency</code> <strong>(required, e.g. USD, KSH, TSH)</strong></li>
-                            <li><code>Status</code> <strong>(required)</strong></li>
-                            <li><code>Quantity</code> (optional)</li>
+                            <li><code>MAC Address</code> (optional)</li>
+                            <li><code>Status</code> (required — e.g. available, issued, returned, faulty)</li>
                         </ul>
-                    </small>
-
-                    <small class="form-text text-muted d-block mt-3">
-                        <strong>Legacy Price Format (also supported):</strong>
-                        <ul class="small mt-2 mb-0">
-                            <li>
-                                You may use <code>Selling Price (USD)</code>, <code>Selling Price (KSH)</code>, or
-                                <code>Selling Price (TSH)</code>. The system will automatically detect the correct currency.
-                            </li>
-                        </ul>
-                    </small>
-
-                    <small class="form-text text-muted d-block mt-3">
-                        <strong>Status must be one of:</strong>
-                        <span class="badge bg-success">available</span>,
-                        <span class="badge bg-info">issued</span>,
-                        <span class="badge bg-warning text-dark">returned</span>,
-                        <span class="badge bg-danger">faulty</span>
                     </small>
 
                     <small class="form-text text-muted d-block mt-3">
                         <strong>Notes:</strong><br>
-                        - <code>IMEI No</code> must be unique.<br>
-                        - If multiple IMEIs are listed in one row, separate devices will be created automatically.<br>
-                        - If <code>Quantity</code> is not provided, it defaults to the number of IMEIs.<br>
-                        - For legacy pricing, if multiple price fields are present, the order of priority is:
-                          <strong>USD → KSH → TSH</strong>.
+                        - IMEI, Serial, and MAC addresses must be unique if provided.<br>
+                        - If fields are left blank, they’ll be skipped automatically.<br>
+                        - Invalid or duplicate entries will be ignored.
                     </small>
                 </div>
 
                 <div class="mt-4">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-success">
                         <i class="fas fa-upload me-2"></i> Upload Devices
                     </button>
                     <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-outline-secondary ms-2">
@@ -86,6 +59,5 @@
 
         </div>
     </div>
-
 </div>
 {% endblock %}
