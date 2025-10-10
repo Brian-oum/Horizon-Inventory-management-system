@@ -60,48 +60,46 @@ class Client(models.Model):
         return self.name
 
 class Device(models.Model):
-    name = models.CharField(max_length=255, blank=True)  # Device name
-    total_quantity = models.PositiveIntegerField(default=1)
-    product_id = models.CharField(max_length=30)
-    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True)
+    STATUS_CHOICES = (
+        ('available', 'Available'),
+        ('issued', 'Issued'),
+        ('returned', 'Returned'),
+        ('faulty', 'Faulty'),
+    )
+
+    name = models.CharField(max_length=255)  # REQUIRED
     oem = models.ForeignKey(
         OEM,
         on_delete=models.SET_NULL,
         null=True,
-        blank=True,
+        blank=False,  # ✅ Make OEM required
         to_field='oem_id',
         related_name='devices'
     )
-    imei_no = models.CharField(max_length=50, unique=True)
-    serial_no = models.CharField(
-        max_length=50, unique=True, null=True, blank=True)
-    category = models.CharField(max_length=50)
-    manufacturer = models.CharField(max_length=100, blank=True)  # Add if needed
+    product_id = models.CharField(max_length=30, blank=True)
+    total_quantity = models.PositiveIntegerField(default=1)
+
+    imei_no = models.CharField(max_length=50, unique=True, null=True, blank=True)  # Optional
+    serial_no = models.CharField(max_length=50, unique=True, null=True, blank=True)  # Optional
+    mac_address = models.CharField(max_length=50, unique=True, null=True, blank=True)  # Optional
+
+    # ✅ Added Category field
+    category = models.CharField(max_length=100, blank=True, help_text="e.g. Laptop or Router")
+
+    manufacturer = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
-    selling_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True)
-    currency = models.CharField(
-        max_length=10, choices=CURRENCY_CHOICES, default='USD'
-    )
-    branch = models.ForeignKey(
-        Branch, on_delete=models.SET_NULL, null=True, blank=True
-    )
-    country = models.ForeignKey(
-        Country, on_delete=models.SET_NULL, null=True, blank=True
-    )
-    status = models.CharField(
-        max_length=20,
-        choices=(
-            ('available', 'Available'),
-            ('issued', 'Issued'),
-            ('returned', 'Returned'),
-            ('faulty', 'Faulty'),
-        ),
-        default='available'
-    )
+
+    selling_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES, default='USD')
+
+    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True)
+    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')  # ✅ Required
 
     def __str__(self):
-        return f"Device IMEI:{self.imei_no} Status:{self.status}"
+        return f"{self.name} ({self.status})"
+
 
 class DeviceRequest(models.Model):
     device = models.ForeignKey(

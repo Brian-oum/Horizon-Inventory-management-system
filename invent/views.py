@@ -883,131 +883,69 @@ def upload_inventory(request):
             wb = openpyxl.load_workbook(excel_file)
             sheet = wb.active
         except Exception:
-            messages.error(
-                request, "Invalid Excel file. Please upload a valid .xlsx file.")
+            messages.error(request, "Invalid Excel file. Please upload a valid .xlsx file.")
             return redirect("upload_inventory")
 
         header = [str(cell.value).strip() for cell in sheet[1]]
         header_lower = [h.lower() for h in header]
+        header_index_map = {h.lower(): i for i, h in enumerate(header)}
 
-        # Check for selling price + currency (new) or legacy format
-        supports_new = "selling price" in header_lower and "currency" in header_lower
-        supports_old = (
-            "selling price (usd)" in header_lower
-            or "selling price (ksh)" in header_lower
-            or "selling price (tsh)" in header_lower
-        )
-
-        if not (supports_new or supports_old):
-            messages.error(
-                request, "Missing required columns for price and currency.")
-            return redirect("upload_inventory")
-
-        # ✅ Remove OEM ID requirement entirely
-        required_columns = [
-            "Product ID", "IMEI No", "Serial No", "Category",
-            "Description", "Name", "Quantity", "Status"
-        ]
+        # ✅ Required columns
+        required_columns = ["oem", "name", "category", "status"]
         for col in required_columns:
-            if col.lower() not in header_lower:
+            if col not in header_lower:
                 messages.error(request, f"Missing required column: {col}")
                 return redirect("upload_inventory")
-
-        header_index_map = {h.lower(): i for i, h in enumerate(header)}
 
         for row in sheet.iter_rows(min_row=2, values_only=True):
             row_data = {h.lower(): row[i] for h, i in header_index_map.items()}
 
-            product_id = row_data.get("product id")
-            imei_field = str(row_data.get("imei no") or "").strip()
-            serial_no = row_data.get("serial no")
-            category_value = row_data.get("category")
-            description = row_data.get("description")
+            oem = row_data.get("oem")
             name = row_data.get("name")
-            qty_field = row_data.get("quantity")
-            status = (str(row_data.get("status") or "available")).lower()
+            category = row_data.get("category")
+            imei_no = str(row_data.get("imei no") or "").strip()
+            serial_no = str(row_data.get("serial no") or "").strip()
+            mac_address = str(row_data.get("mac address") or "").strip()
+            status = str(row_data.get("status") or "available").lower()
 
             if status not in ["available", "issued", "returned", "faulty"]:
-                messages.warning(
-                    request, f"Invalid status '{status}' for product {product_id}. Skipped.")
+                messages.warning(request, f"Invalid status '{status}' for device '{name}'. Skipped.")
                 continue
 
-            imeis = [i.strip() for i in imei_field.split(",") if i.strip()]
+            # ✅ Check duplicates
+            if imei_no and Device.objects.filter(imei_no=imei_no).exists():
+                messages.warning(request, f"IMEI {imei_no} already exists. Skipped.")
+                continue
+            if serial_no and Device.objects.filter(serial_no=serial_no).exists():
+                messages.warning(request, f"Serial No {serial_no} already exists. Skipped.")
+                continue
+            if mac_address and Device.objects.filter(mac_address=mac_address).exists():
+                messages.warning(request, f"MAC Address {mac_address} already exists. Skipped.")
+                continue
 
-            try:
-                total_qty = int(qty_field)
-            except (TypeError, ValueError):
-                total_qty = len(imeis)
+            # ✅ Create Device
+            device_kwargs = dict(
+                oem=oem,
+                name=name,
+                category=category,
+                imei_no=imei_no or None,
+                serial_no=serial_no or None,
+                mac_address=mac_address or None,
+                status=status,
+            )
 
-            if total_qty != len(imeis):
-                messages.warning(
-                    request,
-                    f"Product '{product_id}' has Quantity={total_qty} but {len(imeis)} IMEIs provided. Using IMEI count."
-                )
-                total_qty = len(imeis)
+            # Assign branch & country
+            if not request.user.is_superuser:
+                device_kwargs["branch"] = request.user.profile.branch
+                device_kwargs["country"] = request.user.profile.country
 
-            # --- Price and currency ---
-            if "selling price" in row_data and "currency" in row_data:
-                selling_price = row_data.get("selling price") or 0
-                currency = str(row_data.get("currency") or "USD").upper()
-                if not selling_price:
-                    selling_price = 0
-                if currency not in ["USD", "KSH", "TSH"]:
-                    currency = "USD"
-            else:
-                price_usd = row_data.get("selling price (usd)") or 0
-                price_ksh = row_data.get("selling price (ksh)") or 0
-                price_tsh = row_data.get("selling price (tsh)") or 0
-                if price_usd and float(price_usd) > 0:
-                    selling_price = price_usd
-                    currency = "USD"
-                elif price_ksh and float(price_ksh) > 0:
-                    selling_price = price_ksh
-                    currency = "KSH"
-                elif price_tsh and float(price_tsh) > 0:
-                    selling_price = price_tsh
-                    currency = "TSH"
-                else:
-                    selling_price = 0
-                    currency = "USD"
+            Device.objects.create(**device_kwargs)
 
-            # --- Create each device ---
-            for imei in imeis:
-                if Device.objects.filter(imei_no=imei).exists():
-                    messages.warning(
-                        request, f"IMEI {imei} already exists. Skipped.")
-                    continue
-                if Device.objects.filter(serial_no=serial_no).exists():
-                    messages.warning(
-                        request, f"Serial No {serial_no} already exists. Skipped.")
-                    continue
-
-                device_kwargs = dict(
-                    product_id=product_id,
-                    imei_no=imei,
-                    serial_no=serial_no,
-                    category=category_value,
-                    description=description,
-                    name=name,
-                    total_quantity=total_qty,
-                    selling_price=selling_price,
-                    currency=currency,
-                    status=status,
-                )
-
-                # Set branch & country for non-superusers
-                if not request.user.is_superuser:
-                    device_kwargs["branch"] = request.user.profile.branch
-                    device_kwargs["country"] = request.user.profile.country
-                else:
-                    device_kwargs["country"] = None
-
-                Device.objects.create(**device_kwargs)
-
-        messages.success(request, "Inventory uploaded successfully.")
+        messages.success(request, "Devices uploaded successfully.")
         return redirect("inventory_list")
 
     return render(request, "invent/upload_inventory.html")
+
 # --- Total Requests Table/Export (Reports) ---
 
 

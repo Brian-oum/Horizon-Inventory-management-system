@@ -55,39 +55,29 @@ class OEMForm(forms.ModelForm):
 
 
 class DeviceForm(forms.ModelForm):
-    branch = forms.ModelChoiceField(
-        queryset=Branch.objects.all(),
-        required=True,
-        label="Branch",
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-
     class Meta:
         model = Device
         fields = [
             'name',
-            'product_id',
             'oem',
+            'category',   # ✅ Added category here
             'imei_no',
             'serial_no',
-            'category',
-            'description',
-            'selling_price',
-            'currency',
+            'mac_address',
             'status',
             'branch',
             'country'
         ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name'}),
-            'product_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Product ID'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Device Name'}),
             'oem': forms.Select(attrs={'class': 'form-select'}),
+            'category': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g. Laptop or Router'  # ✅ Added examples
+            }),
             'imei_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'IMEI Number'}),
             'serial_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Serial Number'}),
-            'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Category'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Description', 'rows': 2}),
-            'selling_price': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Selling Price'}),
-            'currency': forms.Select(attrs={'class': 'form-select'}),
+            'mac_address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 00:1A:2B:3C:4D:5E'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
             'branch': forms.Select(attrs={'class': 'form-select'}),
             'country': forms.Select(attrs={'class': 'form-select'}),
@@ -96,14 +86,28 @@ class DeviceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        if user and not user.is_superuser:
-            branch = user.profile.branch
-            country = user.profile.country
-            self.fields['branch'].initial = branch
-            self.fields['branch'].widget = forms.HiddenInput()
-            self.fields['country'].initial = country
-            self.fields['country'].widget = forms.HiddenInput()
 
+        # Required fields
+        self.fields['name'].required = True
+        self.fields['oem'].required = True
+        self.fields['status'].required = True
+
+        # Optional fields
+        self.fields['imei_no'].required = False
+        self.fields['serial_no'].required = False
+        self.fields['mac_address'].required = False
+        self.fields['category'].required = True  # ✅ You can set to False if you want optional
+
+        # Hide branch and country for non-superusers
+        if user and not user.is_superuser:
+            branch = getattr(user.profile, 'branch', None)
+            country = getattr(user.profile, 'country', None)
+            if branch:
+                self.fields['branch'].initial = branch
+                self.fields['branch'].widget = forms.HiddenInput()
+            if country:
+                self.fields['country'].initial = country
+                self.fields['country'].widget = forms.HiddenInput()
 
 class DeviceRequestForm(forms.ModelForm):
     client_name = forms.CharField(
