@@ -5,20 +5,28 @@
 
 {% block content %}
 <div class="container-fluid mt-4">
-    <h2 class="mb-4 text-primary">
-        <i class="fas fa-layer-group me-2"></i> Devices Grouped by Category & OEM
-    </h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0 text-primary">
+            <i class="fas fa-layer-group me-2"></i> Devices Grouped by Category & OEM
+        </h2>
+        <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
+        </a>
+    </div>
 
-    <!-- Search form -->
+    <!-- Search and Export form -->
     <form method="get" class="mb-4" style="max-width:400px;">
       <div class="input-group">
-        <input type="text" class="form-control" name="q" placeholder="Search devices (IMEI, Serial, OEM, Client...)" value="{{ query|default_if_none:'' }}">
+        <input type="text" class="form-control" name="q" placeholder="Search devices (Name, IMEI, Serial, OEM, Client...)" value="{{ query|default_if_none:'' }}">
         <button class="btn btn-primary" type="submit">
           <i class="fas fa-search"></i> Search
         </button>
         {% if query %}
           <a href="{% url 'inventory_list' %}" class="btn btn-outline-secondary">Reset</a>
         {% endif %}
+        <a href="{% url 'export_grouped_inventory' %}?q={{ query }}&status={{ status }}" class="btn btn-success ms-2">
+          <i class="fas fa-file-export"></i> Export
+        </a>
       </div>
     </form>
 
@@ -48,8 +56,6 @@
                                         <th>OEM ID</th>
                                         <th>IMEI</th>
                                         <th>Status</th>
-                                        <th>Price</th>
-                                        <th>Currency</th>
                                         <th>Client</th>
                                         <th>Issued At</th>
                                     </tr>
@@ -73,21 +79,11 @@
                                             </span>
                                         </td>
                                         <td>
-                                            {% if device.selling_price %}
-                                                {{ device.selling_price|floatformat:2 }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
+                                            {% if device.current_client %}{{ device.current_client.name }}{% else %}-{% endif %}
                                         </td>
                                         <td>
-                                            {% if device.currency %}
-                                                <span class="badge bg-info text-dark">{{ device.currency }}</span>
-                                            {% else %}
-                                                -
-                                            {% endif %}
+                                            {% if device.issued_at %}{{ device.issued_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}
                                         </td>
-                                        <td>{% if device.current_client %}{{ device.current_client.name }}{% else %}-{% endif %}</td>
-                                        <td>{% if device.issued_at %}{{ device.issued_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>

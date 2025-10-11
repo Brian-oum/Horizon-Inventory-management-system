@@ -27,8 +27,12 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="mb-4">Issue IoT Device</h2>
-
+    <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+        <h2 class="mb-0">Issue IoT Device</h2>
+        <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
+        </a>
+    </div>
     {% if messages %}
     <div class="messages mb-3">
         {% for message in messages %}

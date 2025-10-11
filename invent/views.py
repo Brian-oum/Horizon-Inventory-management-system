@@ -23,6 +23,7 @@ from .forms import (
     CustomCreationForm, OEMForm, DeviceForm, DeviceRequestForm
 )
 from django.utils.dateparse import parse_date
+import csv
 
 # --- Authentication/Registration ---
 
@@ -356,10 +357,11 @@ def inventory_list_view(request):
         devices = devices.filter(
             Q(imei_no__icontains=query) |
             Q(serial_no__icontains=query) |
+            Q(name__icontains=query) |
             Q(category__icontains=query) |
-            Q(oem_name_icontains=query) |
-            Q(oem_oem_id_icontains=query) |
-            Q(issuancerecord_clientname_icontains=query)
+            Q(oem__name__icontains=query) |
+            Q(oem__oem_id__icontains=query) |
+            Q(issuancerecord__client__name__icontains=query)
         ).distinct()
 
     for device in devices:
@@ -711,12 +713,12 @@ def client_list(request):
 
 # --- Stock Adjustment/Search ---
 
-
 @login_required
 @permission_required('invent.change_device', raise_exception=True)
 def adjust_stock(request):
     query = request.GET.get('q', '')
     user = request.user
+
     # COUNTRY FILTER: Restrict by user's country
     if user.is_superuser:
         devices = Device.objects.all().order_by('id')
@@ -724,14 +726,18 @@ def adjust_stock(request):
         user_country = getattr(user.profile, "country", None)
         devices = Device.objects.filter(
             branch__country=user_country).order_by('id')
+
+    # Apply search query
     if query:
         devices = devices.filter(
             Q(imei_no__icontains=query) |
             Q(serial_no__icontains=query) |
             Q(name__icontains=query) |
             Q(category__icontains=query) |
-            Q(issuancerecord_clientname_icontains=query)
+            Q(issuancerecord__client__name__icontains=query)
         ).distinct()
+
+    # Annotate with last issuance info
     for device in devices:
         last_issuance = (
             IssuanceRecord.objects
@@ -742,6 +748,7 @@ def adjust_stock(request):
         )
         device.current_client = last_issuance.client if last_issuance else None
         device.issued_at = last_issuance.issued_at if last_issuance else None
+
     context = {
         'devices': devices,
         'query': query,
@@ -980,6 +987,69 @@ def total_requests(request):
     }
     return render(request, 'invent/total_requests.html', context)
 
+@login_required
+def export_grouped_inventory(request):
+    query = request.GET.get('q', '')
+    status = request.GET.get('status', 'all')
+    user = request.user
+
+    if user.is_superuser:
+        devices = Device.objects.select_related('oem', 'branch').order_by('category', 'oem__name', 'id')
+    else:
+        user_country = getattr(user.profile, "country", None)
+        devices = Device.objects.select_related('oem', 'branch').filter(branch__country=user_country).order_by('category', 'oem__name', 'id')
+
+    if status and status != 'all':
+        devices = devices.filter(status=status)
+    if query:
+        devices = devices.filter(
+            Q(imei_no__icontains=query) |
+            Q(serial_no__icontains=query) |
+            Q(name__icontains=query) |
+            Q(category__icontains=query) |
+            Q(oem__name__icontains=query) |
+            Q(oem__oem_id__icontains=query) |
+            Q(issuancerecord__client__name__icontains=query)
+        ).distinct()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Grouped Inventory"
+
+    headers = ['Category', 'Name', 'OEM', 'OEM ID', 'IMEI', 'Serial', 'Status', 'Client', 'Issued At']
+    ws.append(headers)
+
+    for device in devices:
+        last_issuance = (
+            IssuanceRecord.objects
+            .filter(device=device)
+            .order_by('-issued_at')
+            .select_related('client')
+            .first()
+        )
+        client_name = last_issuance.client.name if last_issuance and last_issuance.client else "-"
+        issued_at = last_issuance.issued_at.strftime('%Y-%m-%d %H:%M') if last_issuance and last_issuance.issued_at else "-"
+        ws.append([
+            device.category or "-",
+            device.name or "-",
+            device.oem.name if device.oem else "-",
+            device.oem.oem_id if device.oem else "-",
+            device.imei_no or "-",
+            device.serial_no or "-",
+            device.get_status_display() if hasattr(device, "get_status_display") else device.status,
+            client_name,
+            issued_at
+        ])
+
+    for i, col in enumerate(headers, 1):
+        ws.column_dimensions[get_column_letter(i)].width = 20
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename=grouped_inventory_export.xlsx'
+    wb.save(response)
+    return response
 
 @login_required
 def export_total_requests(request):
