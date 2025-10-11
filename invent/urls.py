@@ -26,6 +26,7 @@ urlpatterns = [
          name='delete_device'),  # For bulk deletion
     path('purchase-orders/', views.purchase_orders, name='purchase_orders'),
     # Reports
+    path('inventory/export_grouped/', views.export_grouped_inventory, name='export_grouped_inventory'),
     path('reports/', views.reports_view, name='reports'),
     path('reports/export/inventory-items/',
          views.export_inventory_items, name='export_inventory_items'),
