@@ -893,33 +893,59 @@ def upload_inventory(request):
             messages.error(request, "Invalid Excel file. Please upload a valid .xlsx file.")
             return redirect("upload_inventory")
 
-        header = [str(cell.value).strip() for cell in sheet[1]]
-        header_lower = [h.lower() for h in header]
-        header_index_map = {h.lower(): i for i, h in enumerate(header)}
+        header = [str(cell.value).strip().lower() for cell in sheet[1] if cell.value]
+        header_index_map = {h: i for i, h in enumerate(header)}
 
-        # ✅ Required columns
         required_columns = ["oem", "name", "category", "status"]
         for col in required_columns:
-            if col not in header_lower:
+            if col not in header_index_map:
                 messages.error(request, f"Missing required column: {col}")
                 return redirect("upload_inventory")
 
+        from invent.models import OEM, Device
+
+        # Remember previous values for blank cells
+        prev_oem_name = None
+        prev_category = None
+        prev_status = None
+
         for row in sheet.iter_rows(min_row=2, values_only=True):
-            row_data = {h.lower(): row[i] for h, i in header_index_map.items()}
+            def safe_get(col):
+                idx = header_index_map.get(col)
+                return str(row[idx]).strip() if idx is not None and row[idx] else ""
 
-            oem = row_data.get("oem")
-            name = row_data.get("name")
-            category = row_data.get("category")
-            imei_no = str(row_data.get("imei no") or "").strip()
-            serial_no = str(row_data.get("serial no") or "").strip()
-            mac_address = str(row_data.get("mac address") or "").strip()
-            status = str(row_data.get("status") or "available").lower()
+            # Pull values or inherit from previous row
+            oem_name = safe_get("oem") or prev_oem_name
+            name = safe_get("name")
+            category = safe_get("category") or prev_category
+            status = (safe_get("status").lower() or prev_status or "available").lower()
+            imei_no = safe_get("imei no")
+            serial_no = safe_get("serial no")
+            mac_address = safe_get("mac address")
 
+            # Update previous remembered values
+            if oem_name: prev_oem_name = oem_name
+            if category: prev_category = category
+            if status: prev_status = status
+
+            # Skip rows without a name
+            if not name:
+                continue
+
+            # Validate mandatory fields
+            if not all([oem_name, category, status]):
+                messages.warning(request, f"Skipping incomplete row: {row}")
+                continue
+
+            # Validate status
             if status not in ["available", "issued", "returned", "faulty"]:
                 messages.warning(request, f"Invalid status '{status}' for device '{name}'. Skipped.")
                 continue
 
-            # ✅ Check duplicates
+            # Get or create OEM and category
+            oem_obj, _ = OEM.objects.get_or_create(name=oem_name)
+
+            # Skip duplicates
             if imei_no and Device.objects.filter(imei_no=imei_no).exists():
                 messages.warning(request, f"IMEI {imei_no} already exists. Skipped.")
                 continue
@@ -930,9 +956,9 @@ def upload_inventory(request):
                 messages.warning(request, f"MAC Address {mac_address} already exists. Skipped.")
                 continue
 
-            # ✅ Create Device
+            # Create the device
             device_kwargs = dict(
-                oem=oem,
+                oem=oem_obj,
                 name=name,
                 category=category,
                 imei_no=imei_no or None,
@@ -941,7 +967,7 @@ def upload_inventory(request):
                 status=status,
             )
 
-            # Assign branch & country
+            # Assign branch & country if user not superuser
             if not request.user.is_superuser:
                 device_kwargs["branch"] = request.user.profile.branch
                 device_kwargs["country"] = request.user.profile.country
@@ -952,6 +978,7 @@ def upload_inventory(request):
         return redirect("inventory_list")
 
     return render(request, "invent/upload_inventory.html")
+
 
 # --- Total Requests Table/Export (Reports) ---
 
