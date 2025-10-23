@@ -13,6 +13,8 @@ CURRENCY_CHOICES = (
 )
 
 # ---  Country Model ---
+
+
 class Country(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
@@ -20,35 +22,42 @@ class Country(models.Model):
         return self.name
 
 # --- Updated Branch: relates to Country ---
-class Branch(models.Model):  
+
+
+class Branch(models.Model):
     name = models.CharField(max_length=100)
     address = models.CharField(max_length=255)
-    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
+    country = models.ForeignKey(
+        Country, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return f"{self.name}, {self.country.name if self.country else ''}"
 
+
 class OEM(models.Model):  # Formerly Supplier
-    oem_id = models.CharField(max_length=20, unique=True)
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, unique=True)
     contact_person = models.CharField(max_length=100, blank=True)
     phone_email = models.CharField(max_length=100, blank=True)
     address = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
-        return f"{self.name} ({self.oem_id})"
+        return self.name
+
 
 class PurchaseOrder(models.Model):
-    oem = models.ForeignKey(OEM, on_delete=models.CASCADE, default=1)  # was supplier
-    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True)
+    oem = models.ForeignKey(OEM, on_delete=models.CASCADE,
+                            default=1)  # was supplier
+    branch = models.ForeignKey(
+        Branch, on_delete=models.SET_NULL, null=True, blank=True)
     order_date = models.DateField()
     expected_delivery = models.DateField()
     status = models.CharField(max_length=50)
-    document = models.FileField(upload_to='purchase_orders/', null=True, blank=True)  # Optional
-
+    document = models.FileField(
+        upload_to='purchase_orders/', null=True, blank=True)  # Optional
 
     def __str__(self):
         return f"PO #{self.id} - {self.oem.name}"
+
 
 class Client(models.Model):
     name = models.CharField(max_length=255)
@@ -58,6 +67,7 @@ class Client(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class Device(models.Model):
     STATUS_CHOICES = (
@@ -72,30 +82,39 @@ class Device(models.Model):
         OEM,
         on_delete=models.SET_NULL,
         null=True,
-        blank=False,  # ✅ Make OEM required
-        to_field='oem_id',
+        blank=False,  # ✅ OEM is required (cannot be left empty)
         related_name='devices'
     )
+
     product_id = models.CharField(max_length=30, blank=True)
     total_quantity = models.PositiveIntegerField(default=1)
 
-    imei_no = models.CharField(max_length=50, unique=True, null=True, blank=True)  # Optional
-    serial_no = models.CharField(max_length=50, unique=True, null=True, blank=True)  # Optional
-    mac_address = models.CharField(max_length=50, unique=True, null=True, blank=True)  # Optional
+    imei_no = models.CharField(
+        max_length=50, unique=True, null=True, blank=True)  # Optional
+    serial_no = models.CharField(
+        max_length=50, unique=True, null=True, blank=True)  # Optional
+    mac_address = models.CharField(
+        max_length=50, unique=True, null=True, blank=True)  # Optional
 
     # ✅ Added Category field
-    category = models.CharField(max_length=100, blank=True, help_text="e.g. Laptop or Router")
+    category = models.CharField(
+        max_length=100, blank=True, help_text="e.g. Laptop or Router")
 
     manufacturer = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
 
-    selling_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES, default='USD')
+    selling_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(
+        max_length=10, choices=CURRENCY_CHOICES, default='USD')
 
-    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True)
-    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
+    branch = models.ForeignKey(
+        Branch, on_delete=models.SET_NULL, null=True, blank=True)
+    country = models.ForeignKey(
+        Country, on_delete=models.SET_NULL, null=True, blank=True)
 
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')  # ✅ Required
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='available')  # ✅ Required
 
     def __str__(self):
         return f"{self.name} ({self.status})"
@@ -119,8 +138,10 @@ class DeviceRequest(models.Model):
         null=True,
         blank=True
     )
-    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests")
-    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
+    branch = models.ForeignKey(
+        Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests")
+    country = models.ForeignKey(
+        Country, on_delete=models.SET_NULL, null=True, blank=True)
     quantity = models.PositiveIntegerField(default=1)
     reason = models.TextField(blank=True, null=True)
     application_date = models.DateField(default=timezone.now)
@@ -190,6 +211,7 @@ class DeviceRequest(models.Model):
     def __str__(self):
         return f"Request for {self.device} by {self.requestor.username}"
 
+
 class IssuanceRecord(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     client = models.ForeignKey(
@@ -207,6 +229,7 @@ class IssuanceRecord(models.Model):
     def __str__(self):
         return f"{self.device} issued to {self.client.name if self.client else 'N/A'} by {self.logistics_manager.username}"
 
+
 class ReturnRecord(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     client = models.ForeignKey(Client, on_delete=models.CASCADE)
@@ -217,10 +240,14 @@ class ReturnRecord(models.Model):
         return f"{self.device} returned by {self.client.name} on {self.returned_at.strftime('%Y-%m-%d')}"
 
 # Profile model to extend User with branch and country
+
+
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True)
-    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
+    branch = models.ForeignKey(
+        Branch, on_delete=models.SET_NULL, null=True, blank=True)
+    country = models.ForeignKey(
+        Country, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.username}'s profile"
