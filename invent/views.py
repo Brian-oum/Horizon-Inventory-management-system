@@ -25,21 +25,6 @@ from .forms import (
 from django.utils.dateparse import parse_date
 import csv
 
-# --- Authentication/Registration ---
-
-
-def register(request):
-    if request.method == 'POST':
-        form = CustomCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            messages.success(
-                request, "Registration successful. Please log in.")
-            return redirect('login')
-    else:
-        form = CustomCreationForm()
-    return render(request, 'invent/register.html', {'form': form})
-
 
 def custom_login(request):
     if request.method == 'POST':
@@ -360,7 +345,6 @@ def inventory_list_view(request):
             Q(name__icontains=query) |
             Q(category__icontains=query) |
             Q(oem__name__icontains=query) |
-            Q(oem__oem_id__icontains=query) |
             Q(issuancerecord__client__name__icontains=query)
         ).distinct()
 
@@ -377,7 +361,7 @@ def inventory_list_view(request):
 
     grouped_devices = defaultdict(lambda: defaultdict(list))
     for device in devices:
-        oem_label = f"{device.oem.name or '-'} ({device.oem.oem_id or '-'})" if device.oem else "-"
+        oem_label = f"{device.oem.name} (ID: {device.oem.id})" if device.oem else "-"
         grouped_devices[device.category][oem_label].append(device)
 
     paginated_grouped_devices = {}
@@ -713,6 +697,7 @@ def client_list(request):
 
 # --- Stock Adjustment/Search ---
 
+
 @login_required
 @permission_required('invent.change_device', raise_exception=True)
 def adjust_stock(request):
@@ -890,10 +875,12 @@ def upload_inventory(request):
             wb = openpyxl.load_workbook(excel_file)
             sheet = wb.active
         except Exception:
-            messages.error(request, "Invalid Excel file. Please upload a valid .xlsx file.")
+            messages.error(
+                request, "Invalid Excel file. Please upload a valid .xlsx file.")
             return redirect("upload_inventory")
 
-        header = [str(cell.value).strip().lower() for cell in sheet[1] if cell.value]
+        header = [str(cell.value).strip().lower()
+                  for cell in sheet[1] if cell.value]
         header_index_map = {h: i for i, h in enumerate(header)}
 
         required_columns = ["oem", "name", "category", "status"]
@@ -918,15 +905,19 @@ def upload_inventory(request):
             oem_name = safe_get("oem") or prev_oem_name
             name = safe_get("name")
             category = safe_get("category") or prev_category
-            status = (safe_get("status").lower() or prev_status or "available").lower()
+            status = (safe_get("status").lower()
+                      or prev_status or "available").lower()
             imei_no = safe_get("imei no")
             serial_no = safe_get("serial no")
             mac_address = safe_get("mac address")
 
             # Update previous remembered values
-            if oem_name: prev_oem_name = oem_name
-            if category: prev_category = category
-            if status: prev_status = status
+            if oem_name:
+                prev_oem_name = oem_name
+            if category:
+                prev_category = category
+            if status:
+                prev_status = status
 
             # Skip rows without a name
             if not name:
@@ -939,7 +930,8 @@ def upload_inventory(request):
 
             # Validate status
             if status not in ["available", "issued", "returned", "faulty"]:
-                messages.warning(request, f"Invalid status '{status}' for device '{name}'. Skipped.")
+                messages.warning(
+                    request, f"Invalid status '{status}' for device '{name}'. Skipped.")
                 continue
 
             # Get or create OEM and category
@@ -947,13 +939,16 @@ def upload_inventory(request):
 
             # Skip duplicates
             if imei_no and Device.objects.filter(imei_no=imei_no).exists():
-                messages.warning(request, f"IMEI {imei_no} already exists. Skipped.")
+                messages.warning(
+                    request, f"IMEI {imei_no} already exists. Skipped.")
                 continue
             if serial_no and Device.objects.filter(serial_no=serial_no).exists():
-                messages.warning(request, f"Serial No {serial_no} already exists. Skipped.")
+                messages.warning(
+                    request, f"Serial No {serial_no} already exists. Skipped.")
                 continue
             if mac_address and Device.objects.filter(mac_address=mac_address).exists():
-                messages.warning(request, f"MAC Address {mac_address} already exists. Skipped.")
+                messages.warning(
+                    request, f"MAC Address {mac_address} already exists. Skipped.")
                 continue
 
             # Create the device
@@ -1014,6 +1009,7 @@ def total_requests(request):
     }
     return render(request, 'invent/total_requests.html', context)
 
+
 @login_required
 def export_grouped_inventory(request):
     query = request.GET.get('q', '')
@@ -1021,10 +1017,12 @@ def export_grouped_inventory(request):
     user = request.user
 
     if user.is_superuser:
-        devices = Device.objects.select_related('oem', 'branch').order_by('category', 'oem__name', 'id')
+        devices = Device.objects.select_related(
+            'oem', 'branch').order_by('category', 'oem__name', 'id')
     else:
         user_country = getattr(user.profile, "country", None)
-        devices = Device.objects.select_related('oem', 'branch').filter(branch__country=user_country).order_by('category', 'oem__name', 'id')
+        devices = Device.objects.select_related('oem', 'branch').filter(
+            branch__country=user_country).order_by('category', 'oem__name', 'id')
 
     if status and status != 'all':
         devices = devices.filter(status=status)
@@ -1043,7 +1041,8 @@ def export_grouped_inventory(request):
     ws = wb.active
     ws.title = "Grouped Inventory"
 
-    headers = ['Category', 'Name', 'OEM', 'OEM ID', 'IMEI', 'Serial', 'Status', 'Client', 'Issued At']
+    headers = ['Category', 'Name', 'OEM', 'OEM ID',
+               'IMEI', 'Serial', 'Status', 'Client', 'Issued At']
     ws.append(headers)
 
     for device in devices:
@@ -1055,7 +1054,8 @@ def export_grouped_inventory(request):
             .first()
         )
         client_name = last_issuance.client.name if last_issuance and last_issuance.client else "-"
-        issued_at = last_issuance.issued_at.strftime('%Y-%m-%d %H:%M') if last_issuance and last_issuance.issued_at else "-"
+        issued_at = last_issuance.issued_at.strftime(
+            '%Y-%m-%d %H:%M') if last_issuance and last_issuance.issued_at else "-"
         ws.append([
             device.category or "-",
             device.name or "-",
@@ -1063,7 +1063,8 @@ def export_grouped_inventory(request):
             device.oem.oem_id if device.oem else "-",
             device.imei_no or "-",
             device.serial_no or "-",
-            device.get_status_display() if hasattr(device, "get_status_display") else device.status,
+            device.get_status_display() if hasattr(
+                device, "get_status_display") else device.status,
             client_name,
             issued_at
         ])
@@ -1077,6 +1078,7 @@ def export_grouped_inventory(request):
     response['Content-Disposition'] = 'attachment; filename=grouped_inventory_export.xlsx'
     wb.save(response)
     return response
+
 
 @login_required
 def export_total_requests(request):

@@ -43,10 +43,8 @@ class CustomCreationForm(UserCreationForm):
 class OEMForm(forms.ModelForm):
     class Meta:
         model = OEM
-        fields = ['oem_id', 'name',
-                  'contact_person', 'phone_email', 'address']
+        fields = ['name', 'contact_person', 'phone_email', 'address']
         widgets = {
-            'oem_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'OEM ID'}),
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'OEM Name'}),
             'contact_person': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Contact Person'}),
             'phone_email': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone or Email'}),
@@ -96,7 +94,8 @@ class DeviceForm(forms.ModelForm):
         self.fields['imei_no'].required = False
         self.fields['serial_no'].required = False
         self.fields['mac_address'].required = False
-        self.fields['category'].required = True  # ✅ You can set to False if you want optional
+        # ✅ You can set to False if you want optional
+        self.fields['category'].required = True
 
         # Hide branch and country for non-superusers
         if user and not user.is_superuser:
@@ -108,6 +107,7 @@ class DeviceForm(forms.ModelForm):
             if country:
                 self.fields['country'].initial = country
                 self.fields['country'].widget = forms.HiddenInput()
+
 
 class DeviceRequestForm(forms.ModelForm):
     client_name = forms.CharField(
