@@ -95,14 +95,14 @@ def requestor_dashboard(request):
 def request_device(request):
     device_id_from_get = request.GET.get('device')
     user = request.user
+
     # COUNTRY FILTER: Restrict device queryset by user's country
     if user.is_superuser:
         available_device_queryset = Device.objects.filter(status='available').annotate(
             requested_quantity=Coalesce(
                 Sum(
                     'requests__quantity',
-                    filter=Q(requests__status__in=[
-                             'Pending', 'Approved', 'Issued']),
+                    filter=Q(requests__status__in=['Pending', 'Approved', 'Issued']),
                     output_field=IntegerField()
                 ),
                 Value(0)
@@ -120,8 +120,7 @@ def request_device(request):
             requested_quantity=Coalesce(
                 Sum(
                     'requests__quantity',
-                    filter=Q(requests__status__in=[
-                             'Pending', 'Approved', 'Issued']),
+                    filter=Q(requests__status__in=['Pending', 'Approved', 'Issued']),
                     output_field=IntegerField()
                 ),
                 Value(0)
@@ -132,6 +131,7 @@ def request_device(request):
             available_quantity__gt=0
         )
 
+    # Group devices by name
     grouped_devices = defaultdict(list)
     for device in available_device_queryset:
         grouped_devices[device.name].append(device)
@@ -149,8 +149,7 @@ def request_device(request):
             "available_count": sum(d.available_quantity for d in devices),
         })
 
-    categories = available_device_queryset.values_list(
-        'category', flat=True).distinct()
+    categories = available_device_queryset.values_list('category', flat=True).distinct()
 
     if request.method == 'POST':
         form = DeviceRequestForm(request.POST)
@@ -162,6 +161,8 @@ def request_device(request):
                 device_request.country = device_request.branch.country
             device_request.requestor = request.user
             device_request.save()
+
+            # Send confirmation email
             send_mail(
                 subject='Device Request Confirmation',
                 message=(
@@ -176,6 +177,7 @@ def request_device(request):
                 recipient_list=[request.user.email],
                 fail_silently=False,
             )
+
             messages.success(request, "Device request submitted successfully!")
             return redirect('requestor_dashboard')
         else:
@@ -189,6 +191,16 @@ def request_device(request):
                     initial_data['device'] = device.id
             except Device.DoesNotExist:
                 pass
+        # ✅ Autofill client information from logged-in user
+        if request.user.is_authenticated:
+            profile = getattr(request.user, 'profile', None)
+            initial_data.update({
+              'client_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+              'client_email': request.user.email,
+              'client_phone': getattr(profile, 'phone_no', ''),    # Adjust field names if different
+              'client_address': getattr(profile, 'address', ''),
+              'branch': getattr(profile, 'branch', None),
+              })
 
         form = DeviceRequestForm(initial=initial_data)
         form.fields['device'].queryset = available_device_queryset
@@ -198,6 +210,7 @@ def request_device(request):
         'available_devices': available_devices,
         'categories': categories,
         'branches': Branch.objects.all(),
+        'oems': OEM.objects.all(),
     })
 
 # --- Cancel Request ---

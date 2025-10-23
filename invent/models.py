@@ -248,7 +248,17 @@ class Profile(models.Model):
         Branch, on_delete=models.SET_NULL, null=True, blank=True)
     country = models.ForeignKey(
         Country, on_delete=models.SET_NULL, null=True, blank=True)
-
+    address = models.CharField(max_length=255, blank=True)
+    phone_no = models.CharField(max_length=50, blank=True)
+    
+    def get_info(self):
+        return {
+            "branch": self.branch.name if self.branch else "",
+            "country": self.country.name if self.country else "",
+            "email": self.user.email,
+            "username": self.user.username,
+        }
+        
     def __str__(self):
         return f"{self.user.username}'s profile"
 

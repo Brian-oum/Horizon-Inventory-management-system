@@ -110,6 +110,13 @@ class DeviceForm(forms.ModelForm):
 
 
 class DeviceRequestForm(forms.ModelForm):
+      # --- New OEM field ---
+    oem = forms.ModelChoiceField(
+        queryset=OEM.objects.all(),
+        required=True,
+        label="OEM (Supplier)",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    )
     client_name = forms.CharField(
         max_length=255, required=True, label="Client Name")
     client_phone = forms.CharField(
@@ -127,7 +134,17 @@ class DeviceRequestForm(forms.ModelForm):
     class Meta:
         model = DeviceRequest
         fields = ['device', 'quantity', 'reason']  # client fields are extra
-
+        
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)  # pass request.user when initializing
+        super().__init__(*args, **kwargs)
+        # Filter available devices only
+        self.fields['device'].queryset = Device.objects.filter(status='available')
+        # 🔹 Auto-fill branch/country from user profile
+        if user and hasattr(user, 'profile'):
+            profile = user.profile
+            if profile.branch:
+                self.initial['branch'] = profile.branch
     def save(self, commit=True, requestor=None):
         # ✅ Create the client first
         client = Client.objects.create(
@@ -146,7 +163,8 @@ class DeviceRequestForm(forms.ModelForm):
         device_request.branch = self.cleaned_data['branch']
         if device_request.branch and device_request.branch.country:
             device_request.country = device_request.branch.country
-
+        #Link OEM from form
+        device_request.device.oem = self.cleaned_data['oem']
         if commit:
             device_request.save()
         return device_request
