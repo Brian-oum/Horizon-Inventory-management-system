@@ -2,7 +2,6 @@ from . import views
 from django.urls import path
 
 urlpatterns = [
-    path('register/', views.register, name='register'),
     path('custom_login/', views.custom_login, name='login'),
     path('logout/', views.logout_view, name='logout'),
 
@@ -26,7 +25,8 @@ urlpatterns = [
          name='delete_device'),  # For bulk deletion
     path('purchase-orders/', views.purchase_orders, name='purchase_orders'),
     # Reports
-    path('inventory/export_grouped/', views.export_grouped_inventory, name='export_grouped_inventory'),
+    path('inventory/export_grouped/', views.export_grouped_inventory,
+         name='export_grouped_inventory'),
     path('reports/', views.reports_view, name='reports'),
     path('reports/export/inventory-items/',
          views.export_inventory_items, name='export_inventory_items'),
