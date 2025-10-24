@@ -107,14 +107,14 @@ def request_device(request):
                     'requests__quantity',
                     filter=Q(requests__status__in=['Pending', 'Approved', 'Issued']),
                     output_field=IntegerField()
-                ),
-                Value(0)
+               ),
+               Value(0)
             )
         ).annotate(
-            available_quantity=F('total_quantity') - F('requested_quantity')
+            available_qty=F('total_quantity') - F('requested_quantity')
         ).filter(
-            available_quantity__gt=0
-        )
+            available_qty__gt=0
+       )
     else:
         user_country = getattr(user.profile, "country", None)
         available_device_queryset = Device.objects.filter(
@@ -123,15 +123,15 @@ def request_device(request):
             requested_quantity=Coalesce(
                 Sum(
                     'requests__quantity',
-                    filter=Q(requests__status__in=['Pending', 'Approved', 'Issued']),
-                    output_field=IntegerField()
+                     filter=Q(requests__status__in=['Pending', 'Approved', 'Issued']),
+                     output_field=IntegerField()
                 ),
                 Value(0)
             )
         ).annotate(
-            available_quantity=F('total_quantity') - F('requested_quantity')
+            available_qty=F('total_quantity') - F('requested_quantity')
         ).filter(
-            available_quantity__gt=0
+            available_qty__gt=0
         )
 
     # Group devices by name
@@ -149,19 +149,43 @@ def request_device(request):
             "category": devices[0].category,
             "description": devices[0].description,
             "status": "available",
-            "available_count": sum(d.available_quantity for d in devices),
+            "available_count": sum(d.available_qty for d in devices)
         })
 
     categories = available_device_queryset.values_list('category', flat=True).distinct()
 
     if request.method == 'POST':
-        form = DeviceRequestForm(request.POST)
+        form = DeviceRequestForm(request.POST, user=request.user)  
         form.fields['device'].queryset = available_device_queryset
+
         if form.is_valid():
             device_request = form.save(commit=False)
+            available_quantity = device_request.device.available_quantity
+            # ✅ Check if the user is requesting more units than are currently available
+            if device_request.quantity > available_quantity:
+                # ❌ Show an error message if the request exceeds available stock
+                messages.error(
+                    request,
+                    f"Only {available_quantity} unit(s) of {device_request.device.name} available."
+                    )
+                return redirect('request_device')
+            # ✅ Calculate available stock before validation
+            available_quantity = (
+                device_request.device.total_quantity - device_request.device.quantity_issued
+            )
+
+            # ✅ Validation check before saving
+            if device_request.quantity > available_quantity:
+                messages.error(
+                    request,
+                    f"Only {available_quantity} unit(s) of {device_request.device.name} available."
+                )
+                return redirect('request_device')
+
             # Assign country from branch if present
             if device_request.branch and device_request.branch.country:
                 device_request.country = device_request.branch.country
+
             device_request.requestor = request.user
             device_request.save()
 
@@ -183,28 +207,33 @@ def request_device(request):
 
             messages.success(request, "Device request submitted successfully!")
             return redirect('requestor_dashboard')
+
         else:
             messages.error(request, "Please correct the errors below.")
+
     else:
+        # Prefill form for GET request
         initial_data = {}
         if device_id_from_get and device_id_from_get.isdigit():
             try:
                 device = Device.objects.get(id=int(device_id_from_get))
                 if device in available_device_queryset:
-                    initial_data['device'] = device.id
+                   initial_data['device'] = device.id
             except Device.DoesNotExist:
-                pass
-        # ✅ Autofill client information from logged-in user
+               pass
+
+        # ✅ Autofill client info from logged-in user
         if request.user.is_authenticated:
             profile = getattr(request.user, 'profile', None)
             initial_data.update({
-              'client_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
-              'client_email': request.user.email,
-              'client_phone': getattr(profile, 'phone_no', ''),    # Adjust field names if different
-              'client_address': getattr(profile, 'address', ''),
-              'branch': getattr(profile, 'branch', None),
-              })
-
+                'client_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+                'client_email': request.user.email,
+                'client_phone': getattr(profile, 'phone_no', ''),
+                'client_address': getattr(profile, 'address', ''),
+                'branch': getattr(profile, 'branch', None),
+            })
+            
+        # ✅ Pass request.user into the form
         form = DeviceRequestForm(initial=initial_data)
         form.fields['device'].queryset = available_device_queryset
 
@@ -215,6 +244,7 @@ def request_device(request):
         'branches': Branch.objects.all(),
         'oems': OEM.objects.all(),
     })
+
 
 # --- Cancel Request ---
 
