@@ -4,12 +4,9 @@ from django.contrib.auth.models import User
 from .models import Profile
 
 @receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        Profile.objects.create(user=instance)
-
-@receiver(post_save, sender=User)
-def save_user_profile(sender, instance, **kwargs):
-    # Only save the profile if it exists
-    if hasattr(instance, 'profile'):
-        instance.profile.save()
+def create_or_ensure_user_profile(sender, instance, created, **kwargs):
+    """
+    Ensure a Profile exists for each User. Use get_or_create to avoid integrity errors.
+    This is defensive — admin add flow will not try to create an inline profile thanks to admin.get_inline_instances override.
+    """
+    Profile.objects.get_or_create(user=instance)

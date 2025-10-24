@@ -13,9 +13,12 @@ from django.views.decorators.http import require_POST
 from collections import defaultdict
 import openpyxl
 from openpyxl.utils import get_column_letter
+import logging
 from django.db.models.functions import Coalesce
 from .models import PurchaseOrder
 from .forms import PurchaseOrderForm
+
+logger = logging.getLogger(__name__)
 from .models import (
     Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord, Branch, Profile
 )
@@ -298,12 +301,52 @@ def store_clerk_dashboard(request):
 
 @require_POST
 def delete_device(request, device_id=None):
-    if device_id:
-        device = get_object_or_404(Device, pk=device_id)
-        device.delete()
-    else:
-        device_ids = request.POST.getlist('device_ids')
-        Device.objects.filter(id__in=device_ids).delete()
+    # Permission check
+    if not request.user.has_perm('invent.delete_device'):
+        messages.error(request, "You do not have permission to delete devices.")
+        logger.warning("User %s attempted device delete without permission", request.user.username)
+        return redirect(reverse('adjust_stock'))
+
+    try:
+        if device_id:
+            # Single delete
+            device = get_object_or_404(Device, pk=device_id)
+
+            # Branch check for non-superusers
+            if not request.user.is_superuser:
+                user_branch = getattr(request.user.profile, 'branch', None)
+                if user_branch is None or device.branch != user_branch:
+                    messages.error(request, "You can only delete devices from your assigned branch.")
+                    logger.warning("User %s attempted to delete device %s from another branch", request.user.username, device.id)
+                    return redirect(reverse('adjust_stock'))
+
+            device.delete()
+            messages.success(request, f"Device '{device.name}' deleted successfully.")
+            logger.info("User %s deleted device %s", request.user.username, device.id)
+        else:
+            # Bulk delete: device_ids expected as repeated inputs
+            device_ids = request.POST.getlist('device_ids')
+            if not device_ids:
+                messages.warning(request, "No devices selected for deletion.")
+                return redirect(reverse('adjust_stock'))
+
+            qs = Device.objects.filter(id__in=device_ids)
+
+            # Enforce branch scoping for non-superusers
+            if not request.user.is_superuser:
+                user_branch = getattr(request.user.profile, 'branch', None)
+                if user_branch is None:
+                    messages.error(request, "Your profile has no branch assigned. Cannot delete devices.")
+                    return redirect(reverse('adjust_stock'))
+                qs = qs.filter(branch=user_branch)
+
+            deleted_count, _ = qs.delete()
+            messages.success(request, f"Deleted {deleted_count} device(s).")
+            logger.info("User %s bulk-deleted %d devices", request.user.username, deleted_count)
+
+    except Exception as e:
+        logger.exception("Error deleting device(s): %s", e)
+        messages.error(request, "An error occurred while deleting devices.")
     return redirect(reverse('adjust_stock'))
 
 # --- Device Request Approval/Reject ---

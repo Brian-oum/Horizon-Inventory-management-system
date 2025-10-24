@@ -65,6 +65,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'invent.context_processors.pending_requests_count',
+                'invent.context_processors.user_branch',
             ],
         },
     },
@@ -158,10 +159,16 @@ LOGIN_REDIRECT_URL = '/' # Redirect to the root (which is requestor_dashboard in
 LOGOUT_REDIRECT_URL = 'login'
 
 # --- SESSION TIMEOUT SETTINGS ---
-SESSION_COOKIE_AGE = 600  # <-- 20 minutes (1200 seconds) -->
+SESSION_COOKIE_AGE = 1200  # <-- 20 minutes (1200 seconds) -->
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False # Changed to False for persistent sessions until timeout
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+BRANCH_ADMIN_ASSIGNABLE_GROUPS = [
+    'Requestor',
+    'Storeclerk',
+    'Branch Admin',
+]

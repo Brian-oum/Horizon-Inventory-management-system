@@ -5,4 +5,9 @@ class InventConfig(AppConfig):
     name = 'invent'
 
     def ready(self):
-        import invent.signals 
+        # Import signals so they are registered when Django starts
+        try:
+            import invent.signals  # noqa: F401
+        except Exception:
+            # Avoid breaking management commands during development if signals import fails
+            pass

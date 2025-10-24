@@ -19,10 +19,13 @@ urlpatterns = [
          name='store_clerk_dashboard'),
     path('manage_stock/', views.manage_stock, name='manage_stock'),
     path('edit_item/<int:item_id>/', views.edit_item, name='edit_item'),
-    path('delete-device/<int:device_id>/',
-         views.delete_device, name='delete_device'),
-    path('delete-device/', views.delete_device,
-         name='delete_device'),  # For bulk deletion
+    path('edit_item/<int:item_id>/', views.edit_item, name='edit_item'),
+    # Bulk delete (no id in URL)
+    path('devices/delete/', views.delete_device, name='delete_device'),
+    # Single delete (device id in URL)
+    path('devices/<int:device_id>/delete/', views.delete_device, name='delete_device_single'),
+    
+    path('purchase-orders/', views.purchase_orders, name='purchase_orders'),
     path('purchase-orders/', views.purchase_orders, name='purchase_orders'),
     # Reports
     path('inventory/export_grouped/', views.export_grouped_inventory,
