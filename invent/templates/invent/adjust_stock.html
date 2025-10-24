@@ -52,8 +52,8 @@
         </div>
 
         <div class="card-body">
-            <!-- Bulk Delete Form -->
-            <form method="post" action="{% url 'delete_device' %}">
+            <!-- Bulk Delete Form (POST) -->
+            <form method="post" action="{% url 'delete_device' %}" id="bulk-delete-form">
                 {% csrf_token %}
                 <div class="table-responsive">
                     <table class="table table-striped table-hover align-middle">
@@ -91,17 +91,17 @@
                                 <td>{{ device.current_client.name|default:"-" }}</td>
                                 <td>{{ device.issued_at|date:"Y-m-d H:i"|default:"-" }}</td>
                                 <td>
-                                    <!-- Single Delete Form -->
-                                    <form method="post" action="{% url 'delete_device' device.id %}" class="d-inline">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-danger btn-sm"
-                                            onclick="return confirm('Are you sure you want to delete this device?');"
-                                            title="Delete Device">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </form>
+                <!-- Single Delete Button (JS builds POST form). URL stored in data attribute to avoid nested-quote issues. -->
+                    <button
+                      type="button"
+                      class="btn btn-danger btn-sm"
+                      data-delete-url="{% url 'delete_device_single' device.id %}"
+                      data-device-id="{{ device.id }}"
+                      onclick="confirmAndDeleteSingle(this)"
+                      title="Delete Device">
+                        <i class="fas fa-trash"></i>
+                    </button>
                                 </td>
-                            </tr>
                             {% empty %}
                             <tr>
                                 <td colspan="9" class="text-center text-muted py-4">No devices found.</td>
@@ -123,13 +123,66 @@
     </div>
 </div>
 
-<!-- Checkbox Select All Script -->
+<!-- Scripts -->
 <script>
+/* Toggle all checkboxes */
 function toggleAll(source) {
     const checkboxes = document.getElementsByName('device_ids');
     for (let i = 0; i < checkboxes.length; i++) {
         checkboxes[i].checked = source.checked;
     }
+}
+
+/* Read CSRF token from cookie (Django default) */
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+/* Create and submit a POST form dynamically for single delete to avoid nested forms */
+function confirmAndDeleteSingle(button) {
+    // read values from the button's data attributes
+    const deviceId = button.dataset.deviceId;
+    const url = button.dataset.deleteUrl;
+
+    if (!confirm('Are you sure you want to delete this device?')) {
+        return;
+    }
+
+    // create a form element
+    const form = document.createElement('form');
+    form.method = 'post';
+    form.action = url;
+
+    // add CSRF token input
+    const csrfToken = getCookie('csrftoken');
+    if (csrfToken) {
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+    }
+
+    // add a hidden input to indicate single delete (optional)
+    const singleInput = document.createElement('input');
+    singleInput.type = 'hidden';
+    singleInput.name = 'single_delete_id';
+    singleInput.value = deviceId;
+    form.appendChild(singleInput);
+
+    document.body.appendChild(form);
+    form.submit();
 }
 </script>
 {% endblock %}

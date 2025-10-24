@@ -1,5 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+    {% if user_branch %}
+  <span class="badge bg-info text-dark">Branch: {{ user_branch.name }}</span>
+{% else %}
+  <span class="text-muted">Branch: Unassigned</span>
+{% endif %}
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
