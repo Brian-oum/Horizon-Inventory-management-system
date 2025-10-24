@@ -16,6 +16,7 @@ from .models import (
     DeviceRequest,
     Profile,
     Country,
+    DeviceIMEI,
 )
 
 ASSIGNABLE_GROUPS = getattr(settings, 'BRANCH_ADMIN_ASSIGNABLE_GROUPS', None)
@@ -241,6 +242,13 @@ class BranchScopedAdmin(admin.ModelAdmin):
                 if self.branch_field and hasattr(obj, self.branch_field) and getattr(obj, self.branch_field, None) is None:
                     setattr(obj, self.branch_field, branch)
         super().save_model(request, obj, form, change)
+        
+# DeviceIMEI inline for Device admin
+class DeviceIMEIInline(admin.TabularInline):
+    model = DeviceIMEI
+    extra = 1
+    fields = ('imei_number', 'is_available')
+    readonly_fields = ()  
 # Device admin
 @admin.register(Device)
 class DeviceAdmin(BranchScopedAdmin):
@@ -248,6 +256,7 @@ class DeviceAdmin(BranchScopedAdmin):
     search_fields = ('name', 'imei_no', 'serial_no', 'oem__name', 'product_id')
     list_filter = ('status', 'category', 'branch', 'oem')
     branch_field = 'branch'
+    inlines = [DeviceIMEIInline]
 # DeviceRequest admin
 @admin.register(DeviceRequest)
 class DeviceRequestAdmin(BranchScopedAdmin):
@@ -274,3 +283,10 @@ class ReturnRecordAdmin(BranchScopedAdmin):
     list_display = ('device', 'client', 'returned_at', 'reason')
     search_fields = ('device__imei_no', 'device__serial_no', 'client__name')
     branch_field = None
+    
+@admin.register(DeviceIMEI)
+class DeviceIMEIAdmin(BranchScopedAdmin):
+    list_display = ('imei_number', 'device', 'is_available')
+    search_fields = ('imei_number', 'device__name', 'device__product_id')
+    list_filter = ('is_available',)
+    branch_field = None  # It will inherit via device.branch

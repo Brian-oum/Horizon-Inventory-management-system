@@ -28,6 +28,28 @@
                 <!-- Left Column: Device Info -->
                 <div class="col-lg-6">
 
+                    <!-- ✅ OEM Dropdown -->
+                     <div class="mb-3">
+                        <label for="id_oem" class="form-label fw-semibold small">OEM</label>
+                        <select name="oem" id="id_oem" class="form-select form-select-sm">
+                            <option value="">Select OEM</option>
+                            {% for oem in oems %}
+                            <option value="{{ oem.id }}">{{ oem.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                     <!-- Category -->
+                    <div class="mb-3">
+                        <label for="id_category" class="form-label fw-semibold small">Category</label>
+                        <select id="id_category" class="form-select form-select-sm">
+                            <option value="">Select a category</option>
+                            {% for category in categories %}
+                                <option value="{{ category }}">{{ category }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
                        <!-- Device -->
                    
                      <div class="mb-3">
@@ -48,28 +70,6 @@
                         {% for error in form.device.errors %}
                             <div class="text-danger small mt-1">{{ error }}</div>
                         {% endfor %}
-                    </div>
-
-                    <!-- Category -->
-                    <div class="mb-3">
-                        <label for="id_category" class="form-label fw-semibold small">Category</label>
-                        <select id="id_category" class="form-select form-select-sm">
-                            <option value="">Select a category</option>
-                            {% for category in categories %}
-                                <option value="{{ category }}">{{ category }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <!-- ✅ OEM Dropdown -->
-                     <div class="mb-3">
-                        <label for="id_oem" class="form-label fw-semibold small">OEM</label>
-                        <select name="oem" id="id_oem" class="form-select form-select-sm">
-                            <option value="">Select OEM</option>
-                            {% for oem in oems %}
-                            <option value="{{ oem.id }}">{{ oem.name }}</option>
-                            {% endfor %}
-                        </select>
                     </div>
                     
                     <!-- Quantity -->

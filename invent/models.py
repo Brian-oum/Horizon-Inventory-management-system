@@ -12,23 +12,21 @@ CURRENCY_CHOICES = (
     # Add more as needed
 )
 
-# ---  Country Model ---
-
-
+# --- Country Model ---
 class Country(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.name
 
+
 # --- Updated Branch: relates to Country ---
-
-
 class Branch(models.Model):
     name = models.CharField(max_length=100)
     address = models.CharField(max_length=255)
     country = models.ForeignKey(
-        Country, on_delete=models.SET_NULL, null=True, blank=True)
+        Country, on_delete=models.SET_NULL, null=True, blank=True
+    )
 
     def __str__(self):
         return f"{self.name}, {self.country.name if self.country else ''}"
@@ -45,15 +43,16 @@ class OEM(models.Model):  # Formerly Supplier
 
 
 class PurchaseOrder(models.Model):
-    oem = models.ForeignKey(OEM, on_delete=models.CASCADE,
-                            default=1)  # was supplier
+    oem = models.ForeignKey(OEM, on_delete=models.CASCADE, default=1)  # was supplier
     branch = models.ForeignKey(
-        Branch, on_delete=models.SET_NULL, null=True, blank=True)
+        Branch, on_delete=models.SET_NULL, null=True, blank=True
+    )
     order_date = models.DateField()
     expected_delivery = models.DateField()
     status = models.CharField(max_length=50)
     document = models.FileField(
-        upload_to='purchase_orders/', null=True, blank=True)  # Optional
+        upload_to='purchase_orders/', null=True, blank=True
+    )  # Optional
 
     def __str__(self):
         return f"PO #{self.id} - {self.oem.name}"
@@ -87,49 +86,132 @@ class Device(models.Model):
     )
 
     product_id = models.CharField(max_length=30, blank=True)
+
+    # Quantities of available and issued items respectively
     total_quantity = models.PositiveIntegerField(default=1)
+    quantity_issued = models.PositiveIntegerField(default=0)  # ✅ NEW
 
     imei_no = models.CharField(
-        max_length=50, unique=True, null=True, blank=True)  # Optional
+        max_length=50, unique=True, null=True, blank=True
+    )  # Optional
     serial_no = models.CharField(
-        max_length=50, unique=True, null=True, blank=True)  # Optional
+        max_length=50, unique=True, null=True, blank=True
+    )  # Optional
     mac_address = models.CharField(
-        max_length=50, unique=True, null=True, blank=True)  # Optional
+        max_length=50, unique=True, null=True, blank=True
+    )  # Optional
 
-    # ✅ Added Category field
     category = models.CharField(
-        max_length=100, blank=True, help_text="e.g. Laptop or Router")
-
+        max_length=100, blank=True, help_text="e.g. Laptop or Router"
+    )
     manufacturer = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
 
     selling_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True)
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
     currency = models.CharField(
-        max_length=10, choices=CURRENCY_CHOICES, default='USD')
+        max_length=10, choices=CURRENCY_CHOICES, default='USD'
+    )
 
     branch = models.ForeignKey(
-        Branch, on_delete=models.SET_NULL, null=True, blank=True)
+        Branch, on_delete=models.SET_NULL, null=True, blank=True
+    )
     country = models.ForeignKey(
-        Country, on_delete=models.SET_NULL, null=True, blank=True)
+        Country, on_delete=models.SET_NULL, null=True, blank=True
+    )
 
     status = models.CharField(
-        max_length=20, choices=STATUS_CHOICES, default='available')  # ✅ Required
+        max_length=20, choices=STATUS_CHOICES, default='available'
+    )
+
+    def quantity_remaining(self):
+        """Returns how many items are left based on issued quantity."""
+        return self.total_quantity - self.quantity_issued
+
+    @property
+    def available_quantity(self):
+        """Returns the number of unrequested and unissued items."""
+        from django.db.models import Sum, Q
+        requested_sum = self.requests.filter(
+            status__in=['Pending', 'Approved', 'Issued']
+        ).aggregate(Sum('quantity'))['quantity__sum'] or 0
+        return max(self.total_quantity - requested_sum, 0)
 
     def __str__(self):
         return f"{self.name} ({self.status})"
+    
+
+class DeviceIMEI(models.Model):
+    """
+    Tracks individual IMEIs for devices (many IMEIs can map to one Device).
+    This is additive and does not replace the existing Device.imei_no field.
+    """
+    device = models.ForeignKey(
+        Device,
+        on_delete=models.CASCADE,
+        related_name='imeis'
+    )
+    imei_number = models.CharField(max_length=50, unique=True)
+    is_available = models.BooleanField(default=True)  # True => not issued / assignable
+    added_on = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-added_on']
+
+    def __str__(self):
+        return f"{self.device.name} - {self.imei_number} ({'available' if self.is_available else 'unavailable'})"
+
+    def mark_unavailable(self):
+        """Mark this IMEI as not available (used)."""
+        if self.is_available:
+            self.is_available = False
+            self.save(update_fields=['is_available'])
+
+    def mark_available(self):
+        """Mark this IMEI as available again (returned)."""
+        if not self.is_available:
+            self.is_available = True
+            self.save(update_fields=['is_available'])
+
+
+# --- add these FK fields to existing models (DeviceRequest and IssuanceRecord) ---
+# Note: keep your existing DeviceRequest.imei_no CharField intact — we only add a FK.
+
+# in DeviceRequest (add below the existing imei_no CharField or anywhere in the class):
+imei_obj = models.ForeignKey(
+    'DeviceIMEI',
+    null=True,
+    blank=True,
+    on_delete=models.SET_NULL,
+    related_name='device_requests'
+)
+
+# in IssuanceRecord (add a nullable FK to store which IMEI was issued)
+imei = models.ForeignKey(
+    'DeviceIMEI',
+    null=True,
+    blank=True,
+    on_delete=models.SET_NULL,
+    related_name='issuance_records'
+)
+
 
 
 class DeviceRequest(models.Model):
     device = models.ForeignKey(
-        "Device",
-        on_delete=models.CASCADE,
-        related_name="requests"
+        "Device", on_delete=models.CASCADE, related_name="requests"
+    )
+    imei_no = models.CharField(max_length=50, null=True, blank=True)  # existing — keep it
+    imei_obj = models.ForeignKey(
+        'DeviceIMEI',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='device_requests'
     )
     requestor = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="device_requests"
+        User, on_delete=models.CASCADE, related_name="device_requests"
     )
     client = models.ForeignKey(
         "Client",
@@ -139,12 +221,18 @@ class DeviceRequest(models.Model):
         blank=True
     )
     branch = models.ForeignKey(
-        Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests")
+        Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests"
+    )
     country = models.ForeignKey(
-        Country, on_delete=models.SET_NULL, null=True, blank=True)
+        Country, on_delete=models.SET_NULL, null=True, blank=True
+    )
+
+    # specify imei_no if applicable during request
+    imei_no = models.CharField(max_length=50, null=True, blank=True)  # ✅ NEW
     quantity = models.PositiveIntegerField(default=1)
     reason = models.TextField(blank=True, null=True)
     application_date = models.DateField(default=timezone.now)
+
     STATUS_CHOICES = [
         ('Pending', 'Pending'),
         ('Approved', 'Approved'),
@@ -154,6 +242,7 @@ class DeviceRequest(models.Model):
         ('Partially Returned', 'Partially Returned'),
         ('Fully Returned', 'Fully Returned'),
     ]
+
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default='Pending'
     )
@@ -214,8 +303,16 @@ class DeviceRequest(models.Model):
 
 class IssuanceRecord(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
+    imei = models.ForeignKey(
+        'DeviceIMEI',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='issuance_records'
+    )
     client = models.ForeignKey(
-        Client, on_delete=models.CASCADE, null=True, blank=True)
+        Client, on_delete=models.CASCADE, null=True, blank=True
+    )
     logistics_manager = models.ForeignKey(User, on_delete=models.CASCADE)
     issued_at = models.DateTimeField(auto_now_add=True)
     device_request = models.ForeignKey(
@@ -239,18 +336,19 @@ class ReturnRecord(models.Model):
     def __str__(self):
         return f"{self.device} returned by {self.client.name} on {self.returned_at.strftime('%Y-%m-%d')}"
 
+
 # Profile model to extend User with branch and country
-
-
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     branch = models.ForeignKey(
-        Branch, on_delete=models.SET_NULL, null=True, blank=True)
+        Branch, on_delete=models.SET_NULL, null=True, blank=True
+    )
     country = models.ForeignKey(
-        Country, on_delete=models.SET_NULL, null=True, blank=True)
+        Country, on_delete=models.SET_NULL, null=True, blank=True
+    )
     address = models.CharField(max_length=255, blank=True)
     phone_no = models.CharField(max_length=50, blank=True)
-    
+
     def get_info(self):
         return {
             "branch": self.branch.name if self.branch else "",
@@ -258,8 +356,10 @@ class Profile(models.Model):
             "email": self.user.email,
             "username": self.user.username,
         }
-        
+
     def __str__(self):
         return f"{self.user.username}'s profile"
+    
+    
 
 # --- END IoT/Client/OEM/Branch/Country Models ---

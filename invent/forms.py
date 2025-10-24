@@ -1,11 +1,8 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from .models import Profile
-from .models import Profile, Country
+from .models import Profile, Country, Device, OEM, PurchaseOrder, DeviceRequest, Client, Branch
 from django.db.models import F  # Import F expression for queryset filtering
-from .models import Device, OEM, PurchaseOrder
-from .models import DeviceRequest, Client, Branch
 
 
 class CustomCreationForm(UserCreationForm):
@@ -23,8 +20,7 @@ class CustomCreationForm(UserCreationForm):
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password1',
-                  'password2', 'country', 'branch']
+        fields = ['username', 'email', 'password1', 'password2', 'country', 'branch']
 
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -37,8 +33,9 @@ class CustomCreationForm(UserCreationForm):
             profile.branch = self.cleaned_data['branch']
             profile.save()
         return user
-# --- NEW FORMS FOR RETURN LOGIC ---
 
+
+# --- NEW FORMS FOR RETURN LOGIC ---
 
 class OEMForm(forms.ModelForm):
     class Meta:
@@ -58,13 +55,13 @@ class DeviceForm(forms.ModelForm):
         fields = [
             'name',
             'oem',
-            'category',   # ✅ Added category here
+            'category',  # ✅ Added category here
             'imei_no',
             'serial_no',
             'mac_address',
             'status',
             'branch',
-            'country'
+            'country',
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Device Name'}),
@@ -94,8 +91,7 @@ class DeviceForm(forms.ModelForm):
         self.fields['imei_no'].required = False
         self.fields['serial_no'].required = False
         self.fields['mac_address'].required = False
-        # ✅ You can set to False if you want optional
-        self.fields['category'].required = True
+        self.fields['category'].required = True  # ✅ Still required
 
         # Hide branch and country for non-superusers
         if user and not user.is_superuser:
@@ -110,20 +106,17 @@ class DeviceForm(forms.ModelForm):
 
 
 class DeviceRequestForm(forms.ModelForm):
-      # --- New OEM field ---
+    # --- New OEM field ---
     oem = forms.ModelChoiceField(
         queryset=OEM.objects.all(),
         required=True,
         label="OEM (Supplier)",
         widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
     )
-    client_name = forms.CharField(
-        max_length=255, required=True, label="Client Name")
-    client_phone = forms.CharField(
-        max_length=50, required=True, label="Client Phone")
+    client_name = forms.CharField(max_length=255, required=True, label="Client Name")
+    client_phone = forms.CharField(max_length=50, required=True, label="Client Phone")
     client_email = forms.EmailField(required=True, label="Client Email")
-    client_address = forms.CharField(
-        max_length=255, required=True, label="Client Address")
+    client_address = forms.CharField(max_length=255, required=True, label="Client Address")
     branch = forms.ModelChoiceField(
         queryset=Branch.objects.all(),
         required=True,
@@ -134,17 +127,20 @@ class DeviceRequestForm(forms.ModelForm):
     class Meta:
         model = DeviceRequest
         fields = ['device', 'quantity', 'reason']  # client fields are extra
-        
+
     def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)  # pass request.user when initializing
+        self.user = kwargs.pop('user', None)  # pass request.user when initializing
         super().__init__(*args, **kwargs)
+
         # Filter available devices only
         self.fields['device'].queryset = Device.objects.filter(status='available')
+
         # 🔹 Auto-fill branch/country from user profile
-        if user and hasattr(user, 'profile'):
-            profile = user.profile
+        if self.user and hasattr(self.user, 'profile'):
+            profile = self.user.profile
             if profile.branch:
                 self.initial['branch'] = profile.branch
+
     def save(self, commit=True, requestor=None):
         # ✅ Create the client first
         client = Client.objects.create(
@@ -159,18 +155,21 @@ class DeviceRequestForm(forms.ModelForm):
         if requestor:
             device_request.requestor = requestor
         device_request.client = client
-
         device_request.branch = self.cleaned_data['branch']
+
         if device_request.branch and device_request.branch.country:
             device_request.country = device_request.branch.country
-        #Link OEM from form
+
+        # ✅ Link OEM from form
         device_request.device.oem = self.cleaned_data['oem']
+
         if commit:
             device_request.save()
+
         return device_request
 
-   # Purchase order with document upload
 
+# --- Purchase order with document upload ---
 
 class PurchaseOrderForm(forms.ModelForm):
     oem = forms.ModelChoiceField(
@@ -186,14 +185,12 @@ class PurchaseOrderForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     order_date = forms.DateField(
-        widget=forms.DateInput(
-            attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         required=True,
         label='Order Date'
     )
     expected_delivery = forms.DateField(
-        widget=forms.DateInput(
-            attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         required=True,
         label='Expected Delivery'
     )
@@ -216,5 +213,4 @@ class PurchaseOrderForm(forms.ModelForm):
 
     class Meta:
         model = PurchaseOrder
-        fields = ['oem', 'branch', 'order_date',
-                  'expected_delivery', 'status', 'document']
+        fields = ['oem', 'branch', 'order_date', 'expected_delivery', 'status', 'document']
