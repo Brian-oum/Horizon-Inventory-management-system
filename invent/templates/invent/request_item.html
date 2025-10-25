@@ -85,7 +85,7 @@
                     <div class="border rounded p-3 bg-light mt-3">
                         <h6 class="fw-bold mb-2 small text-secondary">Device Information</h6>
                         <div class="row small text-muted">
-                            <div class="col-6 mb-1">IMEI: <span id="device_imei" class="fw-semibold">--</span></div>
+                            <div class="col-6 mb-1">Name: <span id="device_name" class="fw-semibold">--</span></div>
                             <div class="col-6 mb-1">Category: <span id="device_model" class="fw-semibold">--</span></div>
                             <div class="col-6 mb-1">Status: <span id="device_status" class="fw-semibold">--</span></div>
                             <div class="col-6 mb-1">Availability: <span id="device_availability" class="fw-semibold">--</span></div>
@@ -186,7 +186,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const categorySelect = document.getElementById('id_category');
     const deviceSelect = $('#id_device');
-    const imeiSpan = document.getElementById('device_imei');
+    const nameSpan = document.getElementById('device_name');
     const modelSpan = document.getElementById('device_model');
     const statusSpan = document.getElementById('device_status');
     const availabilitySpan = document.getElementById('device_availability');
@@ -195,6 +195,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const allDevices = Array.from(deviceSelect.find('option')).map(opt => ({
         id: opt.value,
         text: opt.text,
+        name: opt.dataset.name,
         category: opt.dataset.category,
         imei: opt.dataset.imei,
         status: opt.dataset.status,
@@ -204,59 +205,63 @@ document.addEventListener('DOMContentLoaded', function () {
     function filterDevices() {
         const selectedCategory = categorySelect.value;
         deviceSelect.empty().append('<option value="">Select a device</option>');
-        allDevices.filter(d => d.category === selectedCategory).forEach(d => {
-            deviceSelect.append(
-                `<option value="${d.id}" 
-                         data-category="${d.category}" 
-                         data-imei="${d.imei}" 
-                         data-status="${d.status}" 
-                         data-available-count="${d.availableCount}">${d.text}</option>`
-            );
-        });
+        allDevices
+            .filter(d => d.category === selectedCategory)
+            .forEach(d => {
+                deviceSelect.append(
+                    `<option value="${d.id}" 
+                             data-name="${d.name}"
+                             data-category="${d.category}" 
+                             data-status="${d.status}" 
+                             data-available-count="${d.availableCount}">
+                        ${d.text}
+                    </option>`
+                );
+            });
+
         deviceSelect.val(null).trigger('change');
-        imeiSpan.textContent = '--';
+        nameSpan.textContent = '--';
         modelSpan.textContent = '--';
         statusSpan.textContent = '--';
         availabilitySpan.textContent = '--';
     }
+
     function updateDeviceInfo() {
-    const selectedOption = deviceSelect.find('option:selected');
-    const quantityInput = document.getElementById("id_quantity"); // Django default id
+        const selectedOption = deviceSelect.find('option:selected');
+        const quantityInput = document.getElementById("id_quantity");
 
-    if (selectedOption.val()) {
-        imeiSpan.textContent = selectedOption.data('imei');
-        modelSpan.textContent = selectedOption.data('category');
-        statusSpan.textContent = selectedOption.data('status');
+        if (selectedOption.val()) {
+            // ✅ Now show name instead of IMEI
+            nameSpan.textContent = selectedOption.data('name') || '--';
+            modelSpan.textContent = selectedOption.data('category') || '--';
+            statusSpan.textContent = selectedOption.data('status') || '--';
 
-        // ✅ Restrict quantity
-        const availableCount = selectedOption.data('available-count') || 0;
-        availabilitySpan.textContent = availableCount + ' available';
+            const availableCount = selectedOption.data('available-count') || 0;
+            availabilitySpan.textContent = availableCount + ' available';
 
-        if (quantityInput) {
-            quantityInput.min = 1;
-            quantityInput.max = availableCount;
-            quantityInput.value = availableCount > 0 ? 1 : 0; // default
-        }
+            if (quantityInput) {
+                quantityInput.min = 1;
+                quantityInput.max = availableCount;
+                quantityInput.value = availableCount > 0 ? 1 : 0;
+            }
 
-        if (availableCount > 0) {
-            availabilitySpan.className = 'fw-semibold text-success';
+            availabilitySpan.className = availableCount > 0
+                ? 'fw-semibold text-success'
+                : 'fw-semibold text-danger';
         } else {
-            availabilitySpan.className = 'fw-semibold text-danger';
-        }
-    } else {
-        imeiSpan.textContent = '--';
-        modelSpan.textContent = '--';
-        statusSpan.textContent = '--';
-        availabilitySpan.textContent = '--';
-        availabilitySpan.className = 'fw-semibold';
+            nameSpan.textContent = '--';
+            modelSpan.textContent = '--';
+            statusSpan.textContent = '--';
+            availabilitySpan.textContent = '--';
+            availabilitySpan.className = 'fw-semibold';
 
-        if (quantityInput) {
-            quantityInput.min = 0;
-            quantityInput.max = 0;
-            quantityInput.value = 0;
+            if (quantityInput) {
+                quantityInput.min = 0;
+                quantityInput.max = 0;
+                quantityInput.value = 0;
+            }
         }
     }
-}
 
     // Event listeners
     categorySelect.addEventListener('change', filterDevices);
@@ -279,4 +284,5 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+
 {% endblock main_content %}

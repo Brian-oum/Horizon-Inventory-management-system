@@ -955,97 +955,67 @@ def reports_view(request):
 @login_required
 @permission_required('invent.add_device', raise_exception=True)
 def upload_inventory(request):
-    if request.method == 'POST' and request.FILES.get('excel_file'):
-        excel_file = request.FILES['excel_file']
+    if request.method == 'POST':
+        oem_name = request.POST.get('oem')
+        category = request.POST.get('category')
+        name = request.POST.get('name')
+        excel_file = request.FILES.get('excel_file')
+
+        # Validate basic fields
+        if not all([oem_name, category, name]):
+            messages.error(request, "Please provide OEM, category, and device name before uploading.")
+            return redirect("upload_inventory")
+
+        if not excel_file:
+            messages.error(request, "Please upload an Excel file.")
+            return redirect("upload_inventory")
+
+        # Load Excel
         try:
             wb = openpyxl.load_workbook(excel_file)
             sheet = wb.active
         except Exception:
-            messages.error(
-                request, "Invalid Excel file. Please upload a valid .xlsx file.")
+            messages.error(request, "Invalid Excel file. Please upload a valid .xlsx file.")
             return redirect("upload_inventory")
 
-        header = [str(cell.value).strip().lower()
-                  for cell in sheet[1] if cell.value]
+        header = [str(cell.value).strip().lower() for cell in sheet[1] if cell.value]
         header_index_map = {h: i for i, h in enumerate(header)}
 
-        required_columns = ["oem", "name", "category", "status"]
-        for col in required_columns:
-            if col not in header_index_map:
-                messages.error(request, f"Missing required column: {col}")
-                return redirect("upload_inventory")
+        # Only accept 'imei no' and 'serial no' columns
+        if not any(col in header_index_map for col in ["imei no", "serial no"]):
+            messages.error(request, "Excel file must have at least 'IMEI No' or 'Serial No' column.")
+            return redirect("upload_inventory")
 
-        from invent.models import OEM, Device
+        oem_obj, _ = OEM.objects.get_or_create(name=oem_name)
 
-        # Remember previous values for blank cells
-        prev_oem_name = None
-        prev_category = None
-        prev_status = None
+        added_count = 0
+        skipped_count = 0
 
         for row in sheet.iter_rows(min_row=2, values_only=True):
-            def safe_get(col):
-                idx = header_index_map.get(col)
-                return str(row[idx]).strip() if idx is not None and row[idx] else ""
+            imei_no = str(row[header_index_map["imei no"]]).strip() if "imei no" in header_index_map and row[header_index_map["imei no"]] else None
+            serial_no = str(row[header_index_map["serial no"]]).strip() if "serial no" in header_index_map and row[header_index_map["serial no"]] else None
 
-            # Pull values or inherit from previous row
-            oem_name = safe_get("oem") or prev_oem_name
-            name = safe_get("name")
-            category = safe_get("category") or prev_category
-            status = (safe_get("status").lower()
-                      or prev_status or "available").lower()
-            imei_no = safe_get("imei no")
-            serial_no = safe_get("serial no")
-            mac_address = safe_get("mac address")
-
-            # Update previous remembered values
-            if oem_name:
-                prev_oem_name = oem_name
-            if category:
-                prev_category = category
-            if status:
-                prev_status = status
-
-            # Skip rows without a name
-            if not name:
+            if not imei_no and not serial_no:
+                skipped_count += 1
                 continue
-
-            # Validate mandatory fields
-            if not all([oem_name, category, status]):
-                messages.warning(request, f"Skipping incomplete row: {row}")
-                continue
-
-            # Validate status
-            if status not in ["available", "issued", "returned", "faulty"]:
-                messages.warning(
-                    request, f"Invalid status '{status}' for device '{name}'. Skipped.")
-                continue
-
-            # Get or create OEM and category
-            oem_obj, _ = OEM.objects.get_or_create(name=oem_name)
 
             # Skip duplicates
             if imei_no and Device.objects.filter(imei_no=imei_no).exists():
-                messages.warning(
-                    request, f"IMEI {imei_no} already exists. Skipped.")
+                messages.warning(request, f"IMEI {imei_no} already exists. Skipped.")
+                skipped_count += 1
                 continue
             if serial_no and Device.objects.filter(serial_no=serial_no).exists():
-                messages.warning(
-                    request, f"Serial No {serial_no} already exists. Skipped.")
-                continue
-            if mac_address and Device.objects.filter(mac_address=mac_address).exists():
-                messages.warning(
-                    request, f"MAC Address {mac_address} already exists. Skipped.")
+                messages.warning(request, f"Serial No {serial_no} already exists. Skipped.")
+                skipped_count += 1
                 continue
 
-            # Create the device
             device_kwargs = dict(
                 oem=oem_obj,
                 name=name,
                 category=category,
                 imei_no=imei_no or None,
                 serial_no=serial_no or None,
-                mac_address=mac_address or None,
-                status=status,
+                status="available",
             )
 
             # Assign branch & country if user not superuser
@@ -1054,8 +1024,9 @@ def upload_inventory(request):
                 device_kwargs["country"] = request.user.profile.country
 
             Device.objects.create(**device_kwargs)
+            added_count += 1
 
-        messages.success(request, "Devices uploaded successfully.")
+        messages.success(request, f"Upload complete. {added_count} devices added, {skipped_count} skipped.")
         return redirect("inventory_list")
 
     return render(request, "invent/upload_inventory.html")
