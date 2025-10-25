@@ -20,40 +20,45 @@
                 <i class="fas fa-file-excel me-2"></i> Upload IoT Devices via Excel
             </h4>
         </div>
-        <div class="card-body">
 
+        <div class="card-body">
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
+
+                <!-- OEM -->
                 <div class="mb-3">
-                    <label for="excel_file" class="form-label fw-bold">Select Excel File (.xlsx only)</label>
+                    <label for="oem" class="form-label fw-bold">OEM (Manufacturer)</label>
+                    <input type="text" name="oem" id="oem" class="form-control" placeholder="e.g. Samsung, Huawei" required>
+                </div>
+
+                <!-- Category -->
+                <div class="mb-3">
+                    <label for="category" class="form-label fw-bold">Category</label>
+                    <input type="text" name="category" id="category" class="form-control" placeholder="e.g. Phone, Tablet, Router" required>
+                </div>
+
+                <!-- Device Name -->
+                <div class="mb-3">
+                    <label for="name" class="form-label fw-bold">Device Name / Model</label>
+                    <input type="text" name="name" id="name" class="form-control" placeholder="e.g. Galaxy S21" required>
+                </div>
+
+                <!-- Excel Upload -->
+                <div class="mb-3 mt-4">
+                    <label for="excel_file" class="form-label fw-bold">Upload Excel File (.xlsx only)</label>
                     <input type="file" name="excel_file" id="excel_file" class="form-control" accept=".xlsx" required>
 
                     <small class="form-text text-muted d-block mt-3">
                         <strong>Required Excel Columns:</strong>
                         <ul class="small mt-2 mb-0">
-                            <li><code>OEM</code> – Manufacturer name (e.g. Samsung, Huawei). New OEMs will be added automatically.</li>
-                            <li><code>Name</code> – Device name or model (e.g. Galaxy S21).</li>
-                            <li><code>Category</code> – Device category (e.g. Phone, Tablet, Router).</li>
-                            <li><code>Status</code> – Must be one of: <code>available</code>, <code>issued</code>, <code>returned</code>, or <code>faulty</code>.</li>
+                            <li><code>IMEI No</code> – Unique device IMEI number (optional if Serial provided)</li>
+                            <li><code>Serial No</code> – Unique serial number (optional if IMEI provided)</li>
                         </ul>
-
-                        <strong>Optional Columns:</strong>
-                        <ul class="small mt-2 mb-0">
-                            <li><code>IMEI No</code></li>
-                            <li><code>Serial No</code></li>
-                            <li><code>MAC Address</code></li>
-                        </ul>
-                    </small>
-
-                    <small class="form-text text-muted d-block mt-3">
-                        <strong>Notes:</strong><br>
-                        • You don’t need to create OEMs beforehand — they’ll be added automatically.<br>
-                        • IMEI, Serial, and MAC addresses must be unique if provided.<br>
-                        • Blank fields are skipped automatically.<br>
-                        • Invalid or duplicate entries are ignored and reported as warnings.
+                        <strong>Note:</strong> Any other columns in the Excel file will be ignored.
                     </small>
                 </div>
 
+                <!-- Buttons -->
                 <div class="mt-4">
                     <button type="submit" class="btn btn-success">
                         <i class="fas fa-upload me-2"></i> Upload Devices
@@ -63,7 +68,6 @@
                     </a>
                 </div>
             </form>
-
         </div>
     </div>
 </div>

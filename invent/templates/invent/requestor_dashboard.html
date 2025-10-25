@@ -103,6 +103,14 @@
       position: relative;
       overflow: hidden;
       height: 100%;
+      width: 100%;
+    }
+
+    .summary-card .card-body {
+      padding: 25px 20px; /* default is around 15px */
+    }
+    .summary-card h2 {
+      font-size: 2rem; /* make numbers larger */
     }
 
     .summary-card:hover { transform: translateY(-5px); }
@@ -124,19 +132,18 @@
 
     /* ✅ Sidebar Toggle Button */
     #sidebarToggle {
-      display: none;
       position: fixed;
-      top: 15px; /* ⭐ moved slightly lower for header spacing */
+      top: 15px;
       left: 15px;
-      z-index: 1100; /* ⭐ higher than sidebar for visibility */
+      z-index: 2000; /* keep it above sidebar & content */
       background: white;
       border: 1px solid #ccc;
       border-radius: 5px;
-      padding: 6px 12px;
+      padding: 8px 14px;
       cursor: pointer;
       box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      display: none;
     }
-
     /* ✅ Responsive Sidebar Behavior */
     @media (max-width: 992px) {
       .sidebar {
@@ -148,6 +155,20 @@
       }
       #sidebarToggle {
         display: block !important;
+      }
+      #greeting{
+        display: none;
+      }
+    }
+    @media (min-width: 1200px) {
+      .col-xl-2.custom-width {
+        flex: 0 0 20%;
+        max-width: 20%;
+      }
+    }
+    @media (max-width: 768px) {
+      #greeting {
+        display: none !important;
       }
     }
 
@@ -241,7 +262,7 @@
     </div>
 
     <div class="row g-3 mb-4">
-      <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-2 custom-width">
         <div class="summary-card card-total">
           <div class="card-body">
             <h6>Total Requests</h6>
@@ -250,7 +271,7 @@
           </div>
         </div>
       </div>
-      <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-2 custom-width">
         <div class="summary-card card-approved">
           <div class="card-body">
             <h6>Approved</h6>
@@ -259,7 +280,7 @@
           </div>
         </div>
       </div>
-      <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-2 custom-width">
         <div class="summary-card card-pending">
           <div class="card-body">
             <h6>Pending</h6>
@@ -268,7 +289,7 @@
           </div>
         </div>
       </div>
-      <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-2 custom-width">
         <div class="summary-card card-returned">
           <div class="card-body">
             <h6>Items Returned</h6>
@@ -277,7 +298,7 @@
           </div>
         </div>
       </div>
-      <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-2 custom-width">
         <div class="summary-card card-partial">
           <div class="card-body">
             <h6>Issued Items</h6>
@@ -296,7 +317,7 @@
         <table class="table table-hover">
           <thead class="table-light">
             <tr>
-              <th>#</th>
+              <th>ID</th>
               <th>Item Type</th>
               <th>Status</th>
               <th>Date</th>
