@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.mail import send_mail
-
+from django.conf import settings
 # --- BEGIN IoT/Client/OEM/Branch/Country Models ---
 
 CURRENCY_CHOICES = (
@@ -13,6 +13,8 @@ CURRENCY_CHOICES = (
 )
 
 # --- Country Model ---
+
+
 class Country(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
@@ -43,7 +45,8 @@ class OEM(models.Model):  # Formerly Supplier
 
 
 class PurchaseOrder(models.Model):
-    oem = models.ForeignKey(OEM, on_delete=models.CASCADE, default=1)  # was supplier
+    oem = models.ForeignKey(OEM, on_delete=models.CASCADE,
+                            default=1)  # was supplier
     branch = models.ForeignKey(
         Branch, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -76,63 +79,50 @@ class Device(models.Model):
         ('faulty', 'Faulty'),
     )
 
-    name = models.CharField(max_length=255)  # REQUIRED
+    name = models.CharField(max_length=255)
     oem = models.ForeignKey(
         OEM,
         on_delete=models.SET_NULL,
         null=True,
-        blank=False,  # ✅ OEM is required (cannot be left empty)
+        blank=False,
         related_name='devices'
     )
-
     product_id = models.CharField(max_length=30, blank=True)
-
-    # Quantities of available and issued items respectively
     total_quantity = models.PositiveIntegerField(default=1)
-    quantity_issued = models.PositiveIntegerField(default=0)  # ✅ NEW
-
+    quantity_issued = models.PositiveIntegerField(default=0)
     imei_no = models.CharField(
-        max_length=50, unique=True, null=True, blank=True
-    )  # Optional
+        max_length=50, unique=True, null=True, blank=True)
     serial_no = models.CharField(
-        max_length=50, unique=True, null=True, blank=True
-    )  # Optional
+        max_length=50, unique=True, null=True, blank=True)
     mac_address = models.CharField(
-        max_length=50, unique=True, null=True, blank=True
-    )  # Optional
-
+        max_length=50, unique=True, null=True, blank=True)
     category = models.CharField(
-        max_length=100, blank=True, help_text="e.g. Laptop or Router"
-    )
+        max_length=100, blank=True, help_text="e.g. Laptop or Router")
     manufacturer = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
-
     selling_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True
-    )
+        max_digits=10, decimal_places=2, null=True, blank=True)
     currency = models.CharField(
-        max_length=10, choices=CURRENCY_CHOICES, default='USD'
-    )
-
+        max_length=10, choices=CURRENCY_CHOICES, default='USD')
     branch = models.ForeignKey(
-        Branch, on_delete=models.SET_NULL, null=True, blank=True
-    )
+        Branch, on_delete=models.SET_NULL, null=True, blank=True)
     country = models.ForeignKey(
-        Country, on_delete=models.SET_NULL, null=True, blank=True
-    )
-
+        Country, on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(
-        max_length=20, choices=STATUS_CHOICES, default='available'
-    )
+        max_length=20, choices=STATUS_CHOICES, default='available')
+
+    class Meta:
+        permissions = [
+            ("can_issue_item", "Can issue device to client"),
+            ("can_return_item", "Can record device returns"),
+        ]
 
     def quantity_remaining(self):
-        """Returns how many items are left based on issued quantity."""
         return self.total_quantity - self.quantity_issued
 
     @property
     def available_quantity(self):
-        """Returns the number of unrequested and unissued items."""
-        from django.db.models import Sum, Q
+        from django.db.models import Sum
         requested_sum = self.requests.filter(
             status__in=['Pending', 'Approved', 'Issued']
         ).aggregate(Sum('quantity'))['quantity__sum'] or 0
@@ -140,7 +130,52 @@ class Device(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.status})"
-    
+
+
+# NEW: DeviceSelectionGroup - groups devices selected by a clerk for a request
+
+class DeviceSelectionGroup(models.Model):
+    STATUS_CHOICES = (
+        # created by clerk, waiting admin review
+        ('Pending', 'Pending'),
+        ('Approved', 'Approved'),          # approved by branch admin
+        ('Rejected', 'Rejected'),          # rejected by branch admin
+    )
+
+    device_request = models.ForeignKey(
+        'DeviceRequest',
+        on_delete=models.CASCADE,
+        related_name='selection_groups'
+    )
+    store_clerk = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='device_selection_groups'
+    )
+    devices = models.ManyToManyField('Device', related_name='selection_groups')
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='Pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='device_selection_reviews'
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        permissions = [
+            ("can_approve_selection", "Can approve device selection groups"),
+        ]
+
+    def __str__(self):
+        return f"Selection for Request {self.device_request.id} by {self.store_clerk}"
+
 
 class DeviceIMEI(models.Model):
     """
@@ -153,7 +188,8 @@ class DeviceIMEI(models.Model):
         related_name='imeis'
     )
     imei_number = models.CharField(max_length=50, unique=True)
-    is_available = models.BooleanField(default=True)  # True => not issued / assignable
+    # True => not issued / assignable
+    is_available = models.BooleanField(default=True)
     added_on = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -197,12 +233,12 @@ imei = models.ForeignKey(
 )
 
 
-
 class DeviceRequest(models.Model):
     device = models.ForeignKey(
         "Device", on_delete=models.CASCADE, related_name="requests"
     )
-    imei_no = models.CharField(max_length=50, null=True, blank=True)  # existing — keep it
+    imei_no = models.CharField(
+        max_length=50, null=True, blank=True)  # existing — keep it
     imei_obj = models.ForeignKey(
         'DeviceIMEI',
         null=True,
@@ -301,6 +337,31 @@ class DeviceRequest(models.Model):
         return f"Request for {self.device} by {self.requestor.username}"
 
 
+# --- NEW: DeviceSelection model (placed below DeviceRequest) ---
+class DeviceSelection(models.Model):
+    device_request = models.ForeignKey(
+        'DeviceRequest',
+        on_delete=models.CASCADE,
+        related_name='selections'
+    )
+    device = models.ForeignKey(
+        'Device',
+        on_delete=models.CASCADE,
+        related_name='selected_for_requests'
+    )
+    selected_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='device_selections'
+    )
+    selected_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.device.name} selected for Request {self.device_request.id}"
+
+
 class IssuanceRecord(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     imei = models.ForeignKey(
@@ -359,7 +420,6 @@ class Profile(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s profile"
-    
-    
+
 
 # --- END IoT/Client/OEM/Branch/Country Models ---

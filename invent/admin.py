@@ -5,6 +5,7 @@ from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.core.exceptions import PermissionDenied
 
+from .models import DeviceSelectionGroup
 from .models import (
     Branch,
     OEM,
@@ -53,7 +54,7 @@ def _get_user_branch_from_request(request):
 
 
 class CustomUserAdmin(DefaultUserAdmin):
-   
+
     inlines = (ProfileInline,)
     list_display = ('username', 'email', 'is_staff', 'is_active', 'get_branch')
     list_select_related = ('profile',)
@@ -72,7 +73,7 @@ class CustomUserAdmin(DefaultUserAdmin):
         return super().get_inline_instances(request, obj)
 
     def get_queryset(self, request):
-       
+
         qs = super().get_queryset(request).select_related('profile')
         if request.user.is_superuser:
             return qs
@@ -121,25 +122,28 @@ class CustomUserAdmin(DefaultUserAdmin):
 
     # Restrict which groups a non-superuser may choose in the admin form
     def formfield_for_manytomany(self, db_field, request, **kwargs):
-        
+
         if db_field.name == 'groups' and not request.user.is_superuser:
             if ASSIGNABLE_GROUPS:
-                kwargs['queryset'] = Group.objects.filter(name__in=ASSIGNABLE_GROUPS)
+                kwargs['queryset'] = Group.objects.filter(
+                    name__in=ASSIGNABLE_GROUPS)
             else:
                 # fallback: allow assigning only groups the acting user is already in
                 kwargs['queryset'] = request.user.groups.all()
         return super().formfield_for_manytomany(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
-    
+
         is_new = not change
 
         # Defensive: ensure groups to be assigned are within allowed set
         if not request.user.is_superuser:
-            selected_groups = form.cleaned_data.get('groups') if form.is_valid() else None
+            selected_groups = form.cleaned_data.get(
+                'groups') if form.is_valid() else None
             if selected_groups is not None:
                 if ASSIGNABLE_GROUPS:
-                    allowed_qs = set(Group.objects.filter(name__in=ASSIGNABLE_GROUPS))
+                    allowed_qs = set(Group.objects.filter(
+                        name__in=ASSIGNABLE_GROUPS))
                 else:
                     allowed_qs = set(request.user.groups.all())
 
@@ -148,7 +152,8 @@ class CustomUserAdmin(DefaultUserAdmin):
                 forbidden = [g for g in selected_list if g not in allowed_qs]
                 if forbidden:
                     # remove forbidden groups from selection and warn
-                    allowed_selected = [g for g in selected_list if g in allowed_qs]
+                    allowed_selected = [
+                        g for g in selected_list if g in allowed_qs]
                     # temporarily set the groups on the form instance so that super().save_model doesn't save forbidden ones
                     # We'll set the allowed groups explicitly after saving the User object.
                     form.cleaned_data['groups'] = allowed_selected
@@ -159,7 +164,8 @@ class CustomUserAdmin(DefaultUserAdmin):
 
         # After saving the User, ensure the final groups match allowed selection (defensive)
         if not request.user.is_superuser:
-            post_groups = form.cleaned_data.get('groups') if form.is_valid() else None
+            post_groups = form.cleaned_data.get(
+                'groups') if form.is_valid() else None
             if post_groups is not None:
                 obj.groups.set(post_groups)
 
@@ -177,12 +183,14 @@ class CustomUserAdmin(DefaultUserAdmin):
                 # Do not block user creation on profile assignment errors; log if needed.
                 pass
 
+
 # Unregister default User admin and register our custom one
 try:
     admin.site.unregister(User)
 except Exception:
     pass
 admin.site.register(User, CustomUserAdmin)
+
 
 def get_user_branch(request):
     try:
@@ -216,7 +224,8 @@ class BranchScopedAdmin(admin.ModelAdmin):
         branch = get_user_branch(request)
         if not branch:
             return False
-        obj_branch = getattr(obj, self.branch_field, None) if self.branch_field else None
+        obj_branch = getattr(obj, self.branch_field,
+                             None) if self.branch_field else None
         if obj_branch is None and hasattr(obj, 'device'):
             obj_branch = getattr(obj.device, 'branch', None)
         return obj_branch == branch and request.user.has_perm(f"{self.model._meta.app_label}.change_{self.model._meta.model_name}")
@@ -229,7 +238,8 @@ class BranchScopedAdmin(admin.ModelAdmin):
         branch = get_user_branch(request)
         if not branch:
             return False
-        obj_branch = getattr(obj, self.branch_field, None) if self.branch_field else None
+        obj_branch = getattr(obj, self.branch_field,
+                             None) if self.branch_field else None
         if obj_branch is None and hasattr(obj, 'device'):
             obj_branch = getattr(obj.device, 'branch', None)
         return obj_branch == branch and request.user.has_perm(f"{self.model._meta.app_label}.delete_{self.model._meta.model_name}")
@@ -242,51 +252,78 @@ class BranchScopedAdmin(admin.ModelAdmin):
                 if self.branch_field and hasattr(obj, self.branch_field) and getattr(obj, self.branch_field, None) is None:
                     setattr(obj, self.branch_field, branch)
         super().save_model(request, obj, form, change)
-        
+
 # DeviceIMEI inline for Device admin
+
+
 class DeviceIMEIInline(admin.TabularInline):
     model = DeviceIMEI
     extra = 1
     fields = ('imei_number', 'is_available')
-    readonly_fields = ()  
+    readonly_fields = ()
 # Device admin
+
+
 @admin.register(Device)
 class DeviceAdmin(BranchScopedAdmin):
-    list_display = ('name', 'oem', 'product_id', 'imei_no', 'serial_no', 'branch', 'status')
+    list_display = ('name', 'oem', 'product_id', 'imei_no',
+                    'serial_no', 'branch', 'status')
     search_fields = ('name', 'imei_no', 'serial_no', 'oem__name', 'product_id')
     list_filter = ('status', 'category', 'branch', 'oem')
     branch_field = 'branch'
     inlines = [DeviceIMEIInline]
 # DeviceRequest admin
+
+
 @admin.register(DeviceRequest)
 class DeviceRequestAdmin(BranchScopedAdmin):
-    list_display = ('id', 'device', 'requestor', 'client', 'branch', 'status', 'date_requested')
-    search_fields = ('device__imei_no', 'device__serial_no', 'requestor__username', 'client__name')
+    list_display = ('id', 'device', 'requestor', 'client',
+                    'branch', 'status', 'date_requested')
+    search_fields = ('device__imei_no', 'device__serial_no',
+                     'requestor__username', 'client__name')
     list_filter = ('status', 'branch')
     branch_field = 'branch'
 # PurchaseOrder admin
+
+
 @admin.register(PurchaseOrder)
 class PurchaseOrderAdmin(BranchScopedAdmin):
-    list_display = ('id', 'oem', 'branch', 'order_date', 'expected_delivery', 'status')
+    list_display = ('id', 'oem', 'branch', 'order_date',
+                    'expected_delivery', 'status')
     search_fields = ('oem__name',)
     list_filter = ('status', 'branch')
     branch_field = 'branch'
 # IssuanceRecord admin (fallback to device.branch)
+
+
 @admin.register(IssuanceRecord)
 class IssuanceRecordAdmin(BranchScopedAdmin):
     list_display = ('device', 'client', 'logistics_manager', 'issued_at')
-    search_fields = ('device__imei_no', 'device__serial_no', 'client__name', 'logistics_manager__username')
+    search_fields = ('device__imei_no', 'device__serial_no',
+                     'client__name', 'logistics_manager__username')
     branch_field = None
 # ReturnRecord admin
+
+
 @admin.register(ReturnRecord)
 class ReturnRecordAdmin(BranchScopedAdmin):
     list_display = ('device', 'client', 'returned_at', 'reason')
     search_fields = ('device__imei_no', 'device__serial_no', 'client__name')
     branch_field = None
-    
+
+
 @admin.register(DeviceIMEI)
 class DeviceIMEIAdmin(BranchScopedAdmin):
     list_display = ('imei_number', 'device', 'is_available')
     search_fields = ('imei_number', 'device__name', 'device__product_id')
     list_filter = ('is_available',)
     branch_field = None  # It will inherit via device.branch
+
+
+@admin.register(DeviceSelectionGroup)
+class DeviceSelectionGroupAdmin(admin.ModelAdmin):
+    list_display = ('id', 'device_request', 'store_clerk',
+                    'status', 'created_at', 'reviewed_at', 'reviewed_by')
+    list_filter = ('status', 'created_at')
+    search_fields = ('device_request__id', 'store_clerk__username',
+                     'devices__imei_no', 'devices__serial_no')

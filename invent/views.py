@@ -1,3 +1,11 @@
+import csv
+from django.utils.dateparse import parse_date
+from .forms import (
+    CustomCreationForm, OEMForm, DeviceForm, DeviceRequestForm
+)
+from .models import (
+    Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord, Branch, Profile, DeviceSelection
+)
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login, logout
@@ -17,16 +25,9 @@ import logging
 from django.db.models.functions import Coalesce
 from .models import PurchaseOrder
 from .forms import PurchaseOrderForm
-
+from django.utils import timezone
+from .models import DeviceSelectionGroup  # add import at top
 logger = logging.getLogger(__name__)
-from .models import (
-    Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord, Branch, Profile
-)
-from .forms import (
-    CustomCreationForm, OEMForm, DeviceForm, DeviceRequestForm
-)
-from django.utils.dateparse import parse_date
-import csv
 
 
 def custom_login(request):
@@ -105,16 +106,17 @@ def request_device(request):
             requested_quantity=Coalesce(
                 Sum(
                     'requests__quantity',
-                    filter=Q(requests__status__in=['Pending', 'Approved', 'Issued']),
+                    filter=Q(requests__status__in=[
+                             'Pending', 'Approved', 'Issued']),
                     output_field=IntegerField()
-               ),
-               Value(0)
+                ),
+                Value(0)
             )
         ).annotate(
             available_qty=F('total_quantity') - F('requested_quantity')
         ).filter(
             available_qty__gt=0
-       )
+        )
     else:
         user_country = getattr(user.profile, "country", None)
         available_device_queryset = Device.objects.filter(
@@ -123,8 +125,9 @@ def request_device(request):
             requested_quantity=Coalesce(
                 Sum(
                     'requests__quantity',
-                     filter=Q(requests__status__in=['Pending', 'Approved', 'Issued']),
-                     output_field=IntegerField()
+                    filter=Q(requests__status__in=[
+                             'Pending', 'Approved', 'Issued']),
+                    output_field=IntegerField()
                 ),
                 Value(0)
             )
@@ -152,10 +155,11 @@ def request_device(request):
             "available_count": sum(d.available_qty for d in devices)
         })
 
-    categories = available_device_queryset.values_list('category', flat=True).distinct()
+    categories = available_device_queryset.values_list(
+        'category', flat=True).distinct()
 
     if request.method == 'POST':
-        form = DeviceRequestForm(request.POST, user=request.user)  
+        form = DeviceRequestForm(request.POST, user=request.user)
         form.fields['device'].queryset = available_device_queryset
 
         if form.is_valid():
@@ -167,7 +171,7 @@ def request_device(request):
                 messages.error(
                     request,
                     f"Only {available_quantity} unit(s) of {device_request.device.name} available."
-                    )
+                )
                 return redirect('request_device')
             # ✅ Calculate available stock before validation
             available_quantity = (
@@ -218,9 +222,9 @@ def request_device(request):
             try:
                 device = Device.objects.get(id=int(device_id_from_get))
                 if device in available_device_queryset:
-                   initial_data['device'] = device.id
+                    initial_data['device'] = device.id
             except Device.DoesNotExist:
-               pass
+                pass
 
         # ✅ Autofill client info from logged-in user
         if request.user.is_authenticated:
@@ -232,7 +236,7 @@ def request_device(request):
                 'client_address': getattr(profile, 'address', ''),
                 'branch': getattr(profile, 'branch', None),
             })
-            
+
         # ✅ Pass request.user into the form
         form = DeviceRequestForm(initial=initial_data)
         form.fields['device'].queryset = available_device_queryset
@@ -333,8 +337,10 @@ def store_clerk_dashboard(request):
 def delete_device(request, device_id=None):
     # Permission check
     if not request.user.has_perm('invent.delete_device'):
-        messages.error(request, "You do not have permission to delete devices.")
-        logger.warning("User %s attempted device delete without permission", request.user.username)
+        messages.error(
+            request, "You do not have permission to delete devices.")
+        logger.warning(
+            "User %s attempted device delete without permission", request.user.username)
         return redirect(reverse('adjust_stock'))
 
     try:
@@ -346,13 +352,17 @@ def delete_device(request, device_id=None):
             if not request.user.is_superuser:
                 user_branch = getattr(request.user.profile, 'branch', None)
                 if user_branch is None or device.branch != user_branch:
-                    messages.error(request, "You can only delete devices from your assigned branch.")
-                    logger.warning("User %s attempted to delete device %s from another branch", request.user.username, device.id)
+                    messages.error(
+                        request, "You can only delete devices from your assigned branch.")
+                    logger.warning(
+                        "User %s attempted to delete device %s from another branch", request.user.username, device.id)
                     return redirect(reverse('adjust_stock'))
 
             device.delete()
-            messages.success(request, f"Device '{device.name}' deleted successfully.")
-            logger.info("User %s deleted device %s", request.user.username, device.id)
+            messages.success(
+                request, f"Device '{device.name}' deleted successfully.")
+            logger.info("User %s deleted device %s",
+                        request.user.username, device.id)
         else:
             # Bulk delete: device_ids expected as repeated inputs
             device_ids = request.POST.getlist('device_ids')
@@ -366,13 +376,15 @@ def delete_device(request, device_id=None):
             if not request.user.is_superuser:
                 user_branch = getattr(request.user.profile, 'branch', None)
                 if user_branch is None:
-                    messages.error(request, "Your profile has no branch assigned. Cannot delete devices.")
+                    messages.error(
+                        request, "Your profile has no branch assigned. Cannot delete devices.")
                     return redirect(reverse('adjust_stock'))
                 qs = qs.filter(branch=user_branch)
 
             deleted_count, _ = qs.delete()
             messages.success(request, f"Deleted {deleted_count} device(s).")
-            logger.info("User %s bulk-deleted %d devices", request.user.username, deleted_count)
+            logger.info("User %s bulk-deleted %d devices",
+                        request.user.username, deleted_count)
 
     except Exception as e:
         logger.exception("Error deleting device(s): %s", e)
@@ -517,139 +529,246 @@ def edit_item(request, device_id):
     }
     return render(request, 'invent/edit_item.html', context)
 
-# --- Issue Device (Clerk) ---
 
+# Branch Admin Approves/Rejects Selected Devices
+@login_required
+@permission_required('invent.can_approve_selection', raise_exception=True)
+def branch_admin_issue_dashboard(request):
+    user = request.user
+
+    # Ensure profile exists
+    branch = getattr(user.profile, 'branch', None)
+    country = getattr(user.profile, 'country', None)
+
+    # Filter device requests in this branch
+    pending_requests = DeviceRequest.objects.filter(
+        status__in=['Pending', 'Under Review'],
+        branch=branch,
+        country=country
+    )
+
+    # Filter available devices in the same branch
+    available_devices = Device.objects.filter(
+        status='available',
+        branch=branch,
+        country=country
+    )
+
+    context = {
+        'pending_requests': pending_requests,
+        'available_devices': available_devices,
+    }
+
+    return render(request, 'invent/branch_admin_issue.html', context)
+
+
+# --- Issue Device (Clerk) ---
 
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
 def issue_device(request):
+    """
+    Store Clerk landing page to view pending requests, 
+    available devices, and approved selections ready for issuance.
+    """
     user = request.user
-    # COUNTRY FILTER: Restrict by user's country
-    if user.is_superuser:
-        available_devices = Device.objects.filter(status='available')
-        clients = Client.objects.all()
-        pending_requests = DeviceRequest.objects.filter(
-            status='Pending'
-        ).select_related("requestor", "device", "client")
-        all_requests = DeviceRequest.objects.select_related(
-            "requestor", "device", "client").all()
-    else:
-        user_country = getattr(user.profile, "country", None)
-        available_devices = Device.objects.filter(
-            status='available', branch__country=user_country)
-        clients = Client.objects.all()
-        pending_requests = DeviceRequest.objects.filter(
-            status='Pending', branch__country=user_country
-        ).select_related("requestor", "device", "client")
-        all_requests = DeviceRequest.objects.select_related(
-            "requestor", "device", "client").filter(branch__country=user_country)
+    branch = getattr(user.profile, 'branch', None)
+    country = getattr(user.profile, 'country', None)
 
-    pending_requests_count = pending_requests.count()
+    pending_requests = DeviceRequest.objects.filter(
+        status__in=['Pending', 'Under Review'],
+        branch=branch,
+        country=country
+    )
 
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        device_request_id = request.POST.get('device_request_id')
+    available_devices = Device.objects.filter(
+        status='available',
+        branch=branch,
+        country=country
+    )
 
-        if action in ['approve', 'reject', 'issue'] and device_request_id:
-            device_request = get_object_or_404(
-                DeviceRequest, id=device_request_id)
-            device = device_request.device
-            client = device_request.client
+    approved_selections = DeviceSelectionGroup.objects.filter(
+        status='Approved',
+        device_request__branch=branch,
+        device_request__country=country
+    )
 
-            if action == 'approve' and device_request.status == 'Pending':
-                device_request.status = 'Approved'
-                device_request.save()
-                messages.success(
-                    request, f"Request {device_request.id} for device {device.imei_no} has been *Approved*. Now, please finalize the issuance.")
-                return redirect('issue_device')
+    context = {
+        'pending_requests': pending_requests,
+        'available_devices': available_devices,
+        'approved_selections': approved_selections,
+        'pending_count': pending_requests.count(),
+    }
 
-            elif action == 'issue' and device_request.status == 'Approved':
-                if client is None:
-                    messages.error(
-                        request,
-                        f"Cannot issue Request {device_request.id}: *No client is linked* to this approved device request. Update the request first."
-                    )
-                    return redirect('issue_device')
+    return render(request, 'invent/issue_device.html', context)
 
-                if device.status == 'available':
-                    with transaction.atomic():
-                        device.status = 'issued'
-                        device.save()
-                        IssuanceRecord.objects.create(
-                            device=device,
-                            client=client,
-                            logistics_manager=request.user,
-                            device_request=device_request
-                        )
-                        device_request.status = 'Issued'
-                        device_request.save()
-                        messages.success(
-                            request,
-                            f"Device {device.imei_no} successfully *Issued* to {client.name} (Request {device_request.id})."
-                        )
-                else:
-                    messages.error(
-                        request, f"Device {device.imei_no} is no longer available to be issued.")
 
-                return redirect('issue_device')
-
-            elif action == 'reject' and device_request.status in ['Pending', 'Approved']:
-                device_request.status = 'Rejected'
-                device_request.save()
-                messages.success(
-                    request, f"Request {device_request.id} *rejected*. Transaction ended.")
-                return redirect('issue_device')
-
-            else:
-                messages.warning(
-                    request, "Invalid action or status for this request.")
-                return redirect('issue_device')
-
-        device_id = request.POST.get('device_id')
-        client_id = request.POST.get('client_id')
-        if device_id and client_id:
-            try:
-                device = get_object_or_404(
-                    Device, id=device_id, status='available')
-                client = get_object_or_404(Client, id=client_id)
-                with transaction.atomic():
-                    device.status = 'issued'
-                    device.save()
-                    IssuanceRecord.objects.create(
-                        device=device,
-                        client=client,
-                        logistics_manager=request.user
-                    )
-                    messages.success(
-                        request,
-                        f"Device {device.imei_no} issued to {client.name} (Direct Issuance)."
-                    )
-                return redirect('issue_device')
-            except Exception as e:
-                messages.error(request, f"Error during direct issuance: {e}")
-                return redirect('issue_device')
-
-        messages.error(
-            request, "Please provide valid inputs for issuance or request action.")
+@login_required
+@permission_required('invent.can_issue_item', raise_exception=True)
+def submit_devices_for_approval(request):
+    """
+    Store Clerk posts selected device ids for a given request.
+    Creates a DeviceSelectionGroup with status 'Pending'.
+    """
+    if request.method != 'POST':
         return redirect('issue_device')
 
-    if user.is_superuser:
-        approved_requests = DeviceRequest.objects.filter(
-            status='Approved'
-        ).select_related("requestor", "device", "client")
-    else:
-        approved_requests = DeviceRequest.objects.filter(
-            status='Approved', branch__country=user_country
-        ).select_related("requestor", "device", "client")
+    req_id = request.POST.get('request_id')
+    # note: select2/multi selects send as list
+    selected_ids = request.POST.getlist('device_ids')
 
-    return render(request, 'invent/issue_device.html', {
-        'available_devices': available_devices,
-        'clients': clients,
-        'pending_requests': pending_requests,
-        'approved_requests': approved_requests,
-        'pending_requests_count': pending_requests_count,
-        'all_requests': all_requests,
-    })
+    if not req_id or not selected_ids:
+        messages.error(request, "Select devices before submitting.")
+        return redirect('issue_device')
+
+    device_request = get_object_or_404(DeviceRequest, id=req_id)
+
+    # validate quantity
+    requested_qty = device_request.quantity or 1
+    if len(selected_ids) != requested_qty:
+        messages.error(
+            request, f"Please select exactly {requested_qty} devices.")
+        return redirect('issue_device')
+
+    # fetch devices and ensure they are available and in same branch/country as clerk
+    devices_qs = Device.objects.filter(id__in=selected_ids, status='available')
+    if devices_qs.count() != len(selected_ids):
+        messages.error(
+            request, "One or more selected devices are no longer available.")
+        return redirect('issue_device')
+
+    # create selection group
+    with transaction.atomic():
+        sel_group = DeviceSelectionGroup.objects.create(
+            device_request=device_request,
+            store_clerk=request.user,
+            status='Pending'
+        )
+        sel_group.devices.set(devices_qs)
+        # mark request as under review (optional status)
+        device_request.status = 'Under Review'
+        device_request.save(update_fields=['status'])
+
+    messages.success(
+        request, f"Selected devices submitted for Branch Admin approval (Request {device_request.id}).")
+    return redirect('issue_device')
+
+
+@login_required
+@permission_required('invent.can_approve_selection', raise_exception=True)
+def approve_device_selection(request):
+    """
+    Branch Admin approves or rejects a DeviceSelectionGroup.
+    - GET: Display all pending selections for review.
+    - POST: Approve or reject a specific selection.
+    """
+    if request.method == 'POST':
+        sel_id = request.POST.get('selection_id')
+        action = request.POST.get('action')
+        sel = get_object_or_404(DeviceSelectionGroup, id=sel_id)
+
+        if action == 'approve':
+            with transaction.atomic():
+                sel.status = 'Approved'
+                sel.reviewed_at = timezone.now()
+                sel.reviewed_by = request.user
+                sel.save(update_fields=[
+                         'status', 'reviewed_at', 'reviewed_by'])
+
+                device_request = sel.device_request
+                device_request.status = 'Approved'
+                device_request.save(update_fields=['status'])
+
+            messages.success(
+                request, f"Selection for Request {device_request.id} approved.")
+
+        elif action == 'reject':
+            with transaction.atomic():
+                sel.status = 'Rejected'
+                sel.reviewed_at = timezone.now()
+                sel.reviewed_by = request.user
+                sel.save(update_fields=[
+                         'status', 'reviewed_at', 'reviewed_by'])
+
+                device_request = sel.device_request
+                device_request.status = 'Rejected'
+                device_request.save(update_fields=['status'])
+
+            messages.warning(
+                request, f"Selection for Request {device_request.id} rejected.")
+
+        else:
+            messages.error(request, "Invalid action.")
+
+        # After action, reload the page
+        return redirect('approve_device_selection')
+
+    # GET: Show all pending selections for the Branch Admin to review
+    pending_selections = (
+        DeviceSelectionGroup.objects
+        .filter(status='Pending')
+        .select_related('device_request', 'store_clerk')
+        .prefetch_related('devices')
+        .order_by('-created_at')
+    )
+
+    context = {
+        'pending_selections': pending_selections,
+    }
+
+    return render(request, 'invent/Branch_admin_approve.html', context)
+
+
+@login_required
+@permission_required('invent.can_issue_item', raise_exception=True)
+def issue_approved_devices(request):
+    """
+    Store Clerk triggers issuance for an Approved DeviceSelectionGroup (one group per request).
+    This will set device.status='issued' and create IssuanceRecord entries.
+    """
+    if request.method != 'POST':
+        return redirect('issue_device')
+
+    req_id = request.POST.get('request_id')
+    if not req_id:
+        messages.error(request, "Invalid request.")
+        return redirect('issue_device')
+
+    device_request = get_object_or_404(DeviceRequest, id=req_id)
+
+    # find the approved selection group for this request (most recent)
+    sel = DeviceSelectionGroup.objects.filter(
+        device_request=device_request, status='Approved').order_by('-reviewed_at').first()
+    if not sel:
+        messages.error(
+            request, "No approved selection found for this request.")
+        return redirect('issue_device')
+
+    client = device_request.client
+    if not client:
+        messages.error(request, "No client linked to this request.")
+        return redirect('issue_device')
+
+    with transaction.atomic():
+        for device in sel.devices.select_for_update():  # lock rows
+            if device.status != 'available' and device.status != 'reserved':
+                messages.error(request, f"Device {device} is not available.")
+                return redirect('issue_device')
+            device.status = 'issued'
+            device.save(update_fields=['status'])
+            IssuanceRecord.objects.create(
+                device=device,
+                client=client,
+                logistics_manager=request.user,
+                device_request=device_request
+            )
+        device_request.status = 'Issued'
+        device_request.date_issued = timezone.now()
+        device_request.save(update_fields=['status', 'date_issued'])
+
+    messages.success(
+        request, f"Devices for Request {device_request.id} issued successfully.")
+    return redirect('issue_device')
 
 # --- Return Device (Clerk) ---
 
@@ -963,7 +1082,8 @@ def upload_inventory(request):
 
         # Validate basic fields
         if not all([oem_name, category, name]):
-            messages.error(request, "Please provide OEM, category, and device name before uploading.")
+            messages.error(
+                request, "Please provide OEM, category, and device name before uploading.")
             return redirect("upload_inventory")
 
         if not excel_file:
@@ -975,15 +1095,18 @@ def upload_inventory(request):
             wb = openpyxl.load_workbook(excel_file)
             sheet = wb.active
         except Exception:
-            messages.error(request, "Invalid Excel file. Please upload a valid .xlsx file.")
+            messages.error(
+                request, "Invalid Excel file. Please upload a valid .xlsx file.")
             return redirect("upload_inventory")
 
-        header = [str(cell.value).strip().lower() for cell in sheet[1] if cell.value]
+        header = [str(cell.value).strip().lower()
+                  for cell in sheet[1] if cell.value]
         header_index_map = {h: i for i, h in enumerate(header)}
 
         # Only accept 'imei no' and 'serial no' columns
         if not any(col in header_index_map for col in ["imei no", "serial no"]):
-            messages.error(request, "Excel file must have at least 'IMEI No' or 'Serial No' column.")
+            messages.error(
+                request, "Excel file must have at least 'IMEI No' or 'Serial No' column.")
             return redirect("upload_inventory")
 
         oem_obj, _ = OEM.objects.get_or_create(name=oem_name)
@@ -992,8 +1115,10 @@ def upload_inventory(request):
         skipped_count = 0
 
         for row in sheet.iter_rows(min_row=2, values_only=True):
-            imei_no = str(row[header_index_map["imei no"]]).strip() if "imei no" in header_index_map and row[header_index_map["imei no"]] else None
-            serial_no = str(row[header_index_map["serial no"]]).strip() if "serial no" in header_index_map and row[header_index_map["serial no"]] else None
+            imei_no = str(row[header_index_map["imei no"]]).strip(
+            ) if "imei no" in header_index_map and row[header_index_map["imei no"]] else None
+            serial_no = str(row[header_index_map["serial no"]]).strip(
+            ) if "serial no" in header_index_map and row[header_index_map["serial no"]] else None
 
             if not imei_no and not serial_no:
                 skipped_count += 1
@@ -1001,11 +1126,13 @@ def upload_inventory(request):
 
             # Skip duplicates
             if imei_no and Device.objects.filter(imei_no=imei_no).exists():
-                messages.warning(request, f"IMEI {imei_no} already exists. Skipped.")
+                messages.warning(
+                    request, f"IMEI {imei_no} already exists. Skipped.")
                 skipped_count += 1
                 continue
             if serial_no and Device.objects.filter(serial_no=serial_no).exists():
-                messages.warning(request, f"Serial No {serial_no} already exists. Skipped.")
+                messages.warning(
+                    request, f"Serial No {serial_no} already exists. Skipped.")
                 skipped_count += 1
                 continue
 
@@ -1026,7 +1153,8 @@ def upload_inventory(request):
             Device.objects.create(**device_kwargs)
             added_count += 1
 
-        messages.success(request, f"Upload complete. {added_count} devices added, {skipped_count} skipped.")
+        messages.success(
+            request, f"Upload complete. {added_count} devices added, {skipped_count} skipped.")
         return redirect("inventory_list")
 
     return render(request, "invent/upload_inventory.html")
