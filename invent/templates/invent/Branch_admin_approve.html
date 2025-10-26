@@ -1,0 +1,69 @@
+{% extends 'invent/base_admin.html' %}
+{% load static %}
+
+{% block title %}Device Selections Pending Approval{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-center">Device Selections Pending Approval</h2>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if pending_selections %}
+        {% for selection in pending_selections %}
+        <div class="card mb-4 shadow-sm border-0 rounded-3">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    Request #{{ selection.device_request.id }} — {{ selection.device_request.client.name }}
+                </h5>
+                <small class="text-muted">
+                    Submitted by: {{ selection.store_clerk.username }} |
+                    {{ selection.created_at|date:"M d, Y H:i" }}
+                </small>
+            </div>
+
+            <div class="card-body">
+                <h6 class="text-muted mb-3">Selected Devices:</h6>
+                <ul class="list-group mb-3">
+                    {% for device in selection.devices.all %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ device.device_name }}</strong> <br>
+                            <small>Serial: {{ device.serial_number }}</small>
+                        </div>
+                        <span class="badge bg-secondary">{{ device.status }}</span>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-center text-muted">No devices selected.</li>
+                    {% endfor %}
+                </ul>
+
+                <form method="POST" action="{% url 'approve_device_selection' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="selection_id" value="{{ selection.id }}">
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="submit" name="action" value="reject" class="btn btn-outline-danger">
+                            <i class="bi bi-x-circle"></i> Reject
+                        </button>
+                        <button type="submit" name="action" value="approve" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Approve
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-info text-center">
+            No pending selections at the moment.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
