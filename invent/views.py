@@ -165,6 +165,7 @@ def request_device(request):
 
         if form.is_valid():
             device_request = form.save(commit=False)
+            device_request.imei_no = device_request.device.imei_no
             available_quantity = device_request.device.available_quantity
             # ✅ Check if the user is requesting more units than are currently available
             if device_request.quantity > available_quantity:
@@ -666,49 +667,52 @@ def issue_device(request):
 @permission_required('invent.can_issue_item', raise_exception=True)
 def select_imeis(request, request_id):
     """
-    Opens a detailed page for the selected request to choose IMEIs.
+    Opens a detailed page for the selected request to choose IMEIs (from Device model).
     """
     device_request = get_object_or_404(DeviceRequest, id=request_id)
     device = device_request.device
     user = request.user
 
-    # Filter IMEIs based on OEM, category, and device name
-    available_imeis = DeviceIMEI.objects.filter(
-        device__name=device.name,
-        device__category=device.category,
-        device__oem=device.oem,
-        is_available=True
+     # Filter IMEIs directly from the Device model
+    available_imeis = Device.objects.filter(
+        name=device.name,
+        category=device.category,
+        oem=device.oem,
+        status='available'
     )
-
+    
     if request.method == 'POST':
-        selected_imei_ids = request.POST.getlist('selected_imeis')
+        selected_device_ids = request.POST.getlist('selected_imeis')
 
-        if not selected_imei_ids:
-            messages.error(request, "Please select at least one IMEI before submitting.")
+        if not selected_device_ids:
+            messages.error(request, "Please select at least one device IMEI before submitting.")
             return redirect('select_imeis', request_id=request_id)
 
-        selected_imeis = DeviceIMEI.objects.filter(id__in=selected_imei_ids)
+        selected_devices = Device.objects.filter(id__in=selected_device_ids)
 
-        # Create SelectedDevice entries and mark IMEIs as unavailable
-        for imei in selected_imeis:
+        # Create SelectedDevice entries and mark devices as unavailable
+        for d in selected_devices:
             SelectedDevice.objects.create(
                 request=device_request,
-                device=device,
+                device=d,  # use the actual selected device
                 selected_by=user
             )
-            imei.is_available = False
-            imei.save()
+            d.status = 'allocated'
+            d.is_available = False
+            d.save(update_fields=['status', 'is_available'])
 
         device_request.status = 'Waiting Approval'
-        device_request.save()
+        device_request.save(update_fields=['status'])
+
         messages.success(request, f"IMEIs successfully submitted for Request #{device_request.id}.")
         return redirect('issue_device')
 
     context = {
         'device_request': device_request,
-        'available_imeis': available_imeis,
+        'available_imeis': available_imeis,  # template expects this name
     }
     return render(request, 'invent/select_imeis.html', context)
+
 
 
 @login_required
