@@ -1,235 +1,230 @@
 {% extends 'invent/base_store_clerk.html' %}
 {% load static %}
 
-{% block title %}Issue IoT Device{% endblock %}
+{% block title %}Issue IoT Devices{% endblock %}
 
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <style>
-.select2-container--default .select2-selection--multiple {
+.select2-container--default .select2-selection--single {
+    height: 38px;
     border: 1px solid #ced4da;
     border-radius: 0.375rem;
-    min-height: 38px;
     display: flex;
     align-items: center;
 }
-.select2-container {
-    width: 100% !important;
+.select2-selection__rendered {
+    padding-left: 10px !important;
 }
-.select2-selection__choice {
-    background-color: #0d6efd !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 0.25rem;
-    padding: 2px 8px;
-    margin-top: 4px;
-}
+.select2-container { width: 100% !important; }
+.badge-status { font-size: 0.85rem; padding: 0.4em 0.6em; }
+.table th, .table td { vertical-align: middle !important; }
+.card-header { background: #f8f9fa; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="mb-0">Issue IoT Device</h2>
-        <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-outline-secondary">
+        <h2 class="mb-0"><i class="fas fa-microchip me-2"></i>Issue IoT Devices</h2>
+        <a href="{% url 'store_clerk_dashboard' %}" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
         </a>
     </div>
 
     {% if messages %}
-    <div class="messages mb-3">
         {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
         {% endfor %}
-    </div>
     {% endif %}
 
+    <!-- Tabs -->
     <ul class="nav nav-tabs mb-4" id="deviceIssueTabs" role="tablist">
-        <li class="nav-item">
-            <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
-                Pending Requests
-                {% if pending_requests_count > 0 %}
-                    <span class="badge bg-danger ms-1">{{ pending_requests_count }}</span>
-                {% endif %}
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" id="awaiting-approval-tab" data-bs-toggle="tab" data-bs-target="#awaiting-approval" type="button" role="tab">
-                Awaiting Admin Approval
-                {% if awaiting_approval.count > 0 %}
-                    <span class="badge bg-warning text-dark ms-1">{{ awaiting_approval.count }}</span>
-                {% endif %}
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" id="ready-tab" data-bs-toggle="tab" data-bs-target="#ready" type="button" role="tab">
-                Ready to Issue
-                {% if ready_requests.count > 0 %}
-                    <span class="badge bg-success ms-1">{{ ready_requests.count }}</span>
-                {% endif %}
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab">
-                All Requests ({{ all_requests.count }})
-            </button>
-        </li>
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pending">Pending Requests</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#waiting">Waiting Admin Approval</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#approved">Approved (Ready to Issue)</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#direct">Direct Issue</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#all">All Requests</button></li>
     </ul>
 
-    <div class="tab-content" id="deviceIssueTabsContent">
+    <div class="tab-content">
 
-        <!-- Pending Requests -->
-        <div class="tab-pane fade show active" id="pending" role="tabpanel" aria-labelledby="pending-tab">
-            <h5 class="mb-3">Pending Device Requests Awaiting Device Selection</h5>
-
+        <!-- PENDING REQUESTS TAB -->
+        <div class="tab-pane fade show active" id="pending">
+            <h5 class="mb-3">Pending Requests – Awaiting IMEI Selection</h5>
             {% if pending_requests %}
-                <div class="accordion" id="pendingRequestsAccordion">
-                    {% for req in pending_requests %}
-                    <div class="accordion-item mb-2">
-                        <h2 class="accordion-header" id="heading{{ req.id }}">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                    data-bs-target="#collapse{{ req.id }}" aria-expanded="false"
-                                    aria-controls="collapse{{ req.id }}">
-                                Request #{{ req.id }} — {{ req.requestor.username }} | Client: {{ req.client.name|default:"N/A" }}
-                                <span class="badge bg-warning text-dark ms-3">Requested: {{ req.quantity }}</span>
-                            </button>
-                        </h2>
-                        <div id="collapse{{ req.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ req.id }}" data-bs-parent="#pendingRequestsAccordion">
-                            <div class="accordion-body">
-                                <p><strong>Request Details:</strong></p>
-                                <ul>
-                                    <li>Requested by: {{ req.requestor.username }}</li>
-                                    <li>Client: {{ req.client.name|default:"N/A" }}</li>
-                                    <li>Quantity: {{ req.quantity }}</li>
-                                    <li>Requested at: {{ req.requested_at|date:"Y-m-d H:i" }}</li>
-                                </ul>
-
-                                <form action="{% url 'submit_devices_for_approval' %}" method="post">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="request_id" value="{{ req.id }}">
-
-                                    <div class="mb-3">
-                                        <label class="form-label"><strong>Select Devices (up to {{ req.quantity }})</strong></label>
-                                        <select name="device_ids" id="deviceSelect{{ req.id }}" class="form-select select2" multiple required>
-                                            {% for device in available_devices %}
-                                            <option value="{{ device.id }}">
-                                                IMEI: {{ device.imei_no }} | Serial: {{ device.serial_no|default:"N/A" }} | MAC: {{ device.mac_address|default:"N/A" }}
-                                            </option>
-                                            {% endfor %}
-                                        </select>
-                                        <div class="form-text text-muted">Select exactly {{ req.quantity }} devices to match the requested quantity.</div>
-                                    </div>
-
-                                    <button type="submit" class="btn btn-primary mt-2">
-                                        <i class="fas fa-paper-plane me-1"></i> Submit for Branch Admin Approval
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p class="text-muted">No pending requests awaiting device selection.</p>
-            {% endif %}
-        </div>
-
-        <!-- Awaiting Admin Approval -->
-        <div class="tab-pane fade" id="awaiting-approval" role="tabpanel" aria-labelledby="awaiting-approval-tab">
-            <h5 class="mb-3">Requests Awaiting Branch Admin Approval</h5>
             <div class="table-responsive">
-                <table class="table table-hover table-striped">
-                    <thead class="table-dark">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
                         <tr>
                             <th>ID</th>
                             <th>Requestor</th>
-                            <th>Client</th>
-                            <th>Selected Devices</th>
-                            <th>Submitted At</th>
+                            <th>Device</th>
+                            <th>OEM</th>
+                            <th>Category</th>
+                            <th>Quantity</th>
+                            <th>Requested At</th>
                             <th>Status</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for selection in awaiting_approval %}
+                        {% for req in pending_requests %}
                         <tr>
-                            <td>{{ selection.device_request.id }}</td>
-                            <td>{{ selection.device_request.requestor.username }}</td>
-                            <td>{{ selection.device_request.client.name|default:"N/A" }}</td>
+                            <td>{{ req.id }}</td>
+                            <td>{{ req.requestor.username }}</td>
+                            <td>{{ req.device.device_name }}</td>
+                            <td>{{ req.device.oem.name }}</td>
+                            <td>{{ req.device.category.name }}</td>
+                            <td>{{ req.quantity }}</td>
+                            <td>{{ req.created_at|date:"Y-m-d H:i" }}</td>
+                            <td><span class="badge bg-warning text-dark">{{ req.status }}</span></td>
                             <td>
-                                {% for d in selection.devices.all %}
-                                    <div>IMEI: {{ d.imei_no }} | Serial: {{ d.serial_no|default:"N/A" }}</div>
-                                {% endfor %}
-                            </td>
-                            <td>{{ selection.submitted_at|date:"Y-m-d H:i" }}</td>
-                            <td>
-                                <span class="badge bg-warning text-dark">Awaiting Approval</span>
+                                <a href="{% url 'select_imeis' req.id %}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-list-check me-1"></i>Select IMEIs
+                                </a>
                             </td>
                         </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                <p class="text-muted">No pending requests at the moment.</p>
+            {% endif %}
+        </div>
+
+        <!-- WAITING ADMIN APPROVAL TAB -->
+        <div class="tab-pane fade" id="waiting">
+            <h5 class="mb-3">Requests Waiting for Admin Approval</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Requestor</th>
+                            <th>Device</th>
+                            <th>Selected IMEIs</th>
+                            <th>Status</th>
+                            <th>Submitted At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in waiting_requests %}
+                        <tr>
+                            <td>{{ req.id }}</td>
+                            <td>{{ req.requestor.username }}</td>
+                            <td>{{ req.device.device_name }}</td>
+                            <td>
+                                {% for imei in req.selected_devices.all %}
+                                    <span class="badge bg-secondary">{{ imei.device.imei_no|default:"-" }}</span>
+                                {% empty %}
+                                    <em>No IMEIs selected</em>
+                                {% endfor %}
+                            </td>
+                            <td><span class="badge bg-info text-dark">{{ req.status }}</span></td>
+                            <td>{{ req.updated_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
                         {% empty %}
-                        <tr><td colspan="6" class="text-center text-muted">No selections awaiting admin approval.</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted">No requests pending admin approval.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Ready to Issue -->
-        <div class="tab-pane fade" id="ready" role="tabpanel" aria-labelledby="ready-tab">
-            <h5 class="mb-3">Approved Requests Ready for Issuance</h5>
+        <!-- APPROVED REQUESTS TAB -->
+        <div class="tab-pane fade" id="approved">
+            <h5 class="mb-3">Approved Requests (Ready for Issuance)</h5>
             <div class="table-responsive">
-                <table class="table table-hover table-striped">
-                    <thead class="table-dark">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
                         <tr>
                             <th>ID</th>
                             <th>Requestor</th>
                             <th>Client</th>
-                            <th>Approved Devices</th>
-                            <th>Approved At</th>
+                            <th>IMEIs</th>
+                            <th>Status</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for req in ready_requests %}
+                        {% for req in approved_requests %}
                         <tr>
                             <td>{{ req.id }}</td>
                             <td>{{ req.requestor.username }}</td>
                             <td>{{ req.client.name|default:"N/A" }}</td>
                             <td>
-                                {% for d in req.approved_devices.all %}
-                                    <div>IMEI: {{ d.imei_no }} | Serial: {{ d.serial_no|default:"N/A" }}</div>
+                                {% for sd in req.selected_devices.all %}
+                                    <span class="badge bg-secondary">{{ sd.device.imei_no|default:"-" }}</span>
                                 {% endfor %}
                             </td>
-                            <td>{{ req.approved_at|date:"Y-m-d H:i" }}</td>
+                            <td><span class="badge bg-success">{{ req.status }}</span></td>
                             <td>
-                                <form action="{% url 'issue_approved_devices' %}" method="post">
+                                <form method="post">
                                     {% csrf_token %}
-                                    <input type="hidden" name="request_id" value="{{ req.id }}">
-                                    <button type="submit" class="btn btn-success btn-sm">Issue Devices</button>
+                                    <input type="hidden" name="action" value="issue">
+                                    <input type="hidden" name="device_request_id" value="{{ req.id }}">
+                                    <button class="btn btn-sm btn-primary">
+                                        <i class="fas fa-share-square me-1"></i>Issue Devices
+                                    </button>
                                 </form>
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="6" class="text-center text-muted">No approved requests available.</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted">No approved requests ready to issue.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- All Requests -->
-        <div class="tab-pane fade" id="all" role="tabpanel" aria-labelledby="all-tab">
-            <h5 class="mb-3">All Device Requests</h5>
+        <!-- DIRECT ISSUE TAB -->
+        <div class="tab-pane fade" id="direct">
+            <h5 class="mb-3">Direct Device Issuance</h5>
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="direct_issue">
+                <div class="col-md-5">
+                    <label><strong>Select Device</strong></label>
+                    <select name="device_id" class="form-select select2" required>
+                        <option value="">-- Select Device --</option>
+                        {% for device in available_devices %}
+                        <option value="{{ device.id }}">IMEI: {{ device.imei_no }} | {{ device.device_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label><strong>Select Client</strong></label>
+                    <select name="client_id" class="form-select select2" required>
+                        <option value="">-- Select Client --</option>
+                        {% for client in clients %}
+                        <option value="{{ client.id }}">{{ client.name }} ({{ client.phone_no }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-paper-plane me-1"></i>Issue
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- ALL REQUESTS TAB -->
+        <div class="tab-pane fade" id="all">
+            <h5 class="mb-3">All Requests Overview</h5>
             <div class="table-responsive">
-                <table class="table table-hover table-striped">
-                    <thead class="table-dark">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
                         <tr>
                             <th>ID</th>
                             <th>Requestor</th>
+                            <th>Device</th>
                             <th>Client</th>
-                            <th>Quantity</th>
                             <th>Status</th>
                             <th>Requested At</th>
                         </tr>
@@ -239,29 +234,27 @@
                         <tr>
                             <td>{{ req.id }}</td>
                             <td>{{ req.requestor.username }}</td>
+                            <td>{{ req.device.device_name }}</td>
                             <td>{{ req.client.name|default:"N/A" }}</td>
-                            <td>{{ req.quantity }}</td>
                             <td>
                                 <span class="badge 
                                     {% if req.status == 'Pending' %}bg-warning text-dark
-                                    {% elif req.status == 'Under Review' %}bg-info
+                                    {% elif req.status == 'Waiting Approval' %}bg-info text-dark
                                     {% elif req.status == 'Approved' %}bg-success
                                     {% elif req.status == 'Issued' %}bg-primary
                                     {% elif req.status == 'Rejected' %}bg-danger
-                                    {% else %}bg-secondary{% endif %}">
-                                    {{ req.status|capfirst }}
+                                    {% endif %}">{{ req.status }}
                                 </span>
                             </td>
-                            <td>{{ req.requested_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ req.created_at|date:"Y-m-d H:i" }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="6" class="text-center text-muted">No device requests found.</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted">No requests found.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
-
     </div>
 </div>
 {% endblock %}
@@ -269,15 +262,9 @@
 {% block extra_js %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
 $(document).ready(function() {
-    $('.select2').select2({
-        placeholder: "Select devices (IMEI/Serial/MAC)",
-        allowClear: true,
-        width: '100%'
-    });
+    $('.select2').select2({ width: '100%', placeholder: "Select..." });
 });
 </script>
 {% endblock %}

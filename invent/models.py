@@ -335,6 +335,12 @@ class DeviceRequest(models.Model):
 
     def __str__(self):
         return f"Request for {self.device} by {self.requestor.username}"
+    
+class SelectedDevice(models.Model):
+    request = models.ForeignKey(DeviceRequest, on_delete=models.CASCADE, related_name='selected_devices')
+    device = models.ForeignKey(Device, on_delete=models.CASCADE)
+    selected_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    selected_at = models.DateTimeField(auto_now_add=True)
 
 
 # --- NEW: DeviceSelection model (placed below DeviceRequest) ---

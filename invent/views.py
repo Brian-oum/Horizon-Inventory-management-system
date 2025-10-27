@@ -4,7 +4,8 @@ from .forms import (
     CustomCreationForm, OEMForm, DeviceForm, DeviceRequestForm
 )
 from .models import (
-    Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord, Branch, Profile, DeviceSelection
+    Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord, Branch, Profile, DeviceSelection, DeviceIMEI,
+    SelectedDevice
 )
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.forms import AuthenticationForm
@@ -568,39 +569,146 @@ def branch_admin_issue_dashboard(request):
 @permission_required('invent.can_issue_item', raise_exception=True)
 def issue_device(request):
     """
-    Store Clerk landing page to view pending requests, 
-    available devices, and approved selections ready for issuance.
+    Handles all device issuance workflows for store clerks.
     """
     user = request.user
-    branch = getattr(user.profile, 'branch', None)
-    country = getattr(user.profile, 'country', None)
 
-    pending_requests = DeviceRequest.objects.filter(
-        status__in=['Pending', 'Under Review'],
-        branch=branch,
-        country=country
-    )
+    # Filter available data
+    available_devices = Device.objects.filter(status='available')
+    clients = Client.objects.all()
+    pending_requests = DeviceRequest.objects.filter(status='Pending').select_related('device', 'client', 'requestor')
+    waiting_requests = DeviceRequest.objects.filter(status='Waiting Approval').select_related('device', 'client', 'requestor')
+    approved_requests = DeviceRequest.objects.filter(status='Approved').select_related('device', 'client', 'requestor')
+    all_requests = DeviceRequest.objects.all().select_related('device', 'client', 'requestor')
 
-    available_devices = Device.objects.filter(
-        status='available',
-        branch=branch,
-        country=country
-    )
+    # -------------------- HANDLE FORM ACTIONS -------------------- #
+    if request.method == 'POST':
+        action = request.POST.get('action')
 
-    approved_selections = DeviceSelectionGroup.objects.filter(
-        status='Approved',
-        device_request__branch=branch,
-        device_request__country=country
-    )
+        # ---------------- Select IMEIs already handled on another view ---------------- #
 
+        # ----------- DIRECT ISSUE ACTION -----------
+        if action == 'direct_issue':
+            device_id = request.POST.get('device_id')
+            client_id = request.POST.get('client_id')
+
+            if not device_id or not client_id:
+                messages.error(request, "Please select both a device and a client.")
+                return redirect('issue_device')
+
+            device = get_object_or_404(Device, id=device_id, status='available')
+            client = get_object_or_404(Client, id=client_id)
+
+            with transaction.atomic():
+                # Mark device as issued
+                device.status = 'issued'
+                device.save()
+
+                # Create issuance record
+                IssuanceRecord.objects.create(
+                    device=device,
+                    client=client,
+                    logistics_manager=user,
+                    device_request=None  # direct issue has no request
+                )
+
+            messages.success(request, f"Device {device.device_name} (IMEI: {device.imei_no}) issued directly to {client.name}.")
+            return redirect('issue_device')
+
+        # ----------- ISSUE APPROVED REQUEST -----------
+        elif action == 'issue':
+            request_id = request.POST.get('device_request_id')
+            device_request = get_object_or_404(DeviceRequest, id=request_id, status='Approved')
+
+            selected_devices = device_request.selected_devices.all()
+            if not selected_devices.exists():
+                messages.error(request, "No selected IMEIs found for this request.")
+                return redirect('issue_device')
+
+            with transaction.atomic():
+                for sd in selected_devices:
+                    device = sd.device
+                    if device.status == 'available':
+                        device.status = 'issued'
+                        device.save()
+                        IssuanceRecord.objects.create(
+                            device=device,
+                            client=device_request.client,
+                            logistics_manager=user,
+                            device_request=device_request
+                        )
+
+                device_request.status = 'Issued'
+                device_request.save()
+
+            messages.success(request, f"Devices for Request #{device_request.id} issued successfully.")
+            return redirect('issue_device')
+
+        # ----------- INVALID ACTION -----------
+        else:
+            messages.error(request, "Invalid action.")
+            return redirect('issue_device')
+
+    # -------------------- CONTEXT DATA -------------------- #
     context = {
-        'pending_requests': pending_requests,
         'available_devices': available_devices,
-        'approved_selections': approved_selections,
-        'pending_count': pending_requests.count(),
+        'clients': clients,
+        'pending_requests': pending_requests,
+        'waiting_requests': waiting_requests,
+        'approved_requests': approved_requests,
+        'all_requests': all_requests,
     }
 
     return render(request, 'invent/issue_device.html', context)
+
+#--- Select IMEIS ---
+@login_required
+@permission_required('invent.can_issue_item', raise_exception=True)
+def select_imeis(request, request_id):
+    """
+    Opens a detailed page for the selected request to choose IMEIs.
+    """
+    device_request = get_object_or_404(DeviceRequest, id=request_id)
+    device = device_request.device
+    user = request.user
+
+    # Filter IMEIs based on OEM, category, and device name
+    available_imeis = DeviceIMEI.objects.filter(
+        device__name=device.name,
+        device__category=device.category,
+        device__oem=device.oem,
+        is_available=True
+    )
+
+    if request.method == 'POST':
+        selected_imei_ids = request.POST.getlist('selected_imeis')
+
+        if not selected_imei_ids:
+            messages.error(request, "Please select at least one IMEI before submitting.")
+            return redirect('select_imeis', request_id=request_id)
+
+        selected_imeis = DeviceIMEI.objects.filter(id__in=selected_imei_ids)
+
+        # Create SelectedDevice entries and mark IMEIs as unavailable
+        for imei in selected_imeis:
+            SelectedDevice.objects.create(
+                request=device_request,
+                device=device,
+                selected_by=user
+            )
+            imei.is_available = False
+            imei.save()
+
+        device_request.status = 'Waiting Approval'
+        device_request.save()
+        messages.success(request, f"IMEIs successfully submitted for Request #{device_request.id}.")
+        return redirect('issue_device')
+
+    context = {
+        'device_request': device_request,
+        'available_imeis': available_imeis,
+    }
+    return render(request, 'invent/select_imeis.html', context)
 
 
 @login_required
