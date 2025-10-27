@@ -3,6 +3,8 @@ from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
+from django.utils.html import format_html
+from django.shortcuts import redirect
 from django.core.exceptions import PermissionDenied
 
 from .models import DeviceSelectionGroup
@@ -18,6 +20,7 @@ from .models import (
     Profile,
     Country,
     DeviceIMEI,
+    SelectedDevice
 )
 
 ASSIGNABLE_GROUPS = getattr(settings, 'BRANCH_ADMIN_ASSIGNABLE_GROUPS', None)
@@ -274,15 +277,66 @@ class DeviceAdmin(BranchScopedAdmin):
     inlines = [DeviceIMEIInline]
 # DeviceRequest admin
 
-
 @admin.register(DeviceRequest)
-class DeviceRequestAdmin(BranchScopedAdmin):
-    list_display = ('id', 'device', 'requestor', 'client',
-                    'branch', 'status', 'date_requested')
-    search_fields = ('device__imei_no', 'device__serial_no',
-                     'requestor__username', 'client__name')
+class DeviceRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'device', 'requestor', 'client', 'branch', 'status', 'date_requested'
+    )
+    search_fields = (
+        'device__device_name', 'device__imei_no', 'requestor__username', 'client__name'
+    )
     list_filter = ('status', 'branch')
-    branch_field = 'branch'
+    actions = ['approve_requests', 'reject_requests']
+
+    def approve_requests(self, request, queryset):
+        """Admin action to approve pending requests."""
+        approved_count = 0
+
+        for device_request in queryset:
+            if device_request.status == 'Waiting Approval':
+                device_request.status = 'Approved'
+                device_request.save()
+                approved_count += 1
+
+                # Optional: create issuance records automatically
+                selected_devices = device_request.selected_devices.all()
+                for sd in selected_devices:
+                    imei = sd.device
+                    if imei.status == 'available':
+                        imei.status = 'issued'
+                        imei.save()
+                        IssuanceRecord.objects.create(
+                            device=imei,
+                            client=device_request.client,
+                            logistics_manager=request.user,
+                            device_request=device_request
+                        )
+
+        if approved_count:
+            self.message_user(
+                request,
+                f"{approved_count} request(s) approved successfully.",
+                level=messages.SUCCESS,
+            )
+        else:
+            self.message_user(
+                request,
+                "No requests in 'Waiting Approval' state were selected.",
+                level=messages.WARNING,
+            )
+
+    approve_requests.short_description = "✅ Approve selected requests"
+
+    def reject_requests(self, request, queryset):
+        """Admin action to reject pending requests."""
+        rejected_count = queryset.update(status='Rejected')
+        self.message_user(
+            request,
+            f"{rejected_count} request(s) rejected.",
+            level=messages.ERROR,
+        )
+
+    reject_requests.short_description = "❌ Reject selected requests"
 # PurchaseOrder admin
 
 

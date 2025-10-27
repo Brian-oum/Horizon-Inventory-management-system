@@ -20,6 +20,8 @@ urlpatterns = [
          name='store_clerk_dashboard'),
     path('manage_stock/', views.manage_stock, name='manage_stock'),
     path('edit_item/<int:item_id>/', views.edit_item, name='edit_item'),
+    path('select_imeis/<int:request_id>/', views.select_imeis, name='select_imeis'),
+
 
     # Inventory Management
     path('inventory_list/', views.inventory_list_view, name='inventory_list'),
