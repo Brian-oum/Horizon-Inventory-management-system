@@ -17,6 +17,7 @@ from .models import (
     Profile,
     Country,
     DeviceIMEI,
+    SelectedDevice
 )
 
 ASSIGNABLE_GROUPS = getattr(settings, 'BRANCH_ADMIN_ASSIGNABLE_GROUPS', None)
@@ -259,11 +260,26 @@ class DeviceAdmin(BranchScopedAdmin):
     inlines = [DeviceIMEIInline]
 # DeviceRequest admin
 @admin.register(DeviceRequest)
-class DeviceRequestAdmin(BranchScopedAdmin):
-    list_display = ('id', 'device', 'requestor', 'client', 'branch', 'status', 'date_requested')
-    search_fields = ('device__imei_no', 'device__serial_no', 'requestor__username', 'client__name')
-    list_filter = ('status', 'branch')
-    branch_field = 'branch'
+class DeviceRequestAdmin(admin.ModelAdmin):
+    list_display = ('id', 'device', 'client', 'status', 'requestor')
+    list_filter = ('status', 'branch', 'requestor')
+    search_fields = ('device__imei_no', 'client__name')
+    actions = ['approve_requests', 'reject_requests']
+
+    @admin.action(description="Approve selected requests")
+    def approve_requests(self, request, queryset):
+        updated = queryset.filter(status='Waiting Approval').update(status='Approved')
+        self.message_user(request, f"{updated} request(s) approved.")
+
+    @admin.action(description="Reject selected requests")
+    def reject_requests(self, request, queryset):
+        updated = queryset.filter(status='Waiting Approval').update(status='Rejected')
+        self.message_user(request, f"{updated} request(s) rejected.")
+
+@admin.register(SelectedDevice)
+class SelectedDeviceAdmin(admin.ModelAdmin):
+    list_display = ('request', 'device', 'selected_by', 'selected_on')
+    search_fields = ('device__imei_no',)
 # PurchaseOrder admin
 @admin.register(PurchaseOrder)
 class PurchaseOrderAdmin(BranchScopedAdmin):

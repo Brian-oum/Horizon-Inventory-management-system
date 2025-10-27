@@ -1,0 +1,53 @@
+{% extends 'invent/base_store_clerk.html' %}
+{% load static %}
+
+{% block title %}Select IMEIs{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3><i class="fas fa-list-check me-2"></i>Select IMEIs for Request #{{ device_request.id }}</h3>
+    <a href="{% url 'issue_device' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="fas fa-arrow-left me-2"></i> Back
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p><strong>Device:</strong> {{ device_request.device.device_name }}</p>
+      <p><strong>Requested Quantity:</strong> {{ device_request.quantity }}</p>
+
+      <form method="POST">
+        {% csrf_token %}
+        <table class="table table-striped table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Select</th>
+              <th>IMEI Number</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for imei in available_imeis %}
+            <tr>
+              <td><input type="checkbox" name="selected_imeis" value="{{ imei.id }}"></td>
+              <td>{{ imei.imei_number }}</td>
+              <td>
+                <span class="badge bg-success">Available</span>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="3" class="text-center text-muted">No available IMEIs for this device.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="submit" class="btn btn-primary mt-3">
+          <i class="fas fa-paper-plane me-1"></i>Submit for Admin Approval
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

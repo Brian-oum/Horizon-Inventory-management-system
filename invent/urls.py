@@ -11,13 +11,12 @@ urlpatterns = [
     path('request_summary/', views.request_summary, name='request_summary'),
     path('client_list/', views.client_list, name='client_list'),
     path('requests/<str:status>/', views.request_list, name='request_list'),
-    path('cancel-request/<int:request_id>/',
-         views.cancel_request, name='cancel_request'),
+    path('cancel-request/<int:request_id>/', views.cancel_request, name='cancel_request'),
 
     # Store Clerk Paths
-    path('store_clerk_dashboard/', views.store_clerk_dashboard,
-         name='store_clerk_dashboard'),
+    path('store_clerk_dashboard/', views.store_clerk_dashboard, name='store_clerk_dashboard'),
     path('manage_stock/', views.manage_stock, name='manage_stock'),
+    path('select_imeis/<int:request_id>/', views.select_imeis, name='select_imeis'),
     path('edit_item/<int:item_id>/', views.edit_item, name='edit_item'),
     path('edit_item/<int:item_id>/', views.edit_item, name='edit_item'),
     # Bulk delete (no id in URL)

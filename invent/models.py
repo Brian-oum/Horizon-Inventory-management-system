@@ -153,7 +153,7 @@ class DeviceIMEI(models.Model):
         related_name='imeis'
     )
     imei_number = models.CharField(max_length=50, unique=True)
-    is_available = models.BooleanField(default=True)  # True => not issued / assignable
+    is_available = models.BooleanField(default=True) 
     added_on = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -236,6 +236,7 @@ class DeviceRequest(models.Model):
     STATUS_CHOICES = [
         ('Pending', 'Pending'),
         ('Approved', 'Approved'),
+        ('Waiting Approval', 'Waiting Approval'),
         ('Issued', 'Issued'),
         ('Rejected', 'Rejected'),
         ('Cancelled', 'Cancelled'),
@@ -299,7 +300,15 @@ class DeviceRequest(models.Model):
 
     def __str__(self):
         return f"Request for {self.device} by {self.requestor.username}"
+    
+class SelectedDevice(models.Model):
+    request = models.ForeignKey(DeviceRequest, on_delete=models.CASCADE, related_name='selected_devices')
+    device = models.ForeignKey(Device, on_delete=models.CASCADE)
+    selected_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    selected_on = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"{self.device.imei_no} for Request #{self.request.id}"
 
 class IssuanceRecord(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
