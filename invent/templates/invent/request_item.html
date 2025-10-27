@@ -60,7 +60,7 @@
                                 <option value="{{ device.id }}"
                                         data-name="{{ device.name }}"                
                                         data-category="{{ device.category }}"
-                                        data-imei="{{ device.imei_no|join:", " }}"
+                                        data-imei="{{ device.imei_no}}"
                                         data-status="{{ device.status }}"
                                         data-available-count="{{ device.available_count }}">
                                     {{ device.name }}
@@ -87,6 +87,7 @@
                         <div class="row small text-muted">
                             <div class="col-6 mb-1">Name: <span id="device_name" class="fw-semibold">--</span></div>
                             <div class="col-6 mb-1">Category: <span id="device_model" class="fw-semibold">--</span></div>
+                            <div class="col-6 mb-1">IMEI: <span id="device_imei_no" class="fw-semibold">--</span></div>
                             <div class="col-6 mb-1">Status: <span id="device_status" class="fw-semibold">--</span></div>
                             <div class="col-6 mb-1">Availability: <span id="device_availability" class="fw-semibold">--</span></div>
                         </div>
@@ -190,6 +191,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const modelSpan = document.getElementById('device_model');
     const statusSpan = document.getElementById('device_status');
     const availabilitySpan = document.getElementById('device_availability');
+    const imeiSpan = document.getElementById('device_imei_no');
+
 
     // Collect all devices
     const allDevices = Array.from(deviceSelect.find('option')).map(opt => ({
@@ -212,6 +215,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     `<option value="${d.id}" 
                              data-name="${d.name}"
                              data-category="${d.category}" 
+                             data-imei="${d.imei}" 
                              data-status="${d.status}" 
                              data-available-count="${d.availableCount}">
                         ${d.text}
@@ -234,8 +238,10 @@ document.addEventListener('DOMContentLoaded', function () {
             // ✅ Now show name instead of IMEI
             nameSpan.textContent = selectedOption.data('name') || '--';
             modelSpan.textContent = selectedOption.data('category') || '--';
-            statusSpan.textContent = selectedOption.data('status') || '--';
+            imeiSpan.textContent = selectedOption.data('imei') ? selectedOption.data('imei').trim() : '--';
 
+            statusSpan.textContent = selectedOption.data('status') || '--';
+            
             const availableCount = selectedOption.data('available-count') || 0;
             availabilitySpan.textContent = availableCount + ' available';
 
@@ -251,6 +257,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             nameSpan.textContent = '--';
             modelSpan.textContent = '--';
+            imeiSpan.textContent = '--';
             statusSpan.textContent = '--';
             availabilitySpan.textContent = '--';
             availabilitySpan.className = 'fw-semibold';
