@@ -283,34 +283,37 @@ class DeviceRequestAdmin(admin.ModelAdmin):
         'id', 'device', 'requestor', 'client', 'branch', 'status', 'date_requested'
     )
     search_fields = (
-        'device__device_name', 'device__imei_no', 'requestor__username', 'client__name'
+        'device__name', 'device__imei_no', 'requestor__username', 'client__name'
     )
     list_filter = ('status', 'branch')
     actions = ['approve_requests', 'reject_requests']
 
     def approve_requests(self, request, queryset):
-        """Admin action to approve pending requests."""
+        """Admin action to approve pending IMEI selections for requests."""
         approved_count = 0
 
         for device_request in queryset:
-            if device_request.status == 'Waiting Approval':
-                device_request.status = 'Approved'
-                device_request.save()
-                approved_count += 1
-
-                # Optional: create issuance records automatically
+            if device_request.status == 'Pending':
                 selected_devices = device_request.selected_devices.all()
                 for sd in selected_devices:
-                    imei = sd.device
-                    if imei.status == 'available':
-                        imei.status = 'issued'
-                        imei.save()
+                    device = sd.device
+                    imeis = device.imeis.filter(is_available=True)
+
+                    # Assign available IMEIs to the request
+                    for imei in imeis[:device_request.quantity]:
+                        imei.mark_unavailable()
                         IssuanceRecord.objects.create(
-                            device=imei,
+                            device=device,
+                            imei=imei,
                             client=device_request.client,
                             logistics_manager=request.user,
                             device_request=device_request
                         )
+
+                # Update request status
+                device_request.status = 'Approved'
+                device_request.save()
+                approved_count += 1
 
         if approved_count:
             self.message_user(
@@ -321,18 +324,24 @@ class DeviceRequestAdmin(admin.ModelAdmin):
         else:
             self.message_user(
                 request,
-                "No requests in 'Waiting Approval' state were selected.",
+                "No 'Pending' requests were selected for approval.",
                 level=messages.WARNING,
             )
 
     approve_requests.short_description = "✅ Approve selected requests"
 
     def reject_requests(self, request, queryset):
-        """Admin action to reject pending requests."""
-        rejected_count = queryset.update(status='Rejected')
+        """Admin action to reject pending IMEI selections for requests."""
+        rejected = 0
+        for device_request in queryset:
+            if device_request.status == 'Pending':
+                device_request.status = 'Rejected'
+                device_request.save()
+                rejected += 1
+
         self.message_user(
             request,
-            f"{rejected_count} request(s) rejected.",
+            f"{rejected} request(s) rejected.",
             level=messages.ERROR,
         )
 
