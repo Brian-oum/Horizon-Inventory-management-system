@@ -272,6 +272,7 @@ class DeviceRequest(models.Model):
     STATUS_CHOICES = [
         ('Pending', 'Pending'),
         ('Approved', 'Approved'),
+        ('Waiting Approval', 'Waiting Admin Approval'),
         ('Issued', 'Issued'),
         ('Rejected', 'Rejected'),
         ('Cancelled', 'Cancelled'),
