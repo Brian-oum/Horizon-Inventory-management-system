@@ -174,27 +174,26 @@ def request_device(request):
             quantity = form.cleaned_data['quantity']
             device = form.cleaned_data['device']
 
-            # ✅ Recalculate available quantity
-            requested_total = DeviceRequest.objects.filter(
-                device=device,
-                status__in=['Pending', 'Approved', 'Issued']
-            ).aggregate(
-                total_requested=Coalesce(Sum('quantity'), Value(0))
-            )['total_requested']
+            # ✅ Compute availability across all devices with the same name (same model type)
+            same_name_devices = Device.objects.filter(
+                name=device.name,
+                status='available'
+            )
 
-            available_quantity = max(device.total_quantity - requested_total, 0)
-            if quantity > available_quantity:
-                messages.error(request, f"Only {available_quantity} unit(s) available for {device.name}.")
+            total_available = same_name_devices.count()
+
+            if total_available < quantity:
+                messages.error(
+                    request,
+                    f"Only {total_available} unit(s) available for {device.name}."
+                )
                 return redirect('request_device')
 
-            available_imeis = DeviceIMEI.objects.filter(device=device, is_available=True)[:quantity]
-            if available_imeis.count() < quantity:
-                messages.error(request, f"Only {available_imeis.count()} IMEI(s) are available for {device.name}.")
-                return redirect('request_device')
+            # ✅ Select the first N available devices to attach
+            selected_devices = same_name_devices[:quantity]
 
-            # ✅ Create ONE request with multiple IMEIs
             with transaction.atomic():
-                device_request = form.save(commit=False, requestor=request.user)
+                device_request = form.save(commit=False)
                 device_request.quantity = quantity
                 device_request.requestor = request.user
 
@@ -203,28 +202,43 @@ def request_device(request):
 
                 device_request.save()
 
-                # 🔹 Link multiple IMEIs under one request
-                for imei in available_imeis:
-                    imei.is_available = False
-                    imei.save()
-                    DeviceRequest.objects.create(request=device_request, imei=imei)
+                # 🔹 FIXED LOOP — link each unique device (each IMEI)
+                for dev in selected_devices:
+                    dev.status = 'requested'
+                    dev.save()
 
-            # ✅ Send email notification
-            send_mail(
-                subject='Device Request Confirmation',
-                message=(
-                    f"Dear {request.user.first_name or request.user.username},\n\n"
-                    f"Your request for {quantity} unit(s) of {device.name} has been submitted successfully.\n"
-                    f"We will notify you once reviewed or issued.\n\n"
-                    f"Thank you,\nInventory Management Team"
-                ),
-                from_email=None,
-                recipient_list=[request.user.email],
-                fail_silently=False,
-            )
+                    # ✅ FIXED: removed invalid `request=` argument
+                    DeviceRequest.objects.create(
+                        device=dev,
+                        imei_no=dev.imei_no,
+                        requestor=request.user,
+                        client=device_request.client if hasattr(device_request, "client") else None,
+                        branch=device_request.branch,
+                        country=device_request.country,
+                        quantity=1,
+                        status='Pending'
+                    )
 
-            messages.success(request, f"Request for {quantity} {device.name} device(s) submitted successfully!")
+                # ✅ Send email notification
+                send_mail(
+                    subject='Device Request Confirmation',
+                    message=(
+                        f"Dear {request.user.first_name or request.user.username},\n\n"
+                        f"Your request for {quantity} unit(s) of {device.name} has been submitted successfully.\n"
+                        f"We will notify you once reviewed or issued.\n\n"
+                        f"Thank you,\nInventory Management Team"
+                    ),
+                    from_email=None,
+                    recipient_list=[request.user.email],
+                    fail_silently=False,
+                )
+
+                messages.success(
+                    request,
+                    f"Request for {quantity} {device.name} device(s) submitted successfully!"
+                )
             return redirect('requestor_dashboard')
+
         else:
             messages.error(request, "Please correct the errors below.")
     else:
