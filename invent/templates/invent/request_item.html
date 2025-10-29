@@ -193,7 +193,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const availabilitySpan = document.getElementById('device_availability');
     const imeiSpan = document.getElementById('device_imei_no');
 
-
     // Collect all devices
     const allDevices = Array.from(deviceSelect.find('option')).map(opt => ({
         id: opt.value,
@@ -235,13 +234,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const quantityInput = document.getElementById("id_quantity");
 
         if (selectedOption.val()) {
-            // ✅ Now show name instead of IMEI
             nameSpan.textContent = selectedOption.data('name') || '--';
             modelSpan.textContent = selectedOption.data('category') || '--';
             imeiSpan.textContent = selectedOption.data('imei') ? selectedOption.data('imei').trim() : '--';
-
             statusSpan.textContent = selectedOption.data('status') || '--';
-            
+
             const availableCount = selectedOption.data('available-count') || 0;
             availabilitySpan.textContent = availableCount + ' available';
 
@@ -289,6 +286,48 @@ document.addEventListener('DOMContentLoaded', function () {
         submitBtn.disabled = true;
         spinner.classList.remove('d-none');
     });
+
+    // ✅ --- AUTO-FILL CLIENT INFO BY NAME ---
+    const nameInput = document.getElementById("id_client_name");
+    const emailInput = document.getElementById("id_client_email");
+    const phoneInput = document.getElementById("id_client_phone");
+    const addressInput = document.getElementById("id_client_address");
+
+    let typingTimer;
+    const typingDelay = 600; // milliseconds after typing stops
+
+    nameInput.addEventListener("keyup", function() {
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(searchClient, typingDelay);
+    });
+
+    nameInput.addEventListener("keydown", function() {
+        clearTimeout(typingTimer);
+    });
+
+    function searchClient() {
+        const name = nameInput.value.trim();
+        if (!name) return;
+
+        fetch(`/request_device/?ajax=client_lookup&name=${encodeURIComponent(name)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.found === false || data.error) {
+                    // No match → clear fields
+                    emailInput.value = "";
+                    phoneInput.value = "";
+                    addressInput.value = "";
+                    branchSelect.value = "";
+                } else {
+                    // Fill existing client info
+                    emailInput.value = data.email || "";
+                    phoneInput.value = data.phone || "";
+                    addressInput.value = data.address || "";
+                    if (data.branch) branchSelect.value = data.branch;
+                }
+            })
+            .catch(err => console.error("Error fetching client info:", err));
+    }
 });
 </script>
 

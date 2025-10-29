@@ -15,7 +15,7 @@ from django.contrib import messages
 from django.db.models import Q, F, Count, Sum, Value, IntegerField
 from django.db import transaction
 from django.core.mail import send_mail
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.urls import reverse
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
@@ -94,51 +94,58 @@ def requestor_dashboard(request):
     return render(request, 'invent/requestor_dashboard.html', context)
 
 # --- Device Request ---
-
-
 @login_required
 def request_device(request):
-    device_id_from_get = request.GET.get('device')
     user = request.user
 
-    # COUNTRY FILTER: Restrict device queryset by user's country
+    # ✅ AJAX Client Autofill
+    if request.GET.get("ajax") == "client_lookup":
+        name = request.GET.get("name", "").strip()
+        if name:
+            client = Client.objects.filter(name__icontains=name).first()
+            if client:
+                return JsonResponse({
+                    "name": client.name,
+                    "email": client.email,
+                    "phone_no": client.phone_no,
+                    "address": client.address,
+                })
+            return JsonResponse({"not_found": True})
+        return JsonResponse({"error": "Missing name"}, status=400)
+
+    # ---------- COUNTRY FILTER ----------
     if user.is_superuser:
         available_device_queryset = Device.objects.filter(status='available').annotate(
             requested_quantity=Coalesce(
                 Sum(
                     'requests__quantity',
-                    filter=Q(requests__status__in=[
-                             'Pending', 'Approved', 'Issued']),
+                    filter=Q(requests__status__in=['Pending', 'Approved', 'Issued']),
                     output_field=IntegerField()
                 ),
                 Value(0)
             )
         ).annotate(
             available_qty=F('total_quantity') - F('requested_quantity')
-        ).filter(
-            available_qty__gt=0
-        )
+        ).filter(available_qty__gt=0)
     else:
         user_country = getattr(user.profile, "country", None)
         available_device_queryset = Device.objects.filter(
-            status='available', branch__country=user_country
+            status='available',
+            branch__country=user_country
         ).annotate(
             requested_quantity=Coalesce(
                 Sum(
                     'requests__quantity',
-                    filter=Q(requests__status__in=[
-                             'Pending', 'Approved', 'Issued']),
+                    filter=Q(requests__status__in=['Pending', 'Approved', 'Issued']),
                     output_field=IntegerField()
                 ),
                 Value(0)
             )
         ).annotate(
             available_qty=F('total_quantity') - F('requested_quantity')
-        ).filter(
-            available_qty__gt=0
-        )
+        ).filter(available_qty__gt=0)
 
-    # Group devices by name
+    # ---------- GROUP DEVICES ----------
     grouped_devices = defaultdict(list)
     for device in available_device_queryset:
         grouped_devices[device.name].append(device)
@@ -156,54 +163,59 @@ def request_device(request):
             "available_count": sum(d.available_qty for d in devices)
         })
 
-    categories = available_device_queryset.values_list(
-        'category', flat=True).distinct()
+    categories = available_device_queryset.values_list('category', flat=True).distinct()
 
+    # ---------- HANDLE POST ----------
     if request.method == 'POST':
         form = DeviceRequestForm(request.POST, user=request.user)
         form.fields['device'].queryset = available_device_queryset
 
         if form.is_valid():
-            device_request = form.save(commit=False)
-            device_request.imei_no = device_request.device.imei_no
-            available_quantity = device_request.device.available_quantity
-            # ✅ Check if the user is requesting more units than are currently available
-            if device_request.quantity > available_quantity:
-                # ❌ Show an error message if the request exceeds available stock
-                messages.error(
-                    request,
-                    f"Only {available_quantity} unit(s) of {device_request.device.name} available."
-                )
-                return redirect('request_device')
-            # ✅ Calculate available stock before validation
-            available_quantity = (
-                device_request.device.total_quantity - device_request.device.quantity_issued
-            )
+            quantity = form.cleaned_data['quantity']
+            device = form.cleaned_data['device']
 
-            # ✅ Validation check before saving
-            if device_request.quantity > available_quantity:
-                messages.error(
-                    request,
-                    f"Only {available_quantity} unit(s) of {device_request.device.name} available."
-                )
+            # ✅ Recalculate available quantity
+            requested_total = DeviceRequest.objects.filter(
+                device=device,
+                status__in=['Pending', 'Approved', 'Issued']
+            ).aggregate(
+                total_requested=Coalesce(Sum('quantity'), Value(0))
+            )['total_requested']
+
+            available_quantity = max(device.total_quantity - requested_total, 0)
+            if quantity > available_quantity:
+                messages.error(request, f"Only {available_quantity} unit(s) available for {device.name}.")
                 return redirect('request_device')
 
-            # Assign country from branch if present
-            if device_request.branch and device_request.branch.country:
-                device_request.country = device_request.branch.country
+            available_imeis = DeviceIMEI.objects.filter(device=device, is_available=True)[:quantity]
+            if available_imeis.count() < quantity:
+                messages.error(request, f"Only {available_imeis.count()} IMEI(s) are available for {device.name}.")
+                return redirect('request_device')
 
-            device_request.requestor = request.user
-            device_request.save()
+            # ✅ Create ONE request with multiple IMEIs
+            with transaction.atomic():
+                device_request = form.save(commit=False, requestor=request.user)
+                device_request.quantity = quantity
+                device_request.requestor = request.user
 
-            # Send confirmation email
+                if device_request.branch and device_request.branch.country:
+                    device_request.country = device_request.branch.country
+
+                device_request.save()
+
+                # 🔹 Link multiple IMEIs under one request
+                for imei in available_imeis:
+                    imei.is_available = False
+                    imei.save()
+                    DeviceRequest.objects.create(request=device_request, imei=imei)
+
+            # ✅ Send email notification
             send_mail(
                 subject='Device Request Confirmation',
                 message=(
                     f"Dear {request.user.first_name or request.user.username},\n\n"
-                    f"Your request for device (IMEI: {device_request.device.imei_no}, "
-                    f"Name: {device_request.device.name}, "
-                    f"Category: {device_request.device.category}) has been submitted successfully.\n"
-                    f"We will notify you once it is reviewed or issued.\n\n"
+                    f"Your request for {quantity} unit(s) of {device.name} has been submitted successfully.\n"
+                    f"We will notify you once reviewed or issued.\n\n"
                     f"Thank you,\nInventory Management Team"
                 ),
                 from_email=None,
@@ -211,36 +223,12 @@ def request_device(request):
                 fail_silently=False,
             )
 
-            messages.success(request, "Device request submitted successfully!")
+            messages.success(request, f"Request for {quantity} {device.name} device(s) submitted successfully!")
             return redirect('requestor_dashboard')
-
         else:
             messages.error(request, "Please correct the errors below.")
-
     else:
-        # Prefill form for GET request
-        initial_data = {}
-        if device_id_from_get and device_id_from_get.isdigit():
-            try:
-                device = Device.objects.get(id=int(device_id_from_get))
-                if device in available_device_queryset:
-                    initial_data['device'] = device.id
-            except Device.DoesNotExist:
-                pass
-
-        # ✅ Autofill client info from logged-in user
-        if request.user.is_authenticated:
-            profile = getattr(request.user, 'profile', None)
-            initial_data.update({
-                'client_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
-                'client_email': request.user.email,
-                'client_phone': getattr(profile, 'phone_no', ''),
-                'client_address': getattr(profile, 'address', ''),
-                'branch': getattr(profile, 'branch', None),
-            })
-
-        # ✅ Pass request.user into the form
-        form = DeviceRequestForm(initial=initial_data)
+        form = DeviceRequestForm(user=request.user)
         form.fields['device'].queryset = available_device_queryset
 
     return render(request, 'invent/request_item.html', {
