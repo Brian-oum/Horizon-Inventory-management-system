@@ -57,16 +57,16 @@
               </tr>
             </thead>
             <tbody>
-              {% for device in available_imeis %}
+              {% for imei in available_imeis %}
                 <tr>
                   <td>
-                    <input type="checkbox" name="selected_imeis" value="{{ device.id }}">
+                    <input type="checkbox" name="selected_imeis" value="{{ imei.id }}">
                   </td>
-                  <td>{{ device.name }}</td>
-                  <td>{{ device.imei_no|default:"—" }}</td>
-                  <td>{{ device.serial_number|default:"—" }}</td>
+                  <td>{{ imei.device.name }}</td>
+                  <td>{{ imei.imei_number }}</td>
+                  <td>{{ imei.device.serial_no|default:"—" }}</td>
                   <td>
-                    {% if device.status == 'available' %}
+                    {% if imei.is_available %}
                       <span class="badge bg-success">Available</span>
                     {% else %}
                       <span class="badge bg-secondary">Unavailable</span>
