@@ -26,7 +26,11 @@ SECRET_KEY = 'django-insecure-%m#9ig&=05^)h8xv(1@ag76v7ptx44_ur9xh99p+(nwgxecgbl
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'horizoniotsystem.com',
+    'www.horizoniotsystem.com',
+]
+
 
 SITE_ID = 1
 # Application definition
@@ -79,8 +83,12 @@ WSGI_APPLICATION = 'Inventory.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'horizoni_inventorydb',
+        'USER': 'horizoni_inventoryuser',
+        'PASSWORD': 'H0riz0n@16',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 

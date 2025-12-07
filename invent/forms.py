@@ -20,7 +20,8 @@ class CustomCreationForm(UserCreationForm):
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password1', 'password2', 'country', 'branch']
+        fields = ['username', 'email', 'password1',
+                  'password2', 'country', 'branch']
 
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -106,17 +107,14 @@ class DeviceForm(forms.ModelForm):
 
 
 class DeviceRequestForm(forms.ModelForm):
-    # --- New OEM field ---
-    oem = forms.ModelChoiceField(
-        queryset=OEM.objects.all(),
-        required=True,
-        label="OEM (Supplier)",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
-    )
-    client_name = forms.CharField(max_length=255, required=True, label="Client Name")
-    client_phone = forms.CharField(max_length=50, required=True, label="Client Phone")
-    client_email = forms.EmailField(required=True, label="Client Email")
-    client_address = forms.CharField(max_length=255, required=True, label="Client Address")
+    client_name = forms.CharField(max_length=255, required=True, label="Client Name",
+                                  widget=forms.TextInput(attrs={'class': 'form-control form-control-sm'}))
+    client_phone = forms.CharField(max_length=50, required=True, label="Client Phone",
+                                   widget=forms.TextInput(attrs={'class': 'form-control form-control-sm'}))
+    client_email = forms.EmailField(required=True, label="Client Email",
+                                    widget=forms.EmailInput(attrs={'class': 'form-control form-control-sm'}))
+    client_address = forms.CharField(max_length=255, required=True, label="Client Address",
+                                     widget=forms.TextInput(attrs={'class': 'form-control form-control-sm'}))
     branch = forms.ModelChoiceField(
         queryset=Branch.objects.all(),
         required=True,
@@ -124,25 +122,35 @@ class DeviceRequestForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
     )
 
+    oem_id_hidden = forms.IntegerField(
+        required=False, widget=forms.HiddenInput())
+    category_name_hidden = forms.CharField(
+        required=False, widget=forms.HiddenInput())
+    device_name_hidden = forms.CharField(
+        required=False, widget=forms.HiddenInput())
+
     class Meta:
         model = DeviceRequest
-        fields = ['device', 'quantity', 'reason']  # client fields are extra
+        # REMOVED 'reason' field
+        fields = ['device', 'quantity']
+        widgets = {
+            'device': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'min': 1, 'max': 9999, 'placeholder': 'Quantity'}),
+        }
 
     def __init__(self, *args, **kwargs):
-        self.user = kwargs.pop('user', None)  # pass request.user when initializing
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        # Filter available devices only
-        self.fields['device'].queryset = Device.objects.filter(status='available')
+        self.fields['device'].queryset = Device.objects.none()
+        self.fields['device'].required = False
 
-        # 🔹 Auto-fill branch/country from user profile
         if self.user and hasattr(self.user, 'profile'):
             profile = self.user.profile
             if profile.branch:
                 self.initial['branch'] = profile.branch
 
     def save(self, commit=True, requestor=None):
-        # ✅ Create the client first
         client = Client.objects.create(
             name=self.cleaned_data['client_name'],
             phone_no=self.cleaned_data['client_phone'],
@@ -150,7 +158,6 @@ class DeviceRequestForm(forms.ModelForm):
             address=self.cleaned_data['client_address'],
         )
 
-        # ✅ Link client + requestor to the request
         device_request = super().save(commit=False)
         if requestor:
             device_request.requestor = requestor
@@ -160,16 +167,13 @@ class DeviceRequestForm(forms.ModelForm):
         if device_request.branch and device_request.branch.country:
             device_request.country = device_request.branch.country
 
-        # ✅ Link OEM from form
-        device_request.device.oem = self.cleaned_data['oem']
-
         if commit:
             device_request.save()
 
         return device_request
 
-
 # --- Purchase order with document upload ---
+
 
 class PurchaseOrderForm(forms.ModelForm):
     oem = forms.ModelChoiceField(
@@ -185,12 +189,14 @@ class PurchaseOrderForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     order_date = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(
+            attrs={'type': 'date', 'class': 'form-control'}),
         required=True,
         label='Order Date'
     )
     expected_delivery = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(
+            attrs={'type': 'date', 'class': 'form-control'}),
         required=True,
         label='Expected Delivery'
     )
@@ -213,4 +219,5 @@ class PurchaseOrderForm(forms.ModelForm):
 
     class Meta:
         model = PurchaseOrder
-        fields = ['oem', 'branch', 'order_date', 'expected_delivery', 'status', 'document']
+        fields = ['oem', 'branch', 'order_date',
+                  'expected_delivery', 'status', 'document']
