@@ -100,171 +100,180 @@ def requestor_dashboard(request):
 def request_device(request):
     user = request.user
 
-    if request.GET.get("ajax") == "client_lookup":
-        name = request.GET.get("name", "").strip()
-        if name:
-            client = Client.objects.filter(name__icontains=name).first()
-            if client:
-                return JsonResponse({
-                    "name": client.name,
-                    "email": client.email,
-                    "phone_no": client.phone_no,
-                    "address": client.address,
-                })
-            return JsonResponse({"not_found": True})
-        return JsonResponse({"error": "Missing name"}, status=400)
-
+    # =====================================================
+    # AJAX HANDLERS (OEM → Category → Device data loading)
+    # =====================================================
     if request.GET.get("ajax") == "filter_options":
         oem_id = request.GET.get("oem_id")
         category_name = request.GET.get("category_name")
 
         imei_queryset = DeviceIMEI.objects.filter(is_available=True)
 
+        # Limit by user country (non-admin)
         if not user.is_superuser:
             user_country = getattr(user.profile, "country", None)
             if user_country:
-                imei_queryset = imei_queryset.filter(
-                    device__branch__country=user_country)
+                imei_queryset = imei_queryset.filter(device__branch__country=user_country)
 
-        if oem_id and oem_id != '':
-            imei_queryset = imei_queryset.filter(device__oem_id=oem_id)
+        # 1️⃣ No OEM selected → return OEMs
+        if not oem_id:
+            oems = OEM.objects.all().values("id", "name")
+            return JsonResponse({"oems": list(oems)})
 
-        if not oem_id or oem_id == '':
-            oems = OEM.objects.all().values('id', 'name')
-            return JsonResponse({'oems': list(oems)})
+        # Filter by selected OEM
+        imei_queryset = imei_queryset.filter(device__oem_id=oem_id)
 
+        # 2️⃣ OEM selected but no category selected → return category names
         if not category_name:
-            categories = imei_queryset.values_list(
-                'device__category', flat=True).distinct().order_by('device__category')
-            return JsonResponse({'categories': list(categories)})
+            categories = (
+                imei_queryset
+                .values_list("device__category", flat=True)  # <-- treat as CharField
+                .distinct()
+            )
+            return JsonResponse({"categories": list(categories)})
 
-        if category_name and category_name != '':
-            imei_queryset = imei_queryset.filter(
-                device__category=category_name)
+        # Filter by category name (string field)
+        imei_queryset = imei_queryset.filter(device__category=category_name)
 
-        device_names = imei_queryset.values_list(
-            'device__name', flat=True).distinct().order_by('device__name')
-        return JsonResponse({'device_names': list(device_names)})
+        # 3️⃣ Category selected → return device names
+        device_names = (
+            imei_queryset
+            .values_list("device__name", flat=True)
+            .distinct()
+        )
 
+        return JsonResponse({"device_names": list(device_names)})
+
+    # =====================================================
+    # AJAX HANDLER — DEVICE INFO (Available quantity)
+    # =====================================================
     if request.GET.get("ajax") == "device_info":
         device_name = request.GET.get("device_name")
         oem_id = request.GET.get("oem_id")
         category_name = request.GET.get("category_name")
 
-        if not device_name or not oem_id or not category_name:
-            return JsonResponse({'error': 'Missing required parameters'}, status=400)
+        if not all([device_name, oem_id, category_name]):
+            return JsonResponse({"error": "Missing parameters"}, status=400)
 
+        # Fetch device based on all attributes (string category)
         device = Device.objects.filter(
             name=device_name,
             oem_id=oem_id,
-            category=category_name
+            category=category_name  # <-- plain CharField
         ).first()
 
         if not device:
             return JsonResponse({
-                'name': device_name,
-                'oem': OEM.objects.get(id=oem_id).name,
-                'category': category_name,
-                'available_quantity': 0,
-                'status': 'Not Found',
+                "available_quantity": 0,
+                "status": "Not Found"
             })
 
-        imei_filters = Q(device__name=device_name, device__oem_id=oem_id,
-                         device__category=category_name, is_available=True)
-        if not user.is_superuser:
-            user_country = getattr(user.profile, "country", None)
-            if user_country:
-                imei_filters &= Q(device__branch__country=user_country)
+        # Build IMEI filters
+        filters = Q(device=device, is_available=True)
 
-        available_imei_count = DeviceIMEI.objects.filter(imei_filters).count()
-        status_display = "Available" if available_imei_count > 0 else "Not Available"
+        if not user.is_superuser:
+            country = getattr(user.profile, "country", None)
+            if country:
+                filters &= Q(device__branch__country=country)
+
+        count = DeviceIMEI.objects.filter(filters).count()
 
         return JsonResponse({
-            'name': device_name,
-            'oem': device.oem.name,
-            'category': device.category,
-            'available_quantity': available_imei_count,
-            'status': status_display,
+            "available_quantity": count,
+            "status": "Available" if count > 0 else "Not Available"
         })
 
-    if request.method == 'POST':
-        form = DeviceRequestForm(request.POST, user=request.user)
+    # =====================================================
+    # POST — MULTIPLE DEVICE REQUEST HANDLING
+    # =====================================================
+    if request.method == "POST":
+        client_id = request.POST.get("client_id")
+        proof_file = request.FILES.get("payment_proof")
 
-        if form.is_valid():
-            quantity = form.cleaned_data['quantity']
+        device_oems = request.POST.getlist("oem[]")
+        categories = request.POST.getlist("category[]")
+        device_names = request.POST.getlist("device_name[]")
+        quantities = request.POST.getlist("quantity[]")
 
-            oem_id = request.POST.get('oem_id_hidden')
-            category_name = request.POST.get('category_name_hidden')
-            device_name = request.POST.get('device_name_hidden')
+        if not client_id:
+            messages.error(request, "Please select a client.")
+            return redirect("request_device")
 
-            if not all([oem_id, category_name, device_name]):
-                messages.error(
-                    request, "Device selection incomplete. Please select OEM, Category, and Device Name.")
-                return redirect('request_device')
+        client = Client.objects.filter(id=client_id).first()
+        if not client:
+            messages.error(request, "Client not found.")
+            return redirect("request_device")
 
-            device = Device.objects.filter(
-                name=device_name,
-                oem_id=oem_id,
-                category=category_name
-            ).first()
+        if not (device_oems and device_names and quantities):
+            messages.error(request, "Device request fields are incomplete.")
+            return redirect("request_device")
 
-            if not device:
-                messages.error(
-                    request, f"Selected device ({device_name}) not found in inventory records.")
-                return redirect('request_device')
-
-            imei_filters = Q(device__name=device.name, device__oem_id=device.oem_id,
-                             device__category=device.category, is_available=True)
-            if not user.is_superuser:
-                user_country = getattr(user.profile, "country", None)
-                if user_country:
-                    imei_filters &= Q(device__branch__country=user_country)
-
-            available_imeis = DeviceIMEI.objects.filter(
-                imei_filters).order_by('id')[:quantity]
-
-            imei_count = available_imeis.count()
-            if imei_count < quantity:
-                messages.error(
-                    request, f"Only {imei_count} unit(s) are available for {device.name}.")
-                return redirect('request_device')
-
+        try:
             with transaction.atomic():
-                device_request = form.save(
-                    commit=False, requestor=request.user)
-                device_request.device = device
-                device_request.quantity = quantity
+                for idx in range(len(device_oems)):
+                    oem_id = device_oems[idx]
+                    category_name = categories[idx]
+                    device_name = device_names[idx]
+                    qty = int(quantities[idx])
 
-                device_request.save()
+                    # Fetch correct device (string category)
+                    device = Device.objects.filter(
+                        oem_id=oem_id,
+                        category=category_name,
+                        name=device_name
+                    ).first()
 
-                for imei in available_imeis:
-                    imei.mark_unavailable()
+                    if not device:
+                        messages.error(request, f"Device {device_name} not found.")
+                        return redirect("request_device")
 
-            send_mail(
-                subject='Device Request Confirmation',
-                message=(
-                    f"Dear {request.user.first_name or request.user.username},\n\n"
-                    f"Your request for {quantity} unit(s) of {device.name} has been submitted successfully.\n"
-                    f"We will notify you once reviewed or issued.\n\n"
-                    f"Thank you,\nInventory Management Team"
-                ),
-                from_email=None,
-                recipient_list=[request.user.email],
-                fail_silently=False,
-            )
+                    imei_filters = Q(device=device, is_available=True)
 
-            messages.success(
-                request, f"Request for {quantity} {device.name} device(s) submitted successfully!")
-            return redirect('requestor_dashboard')
-        else:
-            messages.error(request, "Please correct the errors below.")
-    else:
-        form = DeviceRequestForm(user=request.user)
+                    if not user.is_superuser:
+                        country = getattr(user.profile, "country", None)
+                        if country:
+                            imei_filters &= Q(device__branch__country=country)
 
-    return render(request, 'invent/request_item.html', {
-        'form': DeviceRequestForm(user=request.user),
-        'oems': OEM.objects.all(),
-        'branches': Branch.objects.all(),
+                    available_imeis = DeviceIMEI.objects.filter(imei_filters).order_by("id")[:qty]
+
+                    if available_imeis.count() < qty:
+                        messages.error(
+                            request,
+                            f"Only {available_imeis.count()} units of {device.name} are available."
+                        )
+                        return redirect("request_device")
+
+                    # Create the DeviceRequest
+                    dr = DeviceRequest.objects.create(
+                        requestor=user,
+                        client=client,
+                        device=device,
+                        quantity=qty,
+                        branch=device.branch,
+                        country=device.branch.country,
+                        payment_proof=proof_file
+                    )
+
+                    # Assign IMEIs to the request
+                    for imei_obj in available_imeis:
+                        dr.imei_obj = imei_obj
+                        dr.imei_no = imei_obj.imei
+                        dr.save()
+                        imei_obj.mark_unavailable()
+
+            messages.success(request, "Your device request has been submitted successfully!")
+            return redirect("requestor_dashboard")
+
+        except Exception as e:
+            messages.error(request, f"Error: {str(e)}")
+            return redirect("request_device")
+
+    # =====================================================
+    # GET — Load Request Form
+    # =====================================================
+    return render(request, "invent/request_item.html", {
+        "clients": Client.objects.all(),
+        "oems": OEM.objects.all(),
     })
 
 
