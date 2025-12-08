@@ -114,7 +114,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Africa/Nairobi'
 
 USE_I18N = True
 
@@ -153,11 +153,12 @@ DEFAULT_FROM_EMAIL = 'brianobanda08@gmail.com'
 # --- AUTHENTICATION AND REDIRECTION SETTINGS ---
 # The URL where requests are redirected for login, if required by login_required()
 # This should match the 'name' attribute of your login URL pattern in invent/urls.py
-LOGIN_URL = 'login' # Changed from '/custom_login/' for consistency with named URL
+LOGIN_URL = 'login'  # Changed from '/custom_login/' for consistency with named URL
 
 # The URL to redirect to after a user has successfully logged in.
 # This is a fallback. Your custom_login view will handle role-based redirection.
-LOGIN_REDIRECT_URL = '/' # Redirect to the root (which is requestor_dashboard in your urls.py)
+# Redirect to the root (which is requestor_dashboard in your urls.py)
+LOGIN_REDIRECT_URL = '/'
 
 # The URL to redirect to after a user logs out.
 # It's good practice to send them back to the login page.
@@ -165,7 +166,8 @@ LOGOUT_REDIRECT_URL = 'login'
 
 # --- SESSION TIMEOUT SETTINGS ---
 SESSION_COOKIE_AGE = 1200  # <-- 20 minutes (1200 seconds) -->
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False # Changed to False for persistent sessions until timeout
+# Changed to False for persistent sessions until timeout
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
