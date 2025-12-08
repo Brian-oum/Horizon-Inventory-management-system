@@ -234,40 +234,22 @@ imei = models.ForeignKey(
 
 
 class DeviceRequest(models.Model):
-    device = models.ForeignKey(
-        "Device", on_delete=models.CASCADE, related_name="requests"
-    )
-    imei_no = models.CharField(
-        max_length=50, null=True, blank=True)  # existing — keep it
-    imei_obj = models.ForeignKey(
-        'DeviceIMEI',
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name='device_requests'
-    )
-    requestor = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="device_requests"
-    )
-    client = models.ForeignKey(
-        "Client",
-        on_delete=models.CASCADE,
-        related_name="client_requests",
-        null=True,
-        blank=True
-    )
-    branch = models.ForeignKey(
-        Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests"
-    )
-    country = models.ForeignKey(
-        Country, on_delete=models.SET_NULL, null=True, blank=True
-    )
+    device = models.ForeignKey("Device", on_delete=models.CASCADE, related_name="requests")
+    imei_obj = models.ForeignKey('DeviceIMEI', null=True, blank=True,
+                                 on_delete=models.SET_NULL, related_name='device_requests')
+    requestor = models.ForeignKey(User, on_delete=models.CASCADE, related_name="device_requests")
+    client = models.ForeignKey("Client", on_delete=models.CASCADE,
+                               related_name="client_requests", null=True, blank=True)
 
-    # specify imei_no if applicable during request
-    imei_no = models.CharField(max_length=50, null=True, blank=True)  # ✅ NEW
+    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests")
+    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
+
+    imei_no = models.CharField(max_length=50, null=True, blank=True)
     quantity = models.PositiveIntegerField(default=1)
     reason = models.TextField(blank=True, null=True)
     application_date = models.DateField(default=timezone.now)
+
+    payment_proof = models.FileField(upload_to="payment_proofs/", null=True, blank=True)
 
     STATUS_CHOICES = [
         ('Pending', 'Pending'),

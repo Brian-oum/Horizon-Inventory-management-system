@@ -12,13 +12,11 @@
         Request Devices
     </h2>
 
-    <!-- IMPORTANT: Added enctype for file upload -->
+    <!-- FORM -->
     <form method="post" id="multiDeviceForm" enctype="multipart/form-data">
         {% csrf_token %}
 
-        <!-- ==========================================
-             SELECT CLIENT PANEL
-        =========================================== -->
+        <!-- CLIENT SELECTION -->
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white border-0">
                 <h5 class="fw-bold text-primary mb-0">
@@ -31,22 +29,17 @@
                 <select name="client_id" class="form-select form-select-sm rounded-2 shadow-sm" required>
                     <option value="">— Choose Client —</option>
                     {% for client in clients %}
-                    <option value="{{ client.id }}">
-                        {{ client.name }} — {{ client.email }}
-                    </option>
+                    <option value="{{ client.id }}">{{ client.name }}</option>
                     {% endfor %}
                 </select>
             </div>
         </div>
 
-        <!-- ==========================================
-             MULTIPLE DEVICE REQUEST SECTIONS
-        =========================================== -->
+        <!-- DEVICE REQUEST SECTIONS -->
         <div id="deviceRequestContainer">
 
             <div class="device-request-group card border-0 shadow-sm mb-4">
 
-                <!-- Section Header -->
                 <div class="card-header bg-light border-0">
                     <h6 class="fw-bold text-primary mb-0">
                         <i class="fas fa-box-open me-2"></i>Device Request
@@ -104,19 +97,14 @@
 
         </div>
 
-        <!-- ==========================================
-             ADD ANOTHER REQUEST BUTTON
-        =========================================== -->
+        <!-- ADD NEW DEVICE REQUEST -->
         <div class="mb-4">
             <button type="button" id="addRequestBtn" class="btn btn-outline-primary btn-sm px-3">
                 <i class="fas fa-plus-circle me-1"></i> Add Another Request
             </button>
         </div>
 
-
-        <!-- ==========================================
-             PAYMENT VERIFICATION — PROFORMA OR MPESA
-        =========================================== -->
+        <!-- PAYMENT PROOF UPLOAD -->
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white border-0">
                 <h5 class="fw-bold text-primary mb-0">
@@ -127,43 +115,26 @@
             <div class="card-body">
 
                 <p class="text-muted small mb-3">
-                    Upload <strong>either</strong> a Proforma Invoice <em>or</em> an M-Pesa payment message screenshot.
+                    Upload a Proforma Invoice or M-PESA screenshot.
                 </p>
 
                 <div class="row g-3">
 
-                    <!-- Proforma Invoice -->
                     <div class="col-md-6">
                         <label class="form-label fw-semibold small text-secondary">
-                            Proforma Invoice (PDF / Image)
+                            Upload Payment Proof
                         </label>
-                        <input type="file" name="proforma_invoice"
+                        <input type="file" name="payment_proof"
                             accept=".pdf,.jpg,.jpeg,.png"
-                            class="form-control form-control-sm shadow-sm">
-                    </div>
-
-                    <!-- M-Pesa Screenshot -->
-                    <div class="col-md-6">
-                        <label class="form-label fw-semibold small text-secondary">
-                            M-Pesa Payment Message Screenshot
-                        </label>
-                        <input type="file" name="mpesa_screenshot"
-                            accept=".jpg,.jpeg,.png"
                             class="form-control form-control-sm shadow-sm">
                     </div>
 
                 </div>
 
-                <small class="text-muted mt-2 d-block">
-                    * Uploading at least one file is recommended.
-                </small>
-
             </div>
         </div>
 
-        <!-- ==========================================
-             SUBMIT BUTTON
-        =========================================== -->
+        <!-- SUBMIT BUTTON -->
         <div class="text-end">
             <button type="submit" class="btn btn-success btn-sm px-4">
                 <i class="fas fa-paper-plane me-1"></i> Submit All Requests
@@ -174,39 +145,32 @@
 
 </div>
 
-
-
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
 <script>
 
 $(document).ready(function () {
 
-    /* ADD REQUEST */
+    // ADD NEW REQUEST SECTION
     $("#addRequestBtn").click(function () {
         let clone = $(".device-request-group:first").clone(true);
 
         clone.find("select").val("");
         clone.find("input").val("1");
 
-        clone.find(".category-select, .device-name-select").prop("disabled", true);
-
-        clone.find(".info-oem").text("--");
-        clone.find(".info-category").text("--");
-        clone.find(".info-device").text("--");
-        clone.find(".info-available").text("--");
+        clone.find(".category-select, .device-name-select").prop("disabled", true).html('<option value="">Select</option>');
 
         clone.find(".remove-request-btn").removeClass("d-none");
 
         $("#deviceRequestContainer").append(clone);
     });
 
-    /* REMOVE REQUEST */
+    // REMOVE SECTION
     $(document).on("click", ".remove-request-btn", function () {
         $(this).closest(".device-request-group").remove();
     });
 
-    /* OEM → Load Categories */
+    // OEM → CATEGORY
     $(document).on("change", ".oem-select", function () {
         let group = $(this).closest(".device-request-group");
         let oemId = $(this).val();
@@ -221,12 +185,14 @@ $(document).ready(function () {
                 categorySelect.empty().append('<option value="">Select category</option>');
                 categorySelect.prop("disabled", false);
 
-                data.categories.forEach(c => categorySelect.append(`<option value="${c}">${c}</option>`));
+                data.categories.forEach(c => {
+                    categorySelect.append(`<option value="${c}">${c}</option>`);
+                });
             }
         });
     });
 
-    /* Category → Load Devices */
+    // CATEGORY → DEVICES
     $(document).on("change", ".category-select", function () {
         let group = $(this).closest(".device-request-group");
         let oemId = group.find(".oem-select").val();
@@ -242,12 +208,14 @@ $(document).ready(function () {
                 deviceSelect.empty().append('<option value="">Select device</option>');
                 deviceSelect.prop("disabled", false);
 
-                data.device_names.forEach(d => deviceSelect.append(`<option value="${d}">${d}</option>`));
+                data.device_names.forEach(d => {
+                    deviceSelect.append(`<option value="${d}">${d}</option>`);
+                });
             }
         });
     });
 
-    /* Device → Load Info */
+    // DEVICE → INFO
     $(document).on("change", ".device-name-select", function () {
         let group = $(this).closest(".device-request-group");
 
@@ -264,11 +232,6 @@ $(document).ready(function () {
                 device_name: deviceName
             },
             success: function (data) {
-                group.find(".info-oem").text(oemId);
-                group.find(".info-category").text(categoryName);
-                group.find(".info-device").text(deviceName);
-                group.find(".info-available").text(data.available_quantity);
-
                 group.find(".quantity-input").attr("max", data.available_quantity);
             }
         });
