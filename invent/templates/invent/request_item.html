@@ -1,313 +1,280 @@
 {% extends "invent/requestor_dashboard.html" %}
 {% load static %}
 
-{% block title %}Request Device{% endblock %}
+{% block title %}Request Devices{% endblock %}
 
 {% block main_content %}
 <div class="container-fluid mt-4">
-    <h2 class="mb-4 text-primary fw-bold">Request a Device</h2>
 
-    {% if messages %}
-        <div class="mb-3">
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show py-2" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endfor %}
+    <!-- Page Title -->
+    <h2 class="mb-4 fw-bold text-dark">
+        <i class="fas fa-laptop-code text-primary me-2"></i>
+        Request Devices
+    </h2>
+
+    <!-- IMPORTANT: Added enctype for file upload -->
+    <form method="post" id="multiDeviceForm" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <!-- ==========================================
+             SELECT CLIENT PANEL
+        =========================================== -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-0">
+                <h5 class="fw-bold text-primary mb-0">
+                    <i class="fas fa-user-check me-2"></i>Select Client
+                </h5>
+            </div>
+
+            <div class="card-body">
+                <label class="fw-semibold text-secondary small">Client</label>
+                <select name="client_id" class="form-select form-select-sm rounded-2 shadow-sm" required>
+                    <option value="">— Choose Client —</option>
+                    {% for client in clients %}
+                    <option value="{{ client.id }}">
+                        {{ client.name }} — {{ client.email }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
-    {% endif %}
 
-    <div class="card shadow-sm p-4 request-card">
-        <form method="post" id="deviceRequestForm">
-            {% csrf_token %}
-            
-            {{ form.oem_id_hidden }}
-            {{ form.category_name_hidden }}
-            {{ form.device_name_hidden }}
+        <!-- ==========================================
+             MULTIPLE DEVICE REQUEST SECTIONS
+        =========================================== -->
+        <div id="deviceRequestContainer">
 
-            <div class="row g-4">
-                
-                <div class="col-lg-6">
+            <div class="device-request-group card border-0 shadow-sm mb-4">
 
-                    <div class="mb-3">
-                        <label for="id_oem" class="form-label fw-semibold small">OEM</label>
-                        <select name="oem" id="id_oem" class="form-select form-select-sm">
-                            <option value="">Select OEM</option>
-                            {% for oem in oems %}
-                            <option value="{{ oem.id }}">{{ oem.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                <!-- Section Header -->
+                <div class="card-header bg-light border-0">
+                    <h6 class="fw-bold text-primary mb-0">
+                        <i class="fas fa-box-open me-2"></i>Device Request
+                    </h6>
+                </div>
 
-                    <div class="mb-3">
-                        <label for="id_category" class="form-label fw-semibold small">Category</label>
-                        <select id="id_category" class="form-select form-select-sm" disabled>
-                            <option value="">Select a category</option>
-                        </select>
-                    </div>
+                <div class="card-body">
 
-                    <div class="mb-3">
-                        <label for="id_device_name" class="form-label fw-semibold small">Device Name</label>
-                        <select id="id_device_name" class="form-select form-select-sm" disabled>
-                            <option value="">Select a device</option>
-                        </select>
-                        {{ form.device }}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="{{ form.quantity.id_for_label }}" class="form-label fw-semibold small">{{ form.quantity.label }}</label>
-                        {{ form.quantity }}
-                        <div class="text-danger small mt-1" id="quantity_error"></div>
-                        {% for error in form.quantity.errors %}
-                            <div class="text-danger small mt-1">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                    
-                    <div class="border rounded p-3 bg-light mt-3">
-                        <h6 class="fw-bold mb-2 small text-secondary">Device Information</h6>
-                        <div class="row small text-muted">
-                            <div class="col-6 mb-1">OEM: <span id="info_oem" class="fw-semibold">--</span></div>
-                            <div class="col-6 mb-1">Category: <span id="info_category" class="fw-semibold">--</span></div>
-                            <div class="col-12 mb-1">Device: <span id="info_device_name" class="fw-semibold">--</span></div>
-                            <div class="col-6 mb-1">Available Qty: <span id="info_available_qty" class="fw-semibold">--</span></div>
-                            <div class="col-6 mb-1">Status: <span id="info_status" class="fw-semibold">--</span></div>
+                    <div class="row g-3">
+
+                        <!-- OEM -->
+                        <div class="col-lg-3">
+                            <label class="small text-secondary fw-semibold">OEM</label>
+                            <select name="oem[]" class="form-select form-select-sm shadow-sm oem-select" required>
+                                <option value="">Select OEM</option>
+                                {% for oem in oems %}
+                                <option value="{{ oem.id }}">{{ oem.name }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
-                    </div>
-                    
+
+                        <!-- Category -->
+                        <div class="col-lg-3">
+                            <label class="small text-secondary fw-semibold">Category</label>
+                            <select name="category[]" class="form-select form-select-sm category-select shadow-sm" disabled required>
+                                <option value="">Select category</option>
+                            </select>
+                        </div>
+
+                        <!-- Device -->
+                        <div class="col-lg-3">
+                            <label class="small text-secondary fw-semibold">Device</label>
+                            <select name="device_name[]" class="form-select form-select-sm device-name-select shadow-sm" disabled required>
+                                <option value="">Select device</option>
+                            </select>
+                        </div>
+
+                        <!-- Quantity -->
+                        <div class="col-lg-3">
+                            <label class="small text-secondary fw-semibold">Quantity</label>
+                            <input type="number" name="quantity[]" class="form-control form-control-sm shadow-sm quantity-input" min="1" value="1" required>
+                        </div>
+
                     </div>
 
-                <div class="col-lg-6">
-                    <div class="border rounded p-3 bg-light h-100">
-                        <h6 class="fw-bold text-primary mb-3 small">Client Information</h6>
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <label for="{{ form.client_name.id_for_label }}" class="form-label small">Name</label>
-                                {{ form.client_name }}
-                            </div>
-                            <div class="col-12">
-                                <label for="{{ form.client_phone.id_for_label }}" class="form-label small">Phone</label>
-                                {{ form.client_phone }}
-                            </div>
-                            <div class="col-12">
-                                <label for="{{ form.client_email.id_for_label }}" class="form-label small">Email</label>
-                                {{ form.client_email }}
-                            </div>
-                            <div class="col-12">
-                                <label for="{{ form.client_address.id_for_label }}" class="form-label small">Address</label>
-                                {{ form.client_address }}
-                            </div>
-                            <div class="col-12">
-                                <label for="{{ form.branch.id_for_label }}" class="form-label small">Branch</label>
-                                {{ form.branch }}
-                            </div>
-                            {% for error in form.client_name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-                            {% for error in form.client_phone.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-                            {% for error in form.client_email.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-                            {% for error in form.client_address.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-                            {% for error in form.branch.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-                        </div>
+                    <!-- Remove Button -->
+                    <div class="mt-3 text-end">
+                        <button type="button" class="btn btn-outline-danger btn-sm remove-request-btn d-none">
+                            <i class="fas fa-trash-alt me-1"></i> Remove
+                        </button>
                     </div>
+
                 </div>
             </div>
 
-            <div class="mt-4 d-flex justify-content-end">
-                <button type="submit" class="btn btn-success btn-sm px-4" id="submitBtn" disabled>
-                    Submit Request
-                    <span class="spinner-border spinner-border-sm d-none ms-2" id="submitSpinner" role="status"></span>
-                </button>
+        </div>
+
+        <!-- ==========================================
+             ADD ANOTHER REQUEST BUTTON
+        =========================================== -->
+        <div class="mb-4">
+            <button type="button" id="addRequestBtn" class="btn btn-outline-primary btn-sm px-3">
+                <i class="fas fa-plus-circle me-1"></i> Add Another Request
+            </button>
+        </div>
+
+
+        <!-- ==========================================
+             PAYMENT VERIFICATION — PROFORMA OR MPESA
+        =========================================== -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-0">
+                <h5 class="fw-bold text-primary mb-0">
+                    <i class="fas fa-file-upload me-2"></i>Payment Verification
+                </h5>
             </div>
-        </form>
-    </div>
+
+            <div class="card-body">
+
+                <p class="text-muted small mb-3">
+                    Upload <strong>either</strong> a Proforma Invoice <em>or</em> an M-Pesa payment message screenshot.
+                </p>
+
+                <div class="row g-3">
+
+                    <!-- Proforma Invoice -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small text-secondary">
+                            Proforma Invoice (PDF / Image)
+                        </label>
+                        <input type="file" name="proforma_invoice"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            class="form-control form-control-sm shadow-sm">
+                    </div>
+
+                    <!-- M-Pesa Screenshot -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small text-secondary">
+                            M-Pesa Payment Message Screenshot
+                        </label>
+                        <input type="file" name="mpesa_screenshot"
+                            accept=".jpg,.jpeg,.png"
+                            class="form-control form-control-sm shadow-sm">
+                    </div>
+
+                </div>
+
+                <small class="text-muted mt-2 d-block">
+                    * Uploading at least one file is recommended.
+                </small>
+
+            </div>
+        </div>
+
+        <!-- ==========================================
+             SUBMIT BUTTON
+        =========================================== -->
+        <div class="text-end">
+            <button type="submit" class="btn btn-success btn-sm px-4">
+                <i class="fas fa-paper-plane me-1"></i> Submit All Requests
+            </button>
+        </div>
+
+    </form>
+
 </div>
+
+
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
 <script>
-$(document).ready(function() {
-    const $oemSelect = $('#id_oem');
-    const $categorySelect = $('#id_category');
-    const $deviceNameSelect = $('#id_device_name');
-    const $quantityInput = $('#id_quantity');
-    const $submitBtn = $('#submitBtn');
-    
-    // Hidden fields for POST validation
-    const $oemIdHidden = $('#id_oem_id_hidden');
-    const $categoryNameHidden = $('#id_category_name_hidden');
-    const $deviceNameHidden = $('#id_device_name_hidden');
-    
-    // Info display spans
-    const $infoOem = $('#info_oem');
-    const $infoCategory = $('#info_category');
-    const $infoDeviceName = $('#info_device_name');
-    const $infoAvailableQty = $('#info_available_qty');
-    const $infoStatus = $('#info_status');
-    const $qtyError = $('#quantity_error');
 
-    // --- Helper Functions ---
-    function updateInfoCard(data) {
-        $infoOem.text(data.oem || $oemSelect.find('option:selected').text() || '--');
-        $infoCategory.text(data.category || '--');
-        $infoDeviceName.text(data.name || '--');
-        
-        const availableQty = data.available_quantity !== undefined ? data.available_quantity : 0;
-        
-        $infoAvailableQty.text(availableQty);
-        $infoStatus.text(data.status || '--');
-        
-        // FIX: Ensure max is at least 1 if a device is selected, or 0 if none/not available.
-        $quantityInput.attr('max', availableQty);
-        
-        // Reset quantity if it exceeds max
-        if (parseInt($quantityInput.val()) > availableQty) {
-            $quantityInput.val(1);
-        }
-        
-        // If nothing is available, set min to 0 temporarily to prevent browser error, 
-        // but the validation below will handle the error message.
-        $quantityInput.attr('min', availableQty > 0 ? 1 : 0);
-    }
+$(document).ready(function () {
 
-    function checkFormValidity() {
-        const currentQty = parseInt($quantityInput.val());
-        const maxQty = parseInt($quantityInput.attr('max'));
-        const isDeviceSelected = $deviceNameSelect.val() !== '';
-        
-        const isQtyValid = currentQty >= 1 && currentQty <= maxQty;
-        
-        // Enable submit only if a device is selected AND quantity is valid
-        $submitBtn.prop('disabled', !(isQtyValid && isDeviceSelected));
-        
-        if (!isDeviceSelected) {
-            $qtyError.text('Please select a device first.');
-        } else if (currentQty < 1) {
-            $qtyError.text('Quantity must be at least 1.');
-        } else if (currentQty > maxQty) {
-            $qtyError.text(`Quantity must be between 1 and ${maxQty}.`);
-        } else {
-            $qtyError.text('');
-        }
-    }
+    /* ADD REQUEST */
+    $("#addRequestBtn").click(function () {
+        let clone = $(".device-request-group:first").clone(true);
 
-    function resetFilters(level = 0) {
-        if (level <= 1) {
-            $categorySelect.empty().append('<option value="">Select a category</option>').prop('disabled', true);
-            $categoryNameHidden.val('');
-        }
-        if (level <= 2) {
-            $deviceNameSelect.empty().append('<option value="">Select a device</option>').prop('disabled', true);
-            $deviceNameHidden.val('');
-        }
-        updateInfoCard({available_quantity: 0}); // Reset card and max quantity to 0
-        $quantityInput.val(1).attr('max', 0);
-        checkFormValidity();
-    }
-    
-    // --- AJAX Load Functions (Kept concise) ---
-    function loadCategories(oemId) {
-        if (!oemId) { resetFilters(1); return; }
-        
-        $categorySelect.prop('disabled', true).empty().append('<option value="">Loading...</option>');
-        
+        clone.find("select").val("");
+        clone.find("input").val("1");
+
+        clone.find(".category-select, .device-name-select").prop("disabled", true);
+
+        clone.find(".info-oem").text("--");
+        clone.find(".info-category").text("--");
+        clone.find(".info-device").text("--");
+        clone.find(".info-available").text("--");
+
+        clone.find(".remove-request-btn").removeClass("d-none");
+
+        $("#deviceRequestContainer").append(clone);
+    });
+
+    /* REMOVE REQUEST */
+    $(document).on("click", ".remove-request-btn", function () {
+        $(this).closest(".device-request-group").remove();
+    });
+
+    /* OEM → Load Categories */
+    $(document).on("change", ".oem-select", function () {
+        let group = $(this).closest(".device-request-group");
+        let oemId = $(this).val();
+        let categorySelect = group.find(".category-select");
+
+        categorySelect.prop("disabled", true).html('<option>Loading...</option>');
+
         $.ajax({
             url: window.location.pathname,
-            type: 'GET',
-            data: { ajax: 'filter_options', oem_id: oemId },
-            success: function(data) {
-                resetFilters(2);
-                $categorySelect.empty().append('<option value="">Select a category</option>').prop('disabled', false);
-                if (data.categories && data.categories.length > 0) {
-                    data.categories.forEach(category => {
-                        $categorySelect.append(`<option value="${category}">${category}</option>`);
-                    });
-                }
+            data: { ajax: "filter_options", oem_id: oemId },
+            success: function (data) {
+                categorySelect.empty().append('<option value="">Select category</option>');
+                categorySelect.prop("disabled", false);
+
+                data.categories.forEach(c => categorySelect.append(`<option value="${c}">${c}</option>`));
             }
         });
-    }
+    });
 
-    function loadDeviceNames(oemId, categoryName) {
-        if (!oemId || !categoryName) { resetFilters(2); return; }
+    /* Category → Load Devices */
+    $(document).on("change", ".category-select", function () {
+        let group = $(this).closest(".device-request-group");
+        let oemId = group.find(".oem-select").val();
+        let categoryName = $(this).val();
+        let deviceSelect = group.find(".device-name-select");
 
-        $deviceNameSelect.prop('disabled', true).empty().append('<option value="">Loading...</option>');
-        
+        deviceSelect.prop("disabled", true).html('<option>Loading...</option>');
+
         $.ajax({
             url: window.location.pathname,
-            type: 'GET',
-            data: { ajax: 'filter_options', oem_id: oemId, category_name: categoryName },
-            success: function(data) {
-                resetFilters(3);
-                $deviceNameSelect.empty().append('<option value="">Select a device</option>').prop('disabled', false);
-                if (data.device_names && data.device_names.length > 0) {
-                    data.device_names.forEach(name => {
-                        $deviceNameSelect.append(`<option value="${name}">${name}</option>`);
-                    });
-                }
+            data: { ajax: "filter_options", oem_id: oemId, category_name: categoryName },
+            success: function (data) {
+                deviceSelect.empty().append('<option value="">Select device</option>');
+                deviceSelect.prop("disabled", false);
+
+                data.device_names.forEach(d => deviceSelect.append(`<option value="${d}">${d}</option>`));
             }
         });
-    }
+    });
 
-    function loadDeviceInfo(oemId, categoryName, deviceName) {
-        if (!oemId || !categoryName || !deviceName) {
-            updateInfoCard({available_quantity: 0});
-            checkFormValidity();
-            return;
-        }
-        
-        $infoAvailableQty.text('Loading...');
-        $infoStatus.text('...');
-        
+    /* Device → Load Info */
+    $(document).on("change", ".device-name-select", function () {
+        let group = $(this).closest(".device-request-group");
+
+        let oemId = group.find(".oem-select").val();
+        let categoryName = group.find(".category-select").val();
+        let deviceName = $(this).val();
+
         $.ajax({
             url: window.location.pathname,
-            type: 'GET',
-            data: { ajax: 'device_info', oem_id: oemId, category_name: categoryName, device_name: deviceName },
-            success: function(data) {
-                updateInfoCard(data);
-                $oemIdHidden.val(oemId);
-                $categoryNameHidden.val(categoryName);
-                $deviceNameHidden.val(deviceName);
-                checkFormValidity();
+            data: {
+                ajax: "device_info",
+                oem_id: oemId,
+                category_name: categoryName,
+                device_name: deviceName
             },
-            error: function() {
-                updateInfoCard({available_quantity: 0, status: 'Error'});
-                checkFormValidity();
+            success: function (data) {
+                group.find(".info-oem").text(oemId);
+                group.find(".info-category").text(categoryName);
+                group.find(".info-device").text(deviceName);
+                group.find(".info-available").text(data.available_quantity);
+
+                group.find(".quantity-input").attr("max", data.available_quantity);
             }
         });
-    }
 
-    // --- Event Handlers ---
-
-    $oemSelect.on('change', function() {
-        const oemId = $(this).val();
-        $oemIdHidden.val(oemId); 
-        loadCategories(oemId);
-        // Do not call resetFilters(2) here, it's called inside loadCategories on success
     });
 
-    $categorySelect.on('change', function() {
-        const oemId = $oemSelect.val();
-        const categoryName = $(this).val();
-        $categoryNameHidden.val(categoryName); 
-        loadDeviceNames(oemId, categoryName);
-        // Do not call resetFilters(3) here, it's called inside loadDeviceNames on success
-    });
-
-    $deviceNameSelect.on('change', function() {
-        const oemId = $oemSelect.val();
-        const categoryName = $categorySelect.val();
-        const deviceName = $(this).val();
-        
-        if (deviceName) {
-            loadDeviceInfo(oemId, categoryName, deviceName);
-        } else {
-            updateInfoCard({available_quantity: 0});
-            checkFormValidity();
-        }
-    });
-    
-    $quantityInput.on('input', checkFormValidity);
-    
-    // Initial state setup
-    resetFilters(1); 
 });
 </script>
 

@@ -175,6 +175,18 @@ class DeviceRequestForm(forms.ModelForm):
 # --- Purchase order with document upload ---
 
 
+class ClientForm(forms.ModelForm):
+    class Meta:
+        model = Client
+        fields = ['name', 'email', 'phone_no', 'address']  # add address if needed
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'phone_no': forms.TextInput(attrs={'class': 'form-control'}),
+            'address': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+
 class PurchaseOrderForm(forms.ModelForm):
     oem = forms.ModelChoiceField(
         queryset=OEM.objects.all(),
