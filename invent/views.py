@@ -160,7 +160,7 @@ def request_device(request):
                 "status": "Not Found"
             })
 
-        # Count available IMEIs
+        # Count available IMEI_NUMBERs
         filters = Q(device=device, is_available=True)
 
         if not user.is_superuser:
@@ -216,23 +216,26 @@ def request_device(request):
                     ).first()
 
                     if not device:
-                        messages.error(request, f"Device {device_name} not found.")
+                        messages.error(
+                            request, f"Device {device_name} not found.")
                         return redirect("request_device")
 
-                    # IMEI selection
-                    imei_filters = Q(device=device, is_available=True)
+                    # IMEI_NUMBER selection
+                    imei_number_filters = Q(device=device, is_available=True)
 
                     if not user.is_superuser:
                         country = getattr(user.profile, "country", None)
                         if country:
-                            imei_filters &= Q(device__branch__country=country)
+                            imei_number_filters &= Q(
+                                device__branch__country=country)
 
-                    available_imeis = DeviceIMEI.objects.filter(imei_filters).order_by("id")[:qty]
+                    available_imei_numbers = DeviceIMEI.objects.filter(
+                        imei_number_filters).order_by("id")[:qty]
 
-                    if available_imeis.count() < qty:
+                    if available_imei_numbers.count() < qty:
                         messages.error(
                             request,
-                            f"Only {available_imeis.count()} units of {device.name} are available."
+                            f"Only {available_imei_numbers.count()} units of {device.name} are available."
                         )
                         return redirect("request_device")
 
@@ -247,14 +250,15 @@ def request_device(request):
                         payment_proof=proof_file
                     )
 
-                    # Assign IMEIs
-                    for imei_obj in available_imeis:
-                        dr.imei_obj = imei_obj
-                        dr.imei_no = imei_obj.imei
+                    # Assign IMEI_NUMBERs
+                    for imei_number_obj in available_imei_numbers:
+                        dr.imei_number_obj = imei_number_obj
+                        dr.imei_number_no = imei_number_obj.imei_number
                         dr.save()
-                        imei_obj.mark_unavailable()
+                        imei_number_obj.mark_unavailable()
 
-            messages.success(request, "Your device request has been submitted successfully!")
+            messages.success(
+                request, "Your device request has been submitted successfully!")
             return redirect("requestor_dashboard")
 
         except Exception as e:
@@ -268,9 +272,6 @@ def request_device(request):
         "clients": Client.objects.all(),
         "oems": OEM.objects.all(),
     })
-
-
-
 # --- Cancel Request ---
 
 
@@ -501,7 +502,6 @@ def inventory_list_view(request):
         'page': page,
     }
     return render(request, 'invent/list_device_grouped.html', context)
-
 # --- Stock Management ---
 
 
@@ -693,6 +693,7 @@ def issue_device(request):
 
 # --- Select IMEIS ---
 
+
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
 def select_imeis(request, request_id):
@@ -732,7 +733,8 @@ def select_imeis(request, request_id):
             try:
                 wb = openpyxl.load_workbook(excel_file)
                 sheet = wb.active
-                for row in sheet.iter_rows(min_row=2, values_only=True):  # assuming header in row 1
+                # assuming header in row 1
+                for row in sheet.iter_rows(min_row=2, values_only=True):
                     imei_number = str(row[0]).strip()
                     try:
                         imei_obj = DeviceIMEI.objects.get(
@@ -753,9 +755,11 @@ def select_imeis(request, request_id):
                         continue  # skip invalid or unavailable IMEIs
 
                 if created == 0:
-                    messages.warning(request, "No valid IMEIs found in the Excel file or all are already assigned.")
+                    messages.warning(
+                        request, "No valid IMEIs found in the Excel file or all are already assigned.")
                 else:
-                    messages.success(request, f"{created} IMEI(s) submitted via Excel for Request #{device_request.id}.")
+                    messages.success(
+                        request, f"{created} IMEI(s) submitted via Excel for Request #{device_request.id}.")
                 device_request.status = 'Waiting Approval'
                 device_request.save(update_fields=['status'])
                 return redirect('issue_device')
@@ -791,14 +795,17 @@ def select_imeis(request, request_id):
 
                 device_request.status = 'Waiting Approval'
                 device_request.save(update_fields=['status'])
-                messages.success(request, f"{created} IMEI(s) submitted for Request #{device_request.id}.")
+                messages.success(
+                    request, f"{created} IMEI(s) submitted for Request #{device_request.id}.")
                 return redirect('issue_device')
             else:
-                messages.error(request, "Selected IMEIs are no longer available.")
+                messages.error(
+                    request, "Selected IMEIs are no longer available.")
                 return redirect('select_imeis', request_id=request_id)
 
         else:
-            messages.error(request, "Please select at least one IMEI or upload an Excel file.")
+            messages.error(
+                request, "Please select at least one IMEI or upload an Excel file.")
             return redirect('select_imeis', request_id=request_id)
 
     context = {
@@ -808,6 +815,7 @@ def select_imeis(request, request_id):
         'available_count': available_count,
     }
     return render(request, 'invent/select_imeis.html', context)
+
 
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
