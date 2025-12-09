@@ -107,41 +107,33 @@ def request_device(request):
         oem_id = request.GET.get("oem_id")
         category_name = request.GET.get("category_name")
 
-        imei_queryset = DeviceIMEI.objects.filter(is_available=True)
+        # Use DEVICE queryset instead of DeviceIMEI (Fix duplicates)
+        devices = Device.objects.all()
 
-        # Limit by user country (non-admin)
+        # Non-admin → restrict devices by user's country
         if not user.is_superuser:
             user_country = getattr(user.profile, "country", None)
             if user_country:
-                imei_queryset = imei_queryset.filter(device__branch__country=user_country)
+                devices = devices.filter(branch__country=user_country)
 
         # 1️⃣ No OEM selected → return OEMs
         if not oem_id:
             oems = OEM.objects.all().values("id", "name")
             return JsonResponse({"oems": list(oems)})
 
-        # Filter by selected OEM
-        imei_queryset = imei_queryset.filter(device__oem_id=oem_id)
+        # Apply OEM filter
+        devices = devices.filter(oem_id=oem_id)
 
-        # 2️⃣ OEM selected but no category selected → return category names
+        # 2️⃣ OEM selected → return categories (string field)
         if not category_name:
-            categories = (
-                imei_queryset
-                .values_list("device__category", flat=True)  # <-- treat as CharField
-                .distinct()
-            )
+            categories = devices.values_list("category", flat=True).distinct()
             return JsonResponse({"categories": list(categories)})
 
-        # Filter by category name (string field)
-        imei_queryset = imei_queryset.filter(device__category=category_name)
+        # Apply category filter (CharField)
+        devices = devices.filter(category=category_name)
 
-        # 3️⃣ Category selected → return device names
-        device_names = (
-            imei_queryset
-            .values_list("device__name", flat=True)
-            .distinct()
-        )
-
+        # 3️⃣ Category selected → return unique device names
+        device_names = devices.values_list("name", flat=True).distinct()
         return JsonResponse({"device_names": list(device_names)})
 
     # =====================================================
@@ -155,11 +147,11 @@ def request_device(request):
         if not all([device_name, oem_id, category_name]):
             return JsonResponse({"error": "Missing parameters"}, status=400)
 
-        # Fetch device based on all attributes (string category)
+        # fetch device
         device = Device.objects.filter(
             name=device_name,
             oem_id=oem_id,
-            category=category_name  # <-- plain CharField
+            category=category_name
         ).first()
 
         if not device:
@@ -168,7 +160,7 @@ def request_device(request):
                 "status": "Not Found"
             })
 
-        # Build IMEI filters
+        # Count available IMEIs
         filters = Q(device=device, is_available=True)
 
         if not user.is_superuser:
@@ -210,13 +202,13 @@ def request_device(request):
 
         try:
             with transaction.atomic():
+
                 for idx in range(len(device_oems)):
                     oem_id = device_oems[idx]
                     category_name = categories[idx]
                     device_name = device_names[idx]
                     qty = int(quantities[idx])
 
-                    # Fetch correct device (string category)
                     device = Device.objects.filter(
                         oem_id=oem_id,
                         category=category_name,
@@ -227,6 +219,7 @@ def request_device(request):
                         messages.error(request, f"Device {device_name} not found.")
                         return redirect("request_device")
 
+                    # IMEI selection
                     imei_filters = Q(device=device, is_available=True)
 
                     if not user.is_superuser:
@@ -243,7 +236,7 @@ def request_device(request):
                         )
                         return redirect("request_device")
 
-                    # Create the DeviceRequest
+                    # Create request
                     dr = DeviceRequest.objects.create(
                         requestor=user,
                         client=client,
@@ -254,7 +247,7 @@ def request_device(request):
                         payment_proof=proof_file
                     )
 
-                    # Assign IMEIs to the request
+                    # Assign IMEIs
                     for imei_obj in available_imeis:
                         dr.imei_obj = imei_obj
                         dr.imei_no = imei_obj.imei
@@ -275,6 +268,7 @@ def request_device(request):
         "clients": Client.objects.all(),
         "oems": OEM.objects.all(),
     })
+
 
 
 # --- Cancel Request ---
@@ -704,8 +698,7 @@ def issue_device(request):
 def select_imeis(request, request_id):
     """
     Select IMEIs for a DeviceRequest.
-    Query DeviceIMEI by product attributes (name/oem/category) so we find available units
-    even if device_request.device references a specific faulty unit.
+    Supports manual selection and Excel upload.
     """
     device_request = get_object_or_404(DeviceRequest, id=request_id)
     requested_device = device_request.device
@@ -713,17 +706,13 @@ def select_imeis(request, request_id):
 
     query = request.GET.get("q", "").strip()
 
-    # Query DeviceIMEI for IMEIs of devices that match the requested product and are available
+    # Available IMEIs matching device attributes
     available_imeis = DeviceIMEI.objects.filter(
         device__name=requested_device.name,
         device__oem=requested_device.oem,
         is_available=True,
     ).select_related('device')
 
-    # Optionally include category match if you use category consistently:
-    # available_imeis = available_imeis.filter(device__category=requested_device.category)
-
-    # Apply search across imei_number, device.imei_no and device.serial_no and device name
     if query:
         available_imeis = available_imeis.filter(
             Q(imei_number__icontains=query) |
@@ -735,38 +724,82 @@ def select_imeis(request, request_id):
     available_count = available_imeis.count()
 
     if request.method == 'POST':
-        selected_imei_ids = request.POST.getlist('selected_imeis')
-        if not selected_imei_ids:
-            messages.error(request, "Please select at least one IMEI before submitting.")
-            return redirect('select_imeis', request_id=request_id)
-
-        # Defensive: only use imeis that are still available
-        selected_imeis_qs = DeviceIMEI.objects.filter(id__in=selected_imei_ids, is_available=True).select_related('device')
-        if not selected_imeis_qs.exists():
-            messages.error(request, "Selected IMEIs are no longer available.")
-            return redirect('select_imeis', request_id=request_id)
-
-        # Optional: check you didn't select more than requested
-        if selected_imeis_qs.count() > device_request.quantity:
-            messages.warning(request, f"You selected {selected_imeis_qs.count()} IMEIs but the request asked for {device_request.quantity}.")
-
         created = 0
-        for imei_obj in selected_imeis_qs:
-            SelectedDevice.objects.create(
-                request=device_request,
-                device=imei_obj.device,
-                selected_by=user
-            )
-            # mark imei as unavailable
-            imei_obj.is_available = False
-            imei_obj.save(update_fields=['is_available'])
-            created += 1
 
-        device_request.status = 'Waiting Approval'
-        device_request.save(update_fields=['status'])
+        # --- Handle Excel Upload ---
+        if 'upload_file' in request.FILES:
+            excel_file = request.FILES['upload_file']
+            try:
+                wb = openpyxl.load_workbook(excel_file)
+                sheet = wb.active
+                for row in sheet.iter_rows(min_row=2, values_only=True):  # assuming header in row 1
+                    imei_number = str(row[0]).strip()
+                    try:
+                        imei_obj = DeviceIMEI.objects.get(
+                            imei_number=imei_number,
+                            device__name=requested_device.name,
+                            device__oem=requested_device.oem,
+                            is_available=True
+                        )
+                        SelectedDevice.objects.create(
+                            request=device_request,
+                            device=imei_obj.device,
+                            selected_by=user
+                        )
+                        imei_obj.is_available = False
+                        imei_obj.save(update_fields=['is_available'])
+                        created += 1
+                    except DeviceIMEI.DoesNotExist:
+                        continue  # skip invalid or unavailable IMEIs
 
-        messages.success(request, f"{created} IMEI(s) submitted for Request #{device_request.id}.")
-        return redirect('issue_device')
+                if created == 0:
+                    messages.warning(request, "No valid IMEIs found in the Excel file or all are already assigned.")
+                else:
+                    messages.success(request, f"{created} IMEI(s) submitted via Excel for Request #{device_request.id}.")
+                device_request.status = 'Waiting Approval'
+                device_request.save(update_fields=['status'])
+                return redirect('issue_device')
+
+            except Exception as e:
+                messages.error(request, f"Error reading Excel file: {e}")
+                return redirect('select_imeis', request_id=request_id)
+
+        # --- Handle Manual Selection ---
+        selected_imei_ids = request.POST.getlist('selected_imeis')
+        if selected_imei_ids:
+            selected_imeis_qs = DeviceIMEI.objects.filter(
+                id__in=selected_imei_ids,
+                is_available=True
+            ).select_related('device')
+
+            if selected_imeis_qs.exists():
+                if selected_imeis_qs.count() > device_request.quantity:
+                    messages.warning(
+                        request,
+                        f"You selected {selected_imeis_qs.count()} IMEIs but the request asked for {device_request.quantity}."
+                    )
+
+                for imei_obj in selected_imeis_qs:
+                    SelectedDevice.objects.create(
+                        request=device_request,
+                        device=imei_obj.device,
+                        selected_by=user
+                    )
+                    imei_obj.is_available = False
+                    imei_obj.save(update_fields=['is_available'])
+                    created += 1
+
+                device_request.status = 'Waiting Approval'
+                device_request.save(update_fields=['status'])
+                messages.success(request, f"{created} IMEI(s) submitted for Request #{device_request.id}.")
+                return redirect('issue_device')
+            else:
+                messages.error(request, "Selected IMEIs are no longer available.")
+                return redirect('select_imeis', request_id=request_id)
+
+        else:
+            messages.error(request, "Please select at least one IMEI or upload an Excel file.")
+            return redirect('select_imeis', request_id=request_id)
 
     context = {
         'device_request': device_request,

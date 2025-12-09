@@ -64,7 +64,7 @@
                             <th>Requestor</th>
                             <th>Device</th>
                             <th>OEM</th>
-                            <th>Category</th>
+                            <th>Client</th>
                             <th>Quantity</th>
                             <th>Requested At</th>
                             <th>Status</th>
@@ -74,13 +74,13 @@
                     <tbody>
                         {% for req in pending_requests %}
                         <tr>
-                            <td>{{ req.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td>{{ req.requestor.username }}</td>
-                            <td>{{ req.device.device_name }}</td>
+                            <td>{{ req.device.name }}</td>
                             <td>{{ req.device.oem.name }}</td>
-                            <td>{{ req.device.category.name }}</td>
+                            <td>{{ req.client.name }}</td>
                             <td>{{ req.quantity }}</td>
-                            <td>{{ req.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ req.date_requested|date:"Y-m-d H:i" }}</td>
                             <td><span class="badge bg-warning text-dark">{{ req.status }}</span></td>
                             <td>
                                 <a href="{% url 'select_imeis' req.id %}" class="btn btn-sm btn-primary">
@@ -107,6 +107,7 @@
                             <th>ID</th>
                             <th>Requestor</th>
                             <th>Device</th>
+                            <th>Client</th>
                             <th>Selected IMEIs</th>
                             <th>Status</th>
                             <th>Submitted At</th>
@@ -115,9 +116,10 @@
                     <tbody>
                         {% for req in waiting_requests %}
                         <tr>
-                            <td>{{ req.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td>{{ req.requestor.username }}</td>
-                            <td>{{ req.device.device_name }}</td>
+                            <td>{{ req.device.name }}</td>
+                            <td>{{ req.client.name }}</td>
                             <td>
                                 {% for imei in req.selected_devices.all %}
                                     <span class="badge bg-secondary">{{ imei.device.imei_no|default:"-" }}</span>
@@ -126,7 +128,7 @@
                                 {% endfor %}
                             </td>
                             <td><span class="badge bg-info text-dark">{{ req.status }}</span></td>
-                            <td>{{ req.updated_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ req.selected_at|date:"Y-m-d H:i" }}</td>
                         </tr>
                         {% empty %}
                         <tr><td colspan="6" class="text-center text-muted">No requests pending admin approval.</td></tr>
@@ -246,7 +248,7 @@
                                     {% endif %}">{{ req.status }}
                                 </span>
                             </td>
-                            <td>{{ req.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ req.date_requested|date:"Y-m-d H:i" }}</td>
                         </tr>
                         {% empty %}
                         <tr><td colspan="6" class="text-center text-muted">No requests found.</td></tr>
