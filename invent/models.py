@@ -233,6 +233,8 @@ imei = models.ForeignKey(
 )
 
 
+from django.core.mail import send_mail
+
 class DeviceRequest(models.Model):
     device = models.ForeignKey("Device", on_delete=models.CASCADE, related_name="requests")
     imei_obj = models.ForeignKey('DeviceIMEI', null=True, blank=True,
@@ -240,7 +242,6 @@ class DeviceRequest(models.Model):
     requestor = models.ForeignKey(User, on_delete=models.CASCADE, related_name="device_requests")
     client = models.ForeignKey("Client", on_delete=models.CASCADE,
                                related_name="client_requests", null=True, blank=True)
-
     branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests")
     country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
 
@@ -248,7 +249,6 @@ class DeviceRequest(models.Model):
     quantity = models.PositiveIntegerField(default=1)
     reason = models.TextField(blank=True, null=True)
     application_date = models.DateField(default=timezone.now)
-
     payment_proof = models.FileField(upload_to="payment_proofs/", null=True, blank=True)
 
     STATUS_CHOICES = [
@@ -262,9 +262,7 @@ class DeviceRequest(models.Model):
         ('Fully Returned', 'Fully Returned'),
     ]
 
-    status = models.CharField(
-        max_length=20, choices=STATUS_CHOICES, default='Pending'
-    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     date_requested = models.DateTimeField(auto_now_add=True)
     date_issued = models.DateTimeField(null=True, blank=True)
     returned_quantity = models.PositiveIntegerField(default=0)
@@ -280,44 +278,61 @@ class DeviceRequest(models.Model):
         super().save(*args, **kwargs)
 
         if status_changed:
-            subject, message = None, None
             user = self.requestor
+            subject, message = None, None
 
+            # --- Notifications to requestor ---
             if self.status == 'Rejected':
-                subject = "Device Request Rejected"
-                message = f"Dear {user.username}, your request for {self.device} has been rejected."
+                subject = f"Device Request #{self.id} Rejected"
+                message = f"Hello,\n\nYour request for {self.device} has been rejected by the admin."
             elif self.status == 'Approved':
-                subject = "Device Request Approved"
-                message = f"Dear {user.username}, your request for {self.device} has been approved."
+                subject = f"Device Request #{self.id} Approved"
+                message = f"Hello,\n\nYour request for {self.device} has been approved by the admin."
             elif self.status == 'Issued':
-                subject = "Device Issued"
-                message = f"Dear {user.username}, your device {self.device} has been issued."
+                subject = f"Device Request #{self.id} Issued"
+                message = f"Hello,\n\nThe device {self.device} has been issued to you."
                 if not self.date_issued:
                     self.date_issued = timezone.now()
                     super().save(update_fields=['date_issued'])
             elif self.status == 'Cancelled':
-                subject = "Device Request Cancelled"
-                message = f"Dear {user.username}, your request for {self.device} has been cancelled."
-            elif self.status in ['Partially Returned', 'Fully Returned']:
-                subject = "Device Return Confirmation"
-                message = (
-                    f"Dear {user.username}, your request for {self.device} has been marked as "
-                    f"{self.status.lower()} ({self.returned_quantity}/{self.quantity} returned)."
-                )
+                subject = f"Device Request #{self.id} Cancelled"
+                message = f"Hello,\n\nYour request for {self.device} has been cancelled."
 
+            # --- Notify the store clerk(s) if admin approves/rejects ---
+            if self.status in ['Approved', 'Rejected']:
+                # Get the store clerk(s) who selected IMEIs for this request
+                clerks = User.objects.filter(selecteddevice__request=self).distinct()
+                clerk_emails = [c.email for c in clerks if c.email]
+                if clerk_emails:
+                    clerk_subject = f"Device Request #{self.id} {self.status}"
+                    clerk_message = (
+                        f"Hello Store Clerk,\n\n"
+                        f"The admin has {self.status.lower()} the device request #{self.id} for {self.device}.\n"
+                        f"Requestor: {self.requestor.username}\n"
+                        f"Quantity: {self.quantity}\n"
+                        f"Client: {self.client.name if self.client else 'N/A'}\n\n"
+                        f"Please take any further action if necessary."
+                    )
+                    send_mail(
+                        clerk_subject,
+                        clerk_message,
+                        from_email=None,
+                        recipient_list=clerk_emails,
+                        fail_silently=False
+                    )
+
+            # --- Send email to requestor ---
             if subject and message:
                 send_mail(
                     subject,
                     message,
                     from_email=None,
                     recipient_list=[user.email],
-                    fail_silently=True,
+                    fail_silently=False
                 )
 
             self._original_status = self.status
 
-    def __str__(self):
-        return f"Request for {self.device} by {self.requestor.username}"
 
 
 class SelectedDevice(models.Model):
