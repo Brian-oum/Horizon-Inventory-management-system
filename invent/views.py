@@ -31,8 +31,9 @@ from django.utils import timezone
 from .models import DeviceSelectionGroup  # add import at top
 logger = logging.getLogger(__name__)
 from django.template.loader import render_to_string
-from weasyprint import HTML
+from xhtml2pdf import pisa
 import tempfile
+
 
 
 def custom_login(request):
@@ -859,18 +860,30 @@ def submit_devices_for_approval(request):
 
 
 def delivery_note(device_request):
-    """Generate a PDF delivery note and return the file path."""
+    """Generate a PDF delivery note and return the file path using xhtml2pdf."""
 
-    html_string = render_to_string("invent/delivery_note.html", {
+    html_content = render_to_string("invent/delivery_note.html", {
         "request": device_request,
         "selected_imeis": device_request.selected_devices.all(),
     })
 
-    # Temporary file
+    # Create temporary pdf file
     pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-    HTML(string=html_string).write_pdf(pdf_file.name)
+
+    # Write PDF
+    pisa_status = pisa.CreatePDF(
+        html_content,
+        dest=pdf_file,
+    )
+
+    pdf_file.close()
+
+    # Check for errors
+    if pisa_status.err:
+        return None
 
     return pdf_file.name
+
 
 @login_required
 @permission_required('invent.can_approve_selection', raise_exception=True)
