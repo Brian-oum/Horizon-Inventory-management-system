@@ -272,47 +272,36 @@
                         <span class="badge bg-danger ms-2">{{ pending_requests_count_for_sidebar }}</span>
                         {% endif %}
                 </li>
-
-
-
-
                 <li class="nav-item mb-2">
                     <a class="nav-link {% if request.resolver_match.url_name == 'return_device' %}active{% endif %}" href="{% url 'return_device' %}">
                         <i class="fas fa-fw fa-arrow-left me-2"></i> Return IoT Device
                     </a>
                 </li>
-            </ul>   
                 <li class="nav-item mb-2">
                     <a class="nav-link {% if request.resolver_match.url_name == 'adjust_stock' %}active{% endif %}" href="{% url 'adjust_stock' %}">
                         <i class="fas fa-fw fa-sliders-h me-2"></i> Adjust Stock
                     </a>
                 </li>
+                
                 <li class="nav-item mb-2">
-    <a class="nav-link {% if request.resolver_match.url_name == 'upload_inventory' %}active{% endif %}" href="{% url 'upload_inventory' %}">
-        <i class="fas fa-fw fa-upload me-2"></i> Upload Inventory
-    </a>
-</li>
-
-<li class="nav-item mb-2">
-    <a class="nav-link {% if request.resolver_match.url_name == 'add_oem' %}active{% endif %}" href="{% url 'add_oem' %}">
-        <i class="fas fa-fw fa-user-plus me-2"></i> Add OEM
-    </a>
-</li>
-
-<li class="nav-item mb-2">
-    <a class="nav-link {% if request.resolver_match.url_name == 'purchase_orders' %}active{% endif %}" href="{% url 'purchase_orders' %}">
-        <i class="fas fa-fw fa-file-invoice me-2"></i> Purchase Orders
-    </a>
-</li>
-
-<li class="nav-item mb-2">
-    <a class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" href="{% url 'reports' %}">
-        <i class="fas fa-fw fa-chart-line me-2"></i> Reports
-    </a>
-</li>
-
-            </ul>
-        </div>
+                    <a class="nav-link {% if 'admin:invent_device_changelist' in request.resolver_match.view_name %}active{% endif %}" href="{% url 'admin:invent_device_changelist' %}">
+                        <i class="fas fa-fw fa-upload me-2"></i> Upload Inventory
+                    </a>
+                </li>
+                
+                <li class="nav-item mb-2">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'add_oem' %}active{% endif %}" href="{% url 'add_oem' %}">
+                        <i class="fas fa-fw fa-user-plus me-2"></i> Add OEM
+                    </a>
+                </li>
+                
+                <li class="nav-item mb-2">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" href="{% url 'reports' %}">
+                        <i class="fas fa-fw fa-chart-line me-2"></i> Reports
+                    </a>
+                </li>
+            </ul> </div>
+        
         {# Sidebar Bottom Section (Logout & Copyright) #}
         <div class="sidebar-bottom">
             <ul class="nav flex-column mb-2">

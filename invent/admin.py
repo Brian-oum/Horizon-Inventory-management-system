@@ -6,6 +6,8 @@ from django.db.models import Q
 from django.utils.html import format_html
 from django.shortcuts import redirect
 from django.core.exceptions import PermissionDenied
+# Import the ImportExportMixin
+from import_export.admin import ImportExportModelAdmin
 
 from .models import DeviceSelectionGroup
 from .models import (
@@ -268,7 +270,7 @@ class DeviceIMEIInline(admin.TabularInline):
 
 
 @admin.register(Device)
-class DeviceAdmin(BranchScopedAdmin):
+class DeviceAdmin(ImportExportModelAdmin, BranchScopedAdmin):
     list_display = ('name', 'oem', 'product_id', 'imei_no',
                     'serial_no', 'branch', 'status')
     search_fields = ('name', 'imei_no', 'serial_no', 'oem__name', 'product_id')
@@ -350,7 +352,7 @@ class DeviceRequestAdmin(admin.ModelAdmin):
 
 
 @admin.register(PurchaseOrder)
-class PurchaseOrderAdmin(BranchScopedAdmin):
+class PurchaseOrderAdmin(ImportExportModelAdmin, BranchScopedAdmin):
     list_display = ('id', 'oem', 'branch', 'order_date',
                     'expected_delivery', 'status')
     search_fields = ('oem__name',)
