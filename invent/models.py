@@ -1,8 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMessage
 from django.conf import settings
+from django.template.loader import render_to_string
+from django.core.mail import EmailMultiAlternatives
 # --- BEGIN IoT/Client/OEM/Branch/Country Models ---
 
 CURRENCY_CHOICES = (
@@ -233,8 +235,6 @@ imei = models.ForeignKey(
 )
 
 
-from django.core.mail import send_mail
-
 class DeviceRequest(models.Model):
     device = models.ForeignKey("Device", on_delete=models.CASCADE, related_name="requests")
     imei_obj = models.ForeignKey('DeviceIMEI', null=True, blank=True,
@@ -291,9 +291,14 @@ class DeviceRequest(models.Model):
             elif self.status == 'Issued':
                 subject = f"Device Request #{self.id} Issued"
                 message = f"Hello,\n\nThe device {self.device} has been issued to you."
+
                 if not self.date_issued:
-                    self.date_issued = timezone.now()
-                    super().save(update_fields=['date_issued'])
+                   self.date_issued = timezone.now()
+                   super().save(update_fields=['date_issued'])
+
+                # ===== NEW – Send delivery note =====
+                self.delivery_note()
+
             elif self.status == 'Cancelled':
                 subject = f"Device Request #{self.id} Cancelled"
                 message = f"Hello,\n\nYour request for {self.device} has been cancelled."
@@ -333,6 +338,61 @@ class DeviceRequest(models.Model):
 
             self._original_status = self.status
 
+def delivery_note(self):
+    """Generate and email the PDF delivery note."""
+
+    # 1️⃣ Generate the PDF using your existing function
+    from invent.views import delivery_note   # adjust path to wherever the function is
+    pdf_path = delivery_note(self)
+
+    # 2️⃣ Prepare email recipients
+    recipients = []
+
+    # Requestor
+    if self.requestor.email:
+        recipients.append(self.requestor.email)
+
+    # Client (if client has an email)
+    if self.client and getattr(self.client, "email", None):
+        recipients.append(self.client.email)
+
+    # Store clerks who selected IMEIs
+    clerks = User.objects.filter(selecteddevice__request=self).distinct()
+    recipients += [c.email for c in clerks if c.email]
+
+    # Admins
+    admin_users = User.objects.filter(is_superuser=True)
+    recipients += [a.email for a in admin_users if a.email]
+
+    recipients = list(set(recipients))  # remove duplicates
+
+    if not recipients:
+        return
+
+    # 3️⃣ Create email
+    subject = f"Delivery Note - Device Request #{self.id}"
+    body = (
+        f"Hello,\n\n"
+        f"Attached is the delivery note for Device Request #{self.id}.\n"
+        f"Device: {self.device.name}\n"
+        f"Client: {self.client.name if self.client else 'N/A'}\n"
+        f"Quantity: {self.quantity}\n\n"
+        f"Thanks."
+    )
+
+    email = EmailMessage(
+        subject=subject,
+        body=body,
+        from_email=None,
+        to=recipients,
+    )
+
+    # 4️⃣ Attach the PDF
+    with open(pdf_path, "rb") as f:
+        email.attach(f"DeliveryNote_{self.id}.pdf", f.read(), "application/pdf")
+
+    # 5️⃣ Send
+    email.send(fail_silently=False)
 
 
 class SelectedDevice(models.Model):
