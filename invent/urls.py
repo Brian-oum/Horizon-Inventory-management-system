@@ -27,7 +27,7 @@ urlpatterns = [
     # Inventory Management
     path('inventory_list/', views.inventory_list_view, name='inventory_list'),
     path('adjust_stock/', views.adjust_stock, name='adjust_stock'),
-    path('upload-inventory/', views.upload_inventory, name='upload_inventory'),
+    #path('upload-inventory/', views.upload_inventory, name='upload_inventory'),
 
     # Device Deletion
     path('devices/delete/', views.delete_device,
@@ -36,7 +36,7 @@ urlpatterns = [
          name='delete_device_single'),  # single delete
 
     # Purchase Orders
-    path('purchase-orders/', views.purchase_orders, name='purchase_orders'),
+    #path('purchase-orders/', views.purchase_orders, name='purchase_orders'),
 
     # Reports
     path('reports/', views.reports_view, name='reports'),
