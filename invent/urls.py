@@ -21,6 +21,7 @@ urlpatterns = [
     path('manage_stock/', views.manage_stock, name='manage_stock'),
     path('edit_item/<int:item_id>/', views.edit_item, name='edit_item'),
     path('select_imeis/<int:request_id>/', views.select_imeis, name='select_imeis'),
+    path("delivery_note/<int:request_id>/", views.delivery_note, name="delivery_note"),
 
 
     # Inventory Management
