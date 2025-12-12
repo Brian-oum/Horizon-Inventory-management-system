@@ -8,6 +8,8 @@ from django.shortcuts import redirect
 from django.core.exceptions import PermissionDenied
 # Import the ImportExportMixin
 from import_export.admin import ImportExportModelAdmin
+# ⭐ NEW: Import resources for defining import/export fields
+from import_export import resources
 
 from .models import DeviceSelectionGroup
 from .models import (
@@ -163,7 +165,7 @@ class CustomUserAdmin(DefaultUserAdmin):
                     # We'll set the allowed groups explicitly after saving the User object.
                     form.cleaned_data['groups'] = allowed_selected
                     messages.warning(request,
-                                     "Some groups you selected were not allowed and have been removed automatically.")
+                                   "Some groups you selected were not allowed and have been removed automatically.")
         # Save the user (this saves auth user fields)
         super().save_model(request, obj, form, change)
 
@@ -266,13 +268,68 @@ class DeviceIMEIInline(admin.TabularInline):
     extra = 1
     fields = ('imei_number', 'is_available')
     readonly_fields = ()
+
+
+# ⭐ NEW: Define the Resource Class for Import/Export functionality
+class DeviceResource(resources.ModelResource):
+    """
+    Defines the fields available for import/export for the Device model.
+    """
+    class Meta:
+        model = Device
+        # Define the exact fields allowed for import/export
+        fields = (
+            'name',          # 1. Device Name
+            'oem',           # 2. OEM
+            'category',      # 3. Category
+            'imei_no',       # 4. IMEI number
+            'serial_no',     # 5. Serial number
+            'mac_address',   # 6. MAC Address
+            'status',        # 7. Status
+        )
+        # Exclude all other fields
+        exclude = (
+            'id', 
+            'product_id', 
+            'total_quantity', 
+            'quantity_issued', 
+            'manufacturer', 
+            'description', 
+            'selling_price', 
+            'currency', 
+            'branch', 
+            'country'
+        )
+
 # Device admin
-
-
 @admin.register(Device)
 class DeviceAdmin(ImportExportModelAdmin, BranchScopedAdmin):
-    list_display = ('name', 'oem', 'product_id', 'imei_no',
-                    'serial_no', 'branch', 'status')
+    # ⭐ MODIFIED: Link the custom resource class defined above
+    resource_class = DeviceResource
+    
+    # This controls the fields on the manual Add/Edit form (previously approved)
+    fields = (
+        'name',
+        'oem',
+        'category',
+        'imei_no',
+        'serial_no',
+        'mac_address',
+        'status',
+    )
+    
+    # This controls the columns on the list view (previously approved)
+    list_display = (
+        'name', 
+        'category',
+        'oem',
+        'status',
+        'imei_no',
+        'serial_no',
+        'mac_address',
+        'branch',
+    )
+    
     search_fields = ('name', 'imei_no', 'serial_no', 'oem__name', 'product_id')
     list_filter = ('status', 'category', 'branch', 'oem')
     branch_field = 'branch'
