@@ -1,7 +1,7 @@
 import csv
 from django.utils.dateparse import parse_date
 from .forms import (
-    CustomCreationForm, OEMForm, DeviceForm, DeviceRequestForm
+    CustomCreationForm, OEMForm, DeviceForm, DeviceRequestForm, ClientForm
 )
 from .models import (
     Device, OEM, DeviceRequest, Client, IssuanceRecord, ReturnRecord, Branch, Profile, DeviceSelection, DeviceIMEI,
@@ -1122,59 +1122,20 @@ def request_summary(request):
 
 # --- Client List ---
 
-
 @login_required
 def client_list(request):
-    user = request.user
-    query = request.GET.get('q', '')
-    status_filter = request.GET.get('status', '')
-    client_filter = request.GET.get('client', '')
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
-
-    # COUNTRY FILTER: Restrict by user's country
-    if user.is_superuser:
-        requests_qs = DeviceRequest.objects.select_related(
-            'client', 'device').order_by('-date_requested')
+    if request.method == "POST":
+        form = ClientForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Client added successfully!")
+            return redirect('client_list')  # redirect to the same page or clients list
+        else:
+            messages.error(request, "Please correct the errors below.")
     else:
-        user_country = getattr(user.profile, "country", None)
-        requests_qs = DeviceRequest.objects.select_related(
-            'client', 'device').filter(branch__country=user_country).order_by('-date_requested')
+        form = ClientForm()
 
-    if query:
-        requests_qs = requests_qs.filter(
-            Q(client_name_icontains=query) |
-            Q(client_email_icontains=query) |
-            Q(client_phone_no_icontains=query) |
-            Q(device_name_icontains=query)
-        )
-
-    if status_filter:
-        requests_qs = requests_qs.filter(status=status_filter)
-
-    if client_filter:
-        requests_qs = requests_qs.filter(client_name_icontains=client_filter)
-
-    if date_from:
-        requests_qs = requests_qs.filter(
-            date_requested_date_gte=parse_date(date_from))
-    if date_to:
-        requests_qs = requests_qs.filter(
-            date_requested_date_lte=parse_date(date_to))
-
-    paginator = Paginator(requests_qs, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
-    context = {
-        'page_obj': page_obj,
-        'query': query,
-        'status_filter': status_filter,
-        'client_filter': client_filter,
-        'date_from': date_from,
-        'date_to': date_to,
-    }
-    return render(request, 'invent/client_list.html', context)
+    return render(request, 'invent/client_list.html', {'form': form})
 
 # --- Stock Adjustment/Search ---
 
