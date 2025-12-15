@@ -233,3 +233,29 @@ class PurchaseOrderForm(forms.ModelForm):
         model = PurchaseOrder
         fields = ['oem', 'branch', 'order_date',
                   'expected_delivery', 'status', 'document']
+
+# ===============================
+# ADMIN ONLY: Excel Upload Form
+# ===============================
+
+class DeviceUploadForm(forms.Form):
+    oem = forms.ModelChoiceField(
+        queryset=OEM.objects.all(),
+        label="OEM (Manufacturer)",
+        required=True
+    )
+    category = forms.CharField(
+        max_length=100,
+        label="Category",
+        required=True
+    )
+    name = forms.CharField(
+        max_length=150,
+        label="Device Model / Name",
+        required=True
+    )
+    excel_file = forms.FileField(
+        label="Excel File (.xlsx)",
+        help_text="Excel file containing IMEI No and/or Serial No columns",
+        required=True
+    )
