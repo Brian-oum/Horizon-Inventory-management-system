@@ -99,16 +99,6 @@ def requestor_dashboard(request):
     return render(request, 'invent/requestor_dashboard.html', context)
 
 
-from django.shortcuts import render, redirect
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.db import transaction
-from django.db.models import Q
-from django.core.mail import send_mail
-
-from .models import Client, OEM, Device, DeviceIMEI, DeviceRequest, User
-
 @login_required
 def request_device(request):
     user = request.user
@@ -124,9 +114,9 @@ def request_device(request):
 
         devices_qs = Device.objects.all()
         if not user.is_superuser:
-            country = getattr(user.profile, "country", None)
-            if country:
-                devices_qs = devices_qs.filter(branch__country=country)
+            user_country = getattr(user.profile, "country", None)
+            if user_country:
+                devices_qs = devices_qs.filter(branch__country=user_country)
 
         # 1️⃣ Return OEMs
         if not oem_id:
@@ -153,7 +143,9 @@ def request_device(request):
 
         imei_qs = DeviceIMEI.objects.filter(device=device, is_available=True)
         if not user.is_superuser:
-            imei_qs = imei_qs.filter(device__branch__country=device.branch.country)
+            user_country = getattr(user.profile, "country", None)
+            if user_country:
+                imei_qs = imei_qs.filter(device__branch__country=user_country)
 
         return JsonResponse({"available_quantity": imei_qs.count()})
 
@@ -208,12 +200,12 @@ def request_device(request):
                         messages.error(request, f"Device '{device_name}' not found.")
                         return redirect("request_device")
 
-                    # Enforce max quantity
+                    # Enforce max quantity using available IMEIs
                     imei_qs = DeviceIMEI.objects.filter(device=device, is_available=True)
                     if not user.is_superuser:
-                        country = getattr(user.profile, "country", None)
-                        if country:
-                            imei_qs = imei_qs.filter(device__branch__country=country)
+                        user_country = getattr(user.profile, "country", None)
+                        if user_country:
+                            imei_qs = imei_qs.filter(device__branch__country=user_country)
 
                     available_qty = imei_qs.count()
                     if qty > available_qty:
@@ -223,7 +215,7 @@ def request_device(request):
                         )
                         return redirect("request_device")
 
-                    # Create DeviceRequest
+                    # --- Create DeviceRequest ---
                     dr = DeviceRequest.objects.create(
                         requestor=user,
                         client=client,
@@ -235,7 +227,15 @@ def request_device(request):
                         status="Pending"
                     )
 
-                    # Notify Store Clerks
+                    # --- Create a DeviceSelectionGroup for the clerks ---
+                    selection_group = DeviceSelectionGroup.objects.create(
+                        device_request=dr,
+                        store_clerk=None,  # To be assigned later
+                        status="Pending"
+                    )
+                    selection_group.devices.set([device])  # Attach the device
+
+                    # Notify Store Clerks to select IMEIs
                     clerks = User.objects.filter(groups__name="Store Clerk")
                     clerk_emails = [u.email for u in clerks if u.email]
                     if clerk_emails:
@@ -249,7 +249,7 @@ def request_device(request):
                                 f"Client: {client.name}\n"
                                 f"Device: {device.name}\n"
                                 f"Quantity: {qty}\n\n"
-                                f"Please log in to select IMEIs."
+                                f"Please log in to select IMEIs for this request."
                             ),
                             from_email=None,
                             recipient_list=clerk_emails,
@@ -270,6 +270,7 @@ def request_device(request):
         "clients": Client.objects.all(),
         "oems": OEM.objects.all(),
     })
+
 
 
 # --- Cancel Request ---
