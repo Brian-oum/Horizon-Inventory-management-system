@@ -13,6 +13,7 @@ from import_export.admin import ImportExportModelAdmin
 from import_export import resources
 from django.urls import path
 from .models import DeviceSelectionGroup
+from django.utils import timezone
 from .models import (
     Branch,
     OEM,
@@ -25,7 +26,7 @@ from .models import (
     Profile,
     Country,
     DeviceIMEI,
-    SelectedDevice
+    DeviceRequestSelectedIMEI
 )
 from django.shortcuts import render, redirect
 import openpyxl
@@ -379,85 +380,127 @@ class DeviceUploadForm(forms.ModelForm):
 @admin.register(Device)
 class DeviceAdmin(admin.ModelAdmin):
     form = DeviceUploadForm
-    list_display = ('name', 'category', 'imei_no', 'serial_no', 'status', 'oem')
+    list_display = ('category', 'name', 'oem', 'imei_no', 'serial_no', 'status')
+    list_filter = ('category', 'oem')
+    search_fields = ('name', 'imei_no', 'serial_no')
+    ordering = ('category', 'name')  # Group devices by category in the list
+    list_display_links = ('name',)  # Click on name to edit device
 
     # Pass request to the form to display messages
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
         form.request = request  # make request available inside form.save()
         return form
+    
+
+class SelectedIMEIInline(admin.TabularInline):
+    model = DeviceRequestSelectedIMEI
+    extra = 0
+    readonly_fields = ('imei', 'date_selected')
+    fields = ('imei', 'approved', 'rejected', 'date_selected')
 
 # DeviceRequest admin
 
 @admin.register(DeviceRequest)
 class DeviceRequestAdmin(admin.ModelAdmin):
     list_display = (
-        'id', 'device', 'requestor', 'client', 'branch', 'status', 'date_requested'
+        'id',
+        'device',
+        'requestor',
+        'client',
+        'branch',
+        'status',
+        'date_requested'
     )
-    search_fields = (
-        'device__name', 'device__imei_no', 'requestor__username', 'client__name'
-    )
+
     list_filter = ('status', 'branch')
+
+    search_fields = (
+        'device__name',
+        'requestor__username',
+        'client__name',
+        'selected_devices__imei__imei_no'
+    )
+
+    inlines = [SelectedIMEIInline]
+
     actions = ['approve_requests', 'reject_requests']
 
+    @admin.action(description="✅ Approve selected IMEIs")
     def approve_requests(self, request, queryset):
-        """Admin action to approve pending IMEI selections for requests."""
         approved_count = 0
 
         for device_request in queryset:
-            if device_request.status == 'Pending':
-                selected_devices = device_request.selected_devices.all()
-                for sd in selected_devices:
-                    device = sd.device
-                    imeis = device.imeis.filter(is_available=True)
+            if device_request.status != 'Pending':
+                continue
 
-                    # Assign available IMEIs to the request
-                    for imei in imeis[:device_request.quantity]:
-                        imei.mark_unavailable()
-                        IssuanceRecord.objects.create(
-                            device=device,
-                            imei=imei,
-                            client=device_request.client,
-                            logistics_manager=request.user,
-                            device_request=device_request
-                        )
+            selections = device_request.selected_devices.filter(approved=False)
 
-                # Update request status
-                device_request.status = 'Approved'
-                device_request.save()
-                approved_count += 1
+            # Quantity enforcement
+            if selections.count() != device_request.quantity:
+                self.message_user(
+                    request,
+                    f"Request #{device_request.id}: selected IMEIs "
+                    f"({selections.count()}) do not match quantity ({device_request.quantity})",
+                    level=messages.ERROR
+                )
+                continue
 
-        if approved_count:
-            self.message_user(
-                request,
-                f"{approved_count} request(s) approved successfully.",
-                level=messages.SUCCESS,
-            )
-        else:
-            self.message_user(
-                request,
-                "No 'Pending' requests were selected for approval.",
-                level=messages.WARNING,
-            )
+            for selection in selections:
+                imei = selection.imei
 
-    approve_requests.short_description = "✅ Approve selected requests"
+                if not imei.is_available:
+                    self.message_user(
+                        request,
+                        f"IMEI {imei.imei_no} is no longer available.",
+                        level=messages.ERROR
+                    )
+                    break
 
+                # Lock IMEI
+                imei.is_available = False
+                imei.save(update_fields=['is_available'])
+
+                # Create issuance record
+                IssuanceRecord.objects.create(
+                    device=imei.device,
+                    imei=imei,
+                    client=device_request.client,
+                    logistics_manager=request.user,
+                    device_request=device_request
+                )
+
+                selection.approved = True
+                selection.save(update_fields=['approved'])
+
+            device_request.status = 'Approved'
+            device_request.date_issued = timezone.now()
+            device_request.save(update_fields=['status', 'date_issued'])
+
+            approved_count += 1
+
+        self.message_user(
+            request,
+            f"{approved_count} request(s) approved successfully.",
+            level=messages.SUCCESS
+        )
+
+    @admin.action(description="❌ Reject selected requests")
     def reject_requests(self, request, queryset):
-        """Admin action to reject pending IMEI selections for requests."""
         rejected = 0
+
         for device_request in queryset:
             if device_request.status == 'Pending':
                 device_request.status = 'Rejected'
-                device_request.save()
+                device_request.save(update_fields=['status'])
                 rejected += 1
 
         self.message_user(
             request,
             f"{rejected} request(s) rejected.",
-            level=messages.ERROR,
+            level=messages.ERROR
         )
 
-    reject_requests.short_description = "❌ Reject selected requests"
 # PurchaseOrder admin
 
 
