@@ -5,12 +5,13 @@ from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.utils.html import format_html
 from django.shortcuts import redirect
+from django import forms
 from django.core.exceptions import PermissionDenied
 # Import the ImportExportMixin
 from import_export.admin import ImportExportModelAdmin
 # ⭐ NEW: Import resources for defining import/export fields
 from import_export import resources
-
+from django.urls import path
 from .models import DeviceSelectionGroup
 from .models import (
     Branch,
@@ -26,6 +27,10 @@ from .models import (
     DeviceIMEI,
     SelectedDevice
 )
+from django.shortcuts import render, redirect
+import openpyxl
+from .models import Device, OEM
+from .forms import DeviceUploadForm
 
 ASSIGNABLE_GROUPS = getattr(settings, 'BRANCH_ADMIN_ASSIGNABLE_GROUPS', None)
 
@@ -302,38 +307,86 @@ class DeviceResource(resources.ModelResource):
         )
 
 # Device admin
+class DeviceUploadForm(forms.ModelForm):
+    excel_file = forms.FileField(
+        required=False,
+        help_text="Optional: Upload an Excel file with IMEI/Serial numbers"
+    )
+
+    class Meta:
+        model = Device
+        fields = ('name', 'category', 'oem', 'excel_file')
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        excel_file = self.cleaned_data.get('excel_file')
+
+        if excel_file:
+            try:
+                wb = openpyxl.load_workbook(excel_file)
+                sheet = wb.active
+            except Exception:
+                raise forms.ValidationError("Invalid Excel file. Please upload a valid .xlsx file.")
+
+            # Extract header
+            header = [str(cell.value).strip().lower() for cell in sheet[1] if cell.value]
+            header_index_map = {h: i for i, h in enumerate(header)}
+
+            if not any(col in header_index_map for col in ["imei no", "serial no"]):
+                raise forms.ValidationError("Excel must have at least 'IMEI No' or 'Serial No' column.")
+
+            oem_obj = instance.oem
+            name = instance.name
+            category = instance.category
+
+            added_count = 0
+            skipped_count = 0
+
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                imei_no = str(row[header_index_map["imei no"]]).strip() if "imei no" in header_index_map and row[header_index_map["imei no"]] else None
+                serial_no = str(row[header_index_map["serial no"]]).strip() if "serial no" in header_index_map and row[header_index_map["serial no"]] else None
+
+                if not imei_no and not serial_no:
+                    skipped_count += 1
+                    continue
+
+                # Skip duplicates
+                if imei_no and Device.objects.filter(imei_no=imei_no).exists():
+                    skipped_count += 1
+                    continue
+                if serial_no and Device.objects.filter(serial_no=serial_no).exists():
+                    skipped_count += 1
+                    continue
+
+                Device.objects.create(
+                    oem=oem_obj,
+                    name=name,
+                    category=category,
+                    imei_no=imei_no,
+                    serial_no=serial_no,
+                    status="available",
+                )
+                added_count += 1
+
+            # Show a message in the admin
+            messages.info(self.request, f"Upload complete: {added_count} added, {skipped_count} skipped.")
+
+        if commit:
+            instance.save()
+        return instance
+
+
 @admin.register(Device)
-class DeviceAdmin(ImportExportModelAdmin, BranchScopedAdmin):
-    # ⭐ MODIFIED: Link the custom resource class defined above
-    resource_class = DeviceResource
-    
-    # This controls the fields on the manual Add/Edit form (previously approved)
-    fields = (
-        'name',
-        'oem',
-        'category',
-        'imei_no',
-        'serial_no',
-        'mac_address',
-        'status',
-    )
-    
-    # This controls the columns on the list view (previously approved)
-    list_display = (
-        'name', 
-        'category',
-        'oem',
-        'status',
-        'imei_no',
-        'serial_no',
-        'mac_address',
-        'branch',
-    )
-    
-    search_fields = ('name', 'imei_no', 'serial_no', 'oem__name', 'product_id')
-    list_filter = ('status', 'category', 'branch', 'oem')
-    branch_field = 'branch'
-    inlines = [DeviceIMEIInline]
+class DeviceAdmin(admin.ModelAdmin):
+    form = DeviceUploadForm
+    list_display = ('name', 'category', 'imei_no', 'serial_no', 'status', 'oem')
+
+    # Pass request to the form to display messages
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        form.request = request  # make request available inside form.save()
+        return form
+
 # DeviceRequest admin
 
 @admin.register(DeviceRequest)

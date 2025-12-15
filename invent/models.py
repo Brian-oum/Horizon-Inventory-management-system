@@ -7,12 +7,6 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 # --- BEGIN IoT/Client/OEM/Branch/Country Models ---
 
-CURRENCY_CHOICES = (
-    ('USD', 'US Dollar'),
-    ('TZS', 'Tanzanian Shilling'),
-    ('KES', 'Kenyan Shilling'),
-    # Add more as needed
-)
 
 # --- Country Model ---
 
@@ -102,10 +96,6 @@ class Device(models.Model):
         max_length=100, blank=True, help_text="e.g. Laptop or Router")
     manufacturer = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
-    selling_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True)
-    currency = models.CharField(
-        max_length=10, choices=CURRENCY_CHOICES, default='USD')
     branch = models.ForeignKey(
         Branch, on_delete=models.SET_NULL, null=True, blank=True)
     country = models.ForeignKey(

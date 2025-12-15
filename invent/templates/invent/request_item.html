@@ -7,121 +7,87 @@
 <div class="container-fluid mt-4">
 
     <!-- Page Title -->
-    <h2 class="mb-1 fw-bold text-dark">
+    <h2 class="mb-4 fw-bold text-dark">
         <i class="fas fa-laptop-code text-primary me-2"></i>
         Request Devices
     </h2>
-    <p class="text-muted small mb-4">
-        Submit one or more device requests for a selected client
-    </p>
 
     <!-- FORM -->
     <form method="post" id="multiDeviceForm" enctype="multipart/form-data">
         {% csrf_token %}
 
         <!-- CLIENT SELECTION -->
-        <div class="card border-0 shadow-sm mb-4 animate-card">
-            <div class="card-header border-bottom py-2">
-                <h5 class="fw-bold text-primary mb-1">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-0">
+                <h5 class="fw-bold text-primary mb-0">
                     <i class="fas fa-user-check me-2"></i>Select Client
                 </h5>
-                <p class="text-muted small mb-0">
-                    Select the client making the request
-                </p>
             </div>
+
             <div class="card-body">
-                <label class="form-label small fw-semibold text-secondary mb-1">Client</label>
-                <select
-                    name="client_id"
-                    class="form-select form-select-sm shadow-sm"
-                    required
-                >
+                <label class="fw-semibold text-secondary small">Client</label>
+                <select name="client_id" class="form-select form-select-sm rounded-2 shadow-sm" required>
                     <option value="">— Choose Client —</option>
                     {% for client in clients %}
-                        <option value="{{ client.id }}">{{ client.name }}</option>
+                    <option value="{{ client.id }}">{{ client.name }}</option>
                     {% endfor %}
                 </select>
             </div>
         </div>
 
-        <!-- DEVICE REQUESTS -->
+        <!-- DEVICE REQUEST SECTIONS -->
         <div id="deviceRequestContainer">
 
-            <div class="device-request-group card border-0 shadow-sm mb-4 animate-card">
+            <div class="device-request-group card border-0 shadow-sm mb-4">
 
-                <div class="card-header border-bottom py-2">
+                <div class="card-header bg-light border-0">
                     <h6 class="fw-bold text-primary mb-0">
-                        <span class="badge bg-primary me-2 request-index">1</span>
-                        Device Request
+                        <i class="fas fa-box-open me-2"></i>Device Request
                     </h6>
                 </div>
 
                 <div class="card-body">
 
-                    <!-- OEM Row -->
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary mb-1">OEM</label>
-                        <select
-                            name="oem[]"
-                            class="form-select form-select-sm shadow-sm oem-select"
-                            required
-                        >
-                            <option value="">Select OEM</option>
-                            {% for oem in oems %}
+                    <div class="row g-3">
+
+                        <!-- OEM -->
+                        <div class="col-lg-3">
+                            <label class="small text-secondary fw-semibold">OEM</label>
+                            <select name="oem[]" class="form-select form-select-sm shadow-sm oem-select" required>
+                                <option value="">Select OEM</option>
+                                {% for oem in oems %}
                                 <option value="{{ oem.id }}">{{ oem.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Category Row -->
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary mb-1">Category</label>
-                        <select
-                            name="category[]"
-                            class="form-select form-select-sm shadow-sm category-select"
-                            disabled
-                            required
-                        >
-                            <option value="">Select category</option>
-                        </select>
-                    </div>
-
-                    <!-- Device Row -->
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-primary mb-1">Device</label>
-                        <select
-                            name="device_name[]"
-                            class="form-select form-select-sm shadow-sm device-name-select"
-                            disabled
-                            required
-                        >
-                            <option value="">Select device</option>
-                        </select>
-                    </div>
-
-                    <!-- Quantity Row -->
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary mb-1">Quantity</label>
-                        <div class="input-group input-group-sm shadow-sm">
-                            <input
-                                type="number"
-                                name="quantity[]"
-                                class="form-control quantity-input text-center"
-                                min="1"
-                                value="1"
-                                required
-                            >
-                            <span class="input-group-text">Units</span>
+                                {% endfor %}
+                            </select>
                         </div>
+
+                        <!-- Category -->
+                        <div class="col-lg-3">
+                            <label class="small text-secondary fw-semibold">Category</label>
+                            <select name="category[]" class="form-select form-select-sm category-select shadow-sm" disabled required>
+                                <option value="">Select category</option>
+                            </select>
+                        </div>
+
+                        <!-- Device -->
+                        <div class="col-lg-3">
+                            <label class="small text-secondary fw-semibold">Device</label>
+                            <select name="device_name[]" class="form-select form-select-sm device-name-select shadow-sm" disabled required>
+                                <option value="">Select device</option>
+                            </select>
+                        </div>
+
+                        <!-- Quantity -->
+                        <div class="col-lg-3">
+                            <label class="small text-secondary fw-semibold">Quantity</label>
+                            <input type="number" name="quantity[]" class="form-control form-control-sm shadow-sm quantity-input" min="1" value="1" required>
+                        </div>
+
                     </div>
 
-                    <!-- Remove Button Row -->
-                    <div class="d-flex justify-content-end">
-                        <button
-                            type="button"
-                            class="btn btn-outline-danger btn-sm remove-request-btn d-none"
-                            title="Remove this request"
-                        >
+                    <!-- Remove Button -->
+                    <div class="mt-3 text-end">
+                        <button type="button" class="btn btn-outline-danger btn-sm remove-request-btn d-none">
                             <i class="fas fa-trash-alt me-1"></i> Remove
                         </button>
                     </div>
@@ -131,44 +97,44 @@
 
         </div>
 
-        <!-- ADD REQUEST -->
+        <!-- ADD NEW DEVICE REQUEST -->
         <div class="mb-4">
-            <button
-                type="button"
-                id="addRequestBtn"
-                class="add-request-btn btn-sm px-4 py-2"
-            >
-                <i class="fas fa-plus-circle me-2"></i> Add Another Request
+            <button type="button" id="addRequestBtn" class="btn btn-outline-primary btn-sm px-3">
+                <i class="fas fa-plus-circle me-1"></i> Add Another Request
             </button>
         </div>
 
-        <!-- PAYMENT -->
-        <div class="card border-0 shadow-sm mb-4 animate-card">
-            <div class="card-header border-bottom py-2">
-                <h5 class="fw-bold text-primary mb-1">
+        <!-- PAYMENT PROOF UPLOAD -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-0">
+                <h5 class="fw-bold text-primary mb-0">
                     <i class="fas fa-file-upload me-2"></i>Payment Verification
                 </h5>
-                <p class="text-muted small mb-0">Upload proof of payment</p>
             </div>
+
             <div class="card-body">
-                <div class="alert alert-light border small mb-3">
-                    <i class="fas fa-info-circle text-primary me-1"></i>
-                    Accepted formats: PDF, JPG, PNG (Max 5MB)
+
+                <p class="text-muted small mb-3">
+                    Upload a Proforma Invoice or M-PESA screenshot.
+                </p>
+
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small text-secondary">
+                            Upload Payment Proof
+                        </label>
+                        <input type="file" name="payment_proof"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            class="form-control form-control-sm shadow-sm">
+                    </div>
+
                 </div>
 
-                <label class="form-label small fw-semibold text-secondary mb-1">
-                    Upload Payment Proof
-                </label>
-                <input
-                    type="file"
-                    name="payment_proof"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    class="form-control form-control-sm shadow-sm"
-                >
             </div>
         </div>
 
-        <!-- SUBMIT -->
+        <!-- SUBMIT BUTTON -->
         <div class="text-end">
             <button type="submit" class="btn btn-success btn-sm px-4">
                 <i class="fas fa-paper-plane me-1"></i> Submit All Requests
@@ -176,107 +142,52 @@
         </div>
 
     </form>
+
 </div>
 
-<!-- STYLES -->
-<style>
-.animate-card {
-    animation: fadeSlideIn 0.45s ease forwards;
-}
-@keyframes fadeSlideIn {
-    from { opacity: 0; transform: translateY(14px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.device-request-group {
-    border-left: 4px solid #0d6efd;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.device-request-group:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 0.75rem 1.5rem rgba(13,110,253,.15);
-}
-
-.add-request-btn {
-    background-color: #0d6efd;
-    color: #fff;
-    font-weight: 600;
-    border: none;
-    border-radius: 6px;
-    box-shadow: 0 4px 10px rgba(13,110,253,.35);
-    transition: all 0.2s ease-in-out;
-}
-.add-request-btn:hover {
-    background-color: #084298;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(8,66,152,.45);
-}
-
-.card-header {
-    background: linear-gradient(90deg, rgba(13,110,253,0.08), rgba(13,110,253,0.02));
-}
-
-.bg-light {
-    background-color: #f8faff !important;
-    border: 1px solid #e4ebf7;
-}
-
-.remove-request-btn:hover {
-    background-color: #dc3545;
-    color: #fff;
-}
-</style>
-
-<!-- SCRIPTS -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
 <script>
+
 $(document).ready(function () {
 
-    function updateRequestIndexes() {
-        $(".device-request-group").each(function (index) {
-            $(this).find(".request-index").text(index + 1);
-        });
-    }
-
-    // ADD REQUEST WITH ANIMATION
+    // ADD NEW REQUEST SECTION
     $("#addRequestBtn").click(function () {
         let clone = $(".device-request-group:first").clone(true);
-        clone.removeClass("animate-card");
-        void clone[0].offsetWidth;
-        clone.addClass("animate-card");
 
         clone.find("select").val("");
         clone.find("input").val("1");
-        clone.find(".category-select, .device-name-select")
-             .prop("disabled", true)
-             .html('<option value="">Select</option>');
+
+        clone.find(".category-select, .device-name-select").prop("disabled", true).html('<option value="">Select</option>');
+
         clone.find(".remove-request-btn").removeClass("d-none");
 
         $("#deviceRequestContainer").append(clone);
-        updateRequestIndexes();
     });
 
-    // REMOVE REQUEST WITH FADE
+    // REMOVE SECTION
     $(document).on("click", ".remove-request-btn", function () {
-        let card = $(this).closest(".device-request-group");
-        card.fadeOut(200, function () {
-            $(this).remove();
-            updateRequestIndexes();
-        });
+        $(this).closest(".device-request-group").remove();
     });
 
     // OEM → CATEGORY
     $(document).on("change", ".oem-select", function () {
         let group = $(this).closest(".device-request-group");
+        let oemId = $(this).val();
         let categorySelect = group.find(".category-select");
+
         categorySelect.prop("disabled", true).html('<option>Loading...</option>');
 
         $.ajax({
             url: window.location.pathname,
-            data: { ajax: "filter_options", oem_id: $(this).val() },
+            data: { ajax: "filter_options", oem_id: oemId },
             success: function (data) {
-                categorySelect.prop("disabled", false).html('<option value="">Select category</option>');
-                data.categories.forEach(c => categorySelect.append(`<option value="${c}">${c}</option>`));
+                categorySelect.empty().append('<option value="">Select category</option>');
+                categorySelect.prop("disabled", false);
+
+                data.categories.forEach(c => {
+                    categorySelect.append(`<option value="${c}">${c}</option>`);
+                });
             }
         });
     });
@@ -284,41 +195,49 @@ $(document).ready(function () {
     // CATEGORY → DEVICES
     $(document).on("change", ".category-select", function () {
         let group = $(this).closest(".device-request-group");
+        let oemId = group.find(".oem-select").val();
+        let categoryName = $(this).val();
         let deviceSelect = group.find(".device-name-select");
+
         deviceSelect.prop("disabled", true).html('<option>Loading...</option>');
 
         $.ajax({
             url: window.location.pathname,
-            data: { 
-                ajax: "filter_options",
-                oem_id: group.find(".oem-select").val(),
-                category_name: $(this).val()
-            },
+            data: { ajax: "filter_options", oem_id: oemId, category_name: categoryName },
             success: function (data) {
-                deviceSelect.prop("disabled", false).html('<option value="">Select device</option>');
-                data.device_names.forEach(d => deviceSelect.append(`<option value="${d}">${d}</option>`));
+                deviceSelect.empty().append('<option value="">Select device</option>');
+                deviceSelect.prop("disabled", false);
+
+                data.device_names.forEach(d => {
+                    deviceSelect.append(`<option value="${d}">${d}</option>`);
+                });
             }
         });
     });
 
-    // DEVICE → MAX QUANTITY
+    // DEVICE → INFO
     $(document).on("change", ".device-name-select", function () {
         let group = $(this).closest(".device-request-group");
+
+        let oemId = group.find(".oem-select").val();
+        let categoryName = group.find(".category-select").val();
+        let deviceName = $(this).val();
+
         $.ajax({
             url: window.location.pathname,
             data: {
                 ajax: "device_info",
-                oem_id: group.find(".oem-select").val(),
-                category_name: group.find(".category-select").val(),
-                device_name: $(this).val()
+                oem_id: oemId,
+                category_name: categoryName,
+                device_name: deviceName
             },
             success: function (data) {
                 group.find(".quantity-input").attr("max", data.available_quantity);
             }
         });
+
     });
 
 });
 </script>
-
 {% endblock %}
