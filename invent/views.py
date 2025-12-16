@@ -64,16 +64,21 @@ def logout_view(request):
 @login_required
 def requestor_dashboard(request):
     user_requests = DeviceRequest.objects.filter(
-        requestor=request.user).order_by('id')
-    labeled_requests = []
-    total_requests_count = user_requests.count()
-    for idx, req in enumerate(user_requests, start=1):
-        label = total_requests_count - idx + 1
-        req.label_id = label
-        labeled_requests.append(req)
+        requestor=request.user).order_by('-id') # Order by -id for most recent first
+    
+    # Labeling logic (as-is, but using negative index for reverse numbering)
+    labeled_requests = list(user_requests) # Convert to list to iterate twice
+    total_requests_count = len(labeled_requests)
+    for idx, req in enumerate(labeled_requests):
+        # Calculate label: 1, 2, 3...
+        req.label_id = total_requests_count - idx 
+        
+    # --- FIX APPLIED HERE ---
+    # Grouping should be by the Device (product), not a non-existent imei field.
     device_summary = (
         user_requests
-        .values('device__imei_no')
+        # FIX: Changed 'device__imei_no' to 'device__name' for grouping by product name.
+        .values('device__name') 
         .annotate(
             total_requested=Count('id'),
             total_approved=Count('id', filter=Q(status='Approved')),
@@ -84,8 +89,10 @@ def requestor_dashboard(request):
             total_partially_returned=Count(
                 'id', filter=Q(status='Partially Returned')),
         )
-        .order_by('device__imei_no')
+        .order_by('device__name')
     )
+    
+    # Direct count queries are efficient and remain correct
     context = {
         'requests': labeled_requests,
         'total_requests': user_requests.count(),
@@ -97,7 +104,6 @@ def requestor_dashboard(request):
         'device_summary': device_summary,
     }
     return render(request, 'invent/requestor_dashboard.html', context)
-
 
 @login_required
 def request_device(request):
@@ -1562,5 +1568,3 @@ def request_list(request, status):
         'status': status,
         'requests': requests
     })
-
-

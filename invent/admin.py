@@ -29,9 +29,8 @@ from .models import (
     DeviceRequestSelectedIMEI
 )
 from django.shortcuts import render, redirect
-import openpyxl
-from .models import Device, OEM
-from .forms import DeviceUploadForm
+
+# Removed openpyxl and DeviceUploadForm imports that were part of the old, incorrect bulk upload logic
 
 ASSIGNABLE_GROUPS = getattr(settings, 'BRANCH_ADMIN_ASSIGNABLE_GROUPS', None)
 
@@ -80,30 +79,24 @@ class CustomUserAdmin(DefaultUserAdmin):
     get_branch.short_description = "Branch"
 
     def get_inline_instances(self, request, obj=None):
-        # Hide inline on the add user page to avoid duplicate-profile creation.
         if obj is None:
             return []
         return super().get_inline_instances(request, obj)
 
     def get_queryset(self, request):
-
         qs = super().get_queryset(request).select_related('profile')
         if request.user.is_superuser:
             return qs
         user_branch = _get_user_branch_from_request(request)
         if not user_branch:
-            # If the acting user has no branch, return empty queryset
             return qs.none()
-        # restrict to users in the same branch and exclude superusers
         return qs.filter(profile__branch=user_branch, is_superuser=False)
 
     def has_view_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
-        # allow viewing the changelist only if they have model view permission
         if obj is None:
             return request.user.has_perm('auth.view_user')
-        # object-level: allow if same branch
         user_branch = _get_user_branch_from_request(request)
         obj_branch = getattr(getattr(obj, 'profile', None), 'branch', None)
         return (user_branch is not None and obj_branch == user_branch) and request.user.has_perm('auth.view_user')
@@ -111,12 +104,10 @@ class CustomUserAdmin(DefaultUserAdmin):
     def has_change_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
-        # list page (obj is None) allowed if user has change permission
         if obj is None:
             return request.user.has_perm('auth.change_user')
         user_branch = _get_user_branch_from_request(request)
         obj_branch = getattr(getattr(obj, 'profile', None), 'branch', None)
-        # allow owners (so a user can edit their own account) OR same-branch edits
         if obj == request.user:
             return request.user.has_perm('auth.change_user')
         return (user_branch is not None and obj_branch == user_branch) and request.user.has_perm('auth.change_user')
@@ -128,28 +119,21 @@ class CustomUserAdmin(DefaultUserAdmin):
             return request.user.has_perm('auth.delete_user')
         user_branch = _get_user_branch_from_request(request)
         obj_branch = getattr(getattr(obj, 'profile', None), 'branch', None)
-        # Prevent deleting superusers via branch-admin
         if obj.is_superuser:
             return False
         return (user_branch is not None and obj_branch == user_branch) and request.user.has_perm('auth.delete_user')
 
-    # Restrict which groups a non-superuser may choose in the admin form
     def formfield_for_manytomany(self, db_field, request, **kwargs):
-
         if db_field.name == 'groups' and not request.user.is_superuser:
             if ASSIGNABLE_GROUPS:
                 kwargs['queryset'] = Group.objects.filter(
                     name__in=ASSIGNABLE_GROUPS)
             else:
-                # fallback: allow assigning only groups the acting user is already in
                 kwargs['queryset'] = request.user.groups.all()
         return super().formfield_for_manytomany(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
-
         is_new = not change
-
-        # Defensive: ensure groups to be assigned are within allowed set
         if not request.user.is_superuser:
             selected_groups = form.cleaned_data.get(
                 'groups') if form.is_valid() else None
@@ -160,40 +144,31 @@ class CustomUserAdmin(DefaultUserAdmin):
                 else:
                     allowed_qs = set(request.user.groups.all())
 
-                # selected_groups can be a QuerySet or list - normalize to list
                 selected_list = list(selected_groups)
                 forbidden = [g for g in selected_list if g not in allowed_qs]
                 if forbidden:
-                    # remove forbidden groups from selection and warn
                     allowed_selected = [
                         g for g in selected_list if g in allowed_qs]
-                    # temporarily set the groups on the form instance so that super().save_model doesn't save forbidden ones
-                    # We'll set the allowed groups explicitly after saving the User object.
                     form.cleaned_data['groups'] = allowed_selected
                     messages.warning(request,
-                                   "Some groups you selected were not allowed and have been removed automatically.")
-        # Save the user (this saves auth user fields)
+                                     "Some groups you selected were not allowed and have been removed automatically.")
         super().save_model(request, obj, form, change)
 
-        # After saving the User, ensure the final groups match allowed selection (defensive)
         if not request.user.is_superuser:
             post_groups = form.cleaned_data.get(
                 'groups') if form.is_valid() else None
             if post_groups is not None:
                 obj.groups.set(post_groups)
 
-        # If it's a new user and the acting user is not superuser, set the profile.branch
         if is_new and not request.user.is_superuser:
             try:
                 user_branch = _get_user_branch_from_request(request)
                 if user_branch:
                     profile, created = Profile.objects.get_or_create(user=obj)
-                    # Only set branch if not already set
                     if profile.branch != user_branch:
                         profile.branch = user_branch
                         profile.save()
             except Exception:
-                # Do not block user creation on profile assignment errors; log if needed.
                 pass
 
 
@@ -223,7 +198,6 @@ class BranchScopedAdmin(admin.ModelAdmin):
         if not branch:
             return qs.none()
         if self.branch_field:
-            # ensure field exists on model
             if any(f.name == self.branch_field for f in self.model._meta.get_fields()):
                 return qs.filter(**{self.branch_field: branch})
         # fallback: try filter via device__branch
@@ -258,7 +232,6 @@ class BranchScopedAdmin(admin.ModelAdmin):
         return obj_branch == branch and request.user.has_perm(f"{self.model._meta.app_label}.delete_{self.model._meta.model_name}")
 
     def save_model(self, request, obj, form, change):
-        # When a Branch Admin creates a new object, ensure it is assigned to their branch
         if not request.user.is_superuser:
             branch = get_user_branch(request)
             if branch:
@@ -268,136 +241,109 @@ class BranchScopedAdmin(admin.ModelAdmin):
 
 # DeviceIMEI inline for Device admin
 
-
 class DeviceIMEIInline(admin.TabularInline):
     model = DeviceIMEI
     extra = 1
-    fields = ('imei_number', 'is_available')
+    # FIX: Added serial_no and mac_address back to the inline
+    fields = ('imei_number', 'serial_no', 'mac_address', 'is_available')
     readonly_fields = ()
 
 
-# ⭐ NEW: Define the Resource Class for Import/Export functionality
+# ⭐ FIX: DeviceResource fields are adjusted to only represent the Product (Device)
 class DeviceResource(resources.ModelResource):
     """
-    Defines the fields available for import/export for the Device model.
+    Defines the fields available for import/export for the Device model,
+    excluding unique asset identifiers, product_id, manufacturer, and description.
     """
     class Meta:
         model = Device
         # Define the exact fields allowed for import/export
         fields = (
-            'name',          # 1. Device Name
-            'oem',           # 2. OEM
-            'category',      # 3. Category
-            'imei_no',       # 4. IMEI number
-            'serial_no',     # 5. Serial number
-            'mac_address',   # 6. MAC Address
-            'status',        # 7. Status
+            'name',
+            'oem',
+            'category',
+            'status', # Status of the device type (e.g., Active/Obsolete)
         )
         # Exclude all other fields
         exclude = (
-            'id', 
-            'product_id', 
-            'total_quantity', 
-            'quantity_issued', 
-            'manufacturer', 
-            'description', 
-            'selling_price', 
-            'currency', 
-            'branch', 
+            'id',
+            'imei_no',
+            'serial_no',
+            'mac_address',
+            'product_id',       # <-- REMOVED as requested
+            'manufacturer',     # <-- REMOVED as requested
+            'description',      # <-- REMOVED as requested
+            'total_quantity',
+            'quantity_issued',
+            'selling_price',
+            'currency',
+            'branch',
             'country'
         )
 
 # Device admin
-class DeviceUploadForm(forms.ModelForm):
-    excel_file = forms.FileField(
-        required=False,
-        help_text="Optional: Upload an Excel file with IMEI/Serial numbers"
-    )
-
-    class Meta:
-        model = Device
-        fields = ('name', 'category', 'oem', 'excel_file')
-
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        excel_file = self.cleaned_data.get('excel_file')
-
-        if excel_file:
-            try:
-                wb = openpyxl.load_workbook(excel_file)
-                sheet = wb.active
-            except Exception:
-                raise forms.ValidationError("Invalid Excel file. Please upload a valid .xlsx file.")
-
-            # Extract header
-            header = [str(cell.value).strip().lower() for cell in sheet[1] if cell.value]
-            header_index_map = {h: i for i, h in enumerate(header)}
-
-            if not any(col in header_index_map for col in ["imei no", "serial no"]):
-                raise forms.ValidationError("Excel must have at least 'IMEI No' or 'Serial No' column.")
-
-            oem_obj = instance.oem
-            name = instance.name
-            category = instance.category
-
-            added_count = 0
-            skipped_count = 0
-
-            for row in sheet.iter_rows(min_row=2, values_only=True):
-                imei_no = str(row[header_index_map["imei no"]]).strip() if "imei no" in header_index_map and row[header_index_map["imei no"]] else None
-                serial_no = str(row[header_index_map["serial no"]]).strip() if "serial no" in header_index_map and row[header_index_map["serial no"]] else None
-
-                if not imei_no and not serial_no:
-                    skipped_count += 1
-                    continue
-
-                # Skip duplicates
-                if imei_no and Device.objects.filter(imei_no=imei_no).exists():
-                    skipped_count += 1
-                    continue
-                if serial_no and Device.objects.filter(serial_no=serial_no).exists():
-                    skipped_count += 1
-                    continue
-
-                Device.objects.create(
-                    oem=oem_obj,
-                    name=name,
-                    category=category,
-                    imei_no=imei_no,
-                    serial_no=serial_no,
-                    status="available",
-                )
-                added_count += 1
-
-            # Show a message in the admin
-            messages.info(self.request, f"Upload complete: {added_count} added, {skipped_count} skipped.")
-
-        if commit:
-            instance.save()
-        return instance
-
-
 @admin.register(Device)
-class DeviceAdmin(admin.ModelAdmin):
-    form = DeviceUploadForm
-    list_display = ('category', 'name', 'oem', 'imei_no', 'serial_no', 'status')
-    list_filter = ('category', 'oem')
-    search_fields = ('name', 'imei_no', 'serial_no')
-    ordering = ('category', 'name')  # Group devices by category in the list
-    list_display_links = ('name',)  # Click on name to edit device
-
-    # Pass request to the form to display messages
-    def get_form(self, request, obj=None, **kwargs):
-        form = super().get_form(request, obj, **kwargs)
-        form.request = request  # make request available inside form.save()
-        return form
+class DeviceAdmin(ImportExportModelAdmin, BranchScopedAdmin): # Use ImportExportModelAdmin
+    # form = DeviceUploadForm # REMOVED: Reverted to default ModelForm, bulk logic is gone.
     
+    # FIXED list_display: Removed imei_no/serial_no/etc. Kept calculated quantities.
+    list_display = (
+        'category', 
+        'name', 
+        'oem', 
+        'status',
+        # Assuming total_quantity and available_quantity are methods/properties on the Device model
+        'total_quantity', 
+        'available_quantity', 
+    )
+    list_filter = ('category', 'oem', 'status')
+    
+    # FIXED search_fields: Removed unique IDs. Search only on product-level fields.
+    search_fields = ('name',) 
+    
+    ordering = ('category', 'name')
+    list_display_links = ('name',)
+    
+    # FIX: Custom fieldsets to remove product_id, manufacturer, and description
+    fieldsets = (
+        (None, {
+            'fields': (
+                'category', 
+                'name', 
+                'oem',
+                'status',
+            )
+        }),
+        ('Location (Optional)', {
+            'classes': ('collapse',),
+            'fields': ('branch', 'country',),
+        }),
+    )
+    
+    inlines = [DeviceIMEIInline]
+    
+    # Removed get_form method since the custom form with broken upload logic is removed.
+    
+# Issuance/Request/Return Inlines and Admins
 
 class SelectedIMEIInline(admin.TabularInline):
     model = DeviceRequestSelectedIMEI
     extra = 0
-    readonly_fields = ('imei', 'date_selected')
-    fields = ('imei', 'approved', 'rejected', 'date_selected')
+    # FIX: Use get_imei_number to display the actual ID, not the ForeignKey object
+    readonly_fields = ('get_imei_number', 'date_selected', 'approved', 'rejected') 
+    fields = ('get_imei_number', 'approved', 'rejected', 'date_selected')
+    
+    def get_imei_number(self, obj):
+        return obj.imei.imei_number
+    get_imei_number.short_description = 'IMEI/ID'
+    
+    # Restrict editing approved/rejected flags via inline
+    def has_change_permission(self, request, obj=None):
+        return False
+    
+    def has_add_permission(self, request, obj=None):
+        return False
+
 
 # DeviceRequest admin
 
@@ -419,7 +365,9 @@ class DeviceRequestAdmin(admin.ModelAdmin):
         'device__name',
         'requestor__username',
         'client__name',
-        'selected_devices__imei__imei_no'
+        # FIX: Correctly traverse to the IMEI number
+        'selected_imeis__imei__imei_number',
+        'selected_imeis__imei__serial_no'
     )
 
     inlines = [SelectedIMEIInline]
@@ -434,8 +382,9 @@ class DeviceRequestAdmin(admin.ModelAdmin):
             if device_request.status != 'Pending':
                 continue
 
-            selections = device_request.selected_devices.filter(approved=False)
-
+            # NOTE: Use the correct related name 'selected_imeis'
+            selections = device_request.selected_imeis.filter(approved=False, rejected=False)
+            
             # Quantity enforcement
             if selections.count() != device_request.quantity:
                 self.message_user(
@@ -446,33 +395,40 @@ class DeviceRequestAdmin(admin.ModelAdmin):
                 )
                 continue
 
+            can_approve = True
+            imeis_to_issue = []
             for selection in selections:
                 imei = selection.imei
-
                 if not imei.is_available:
                     self.message_user(
                         request,
-                        f"IMEI {imei.imei_no} is no longer available.",
+                        f"IMEI {imei.imei_number} is no longer available.",
                         level=messages.ERROR
                     )
+                    can_approve = False
                     break
+                imeis_to_issue.append(imei)
+            
+            if not can_approve:
+                continue
 
-                # Lock IMEI
-                imei.is_available = False
+            for imei in imeis_to_issue:
+                # Lock IMEI (Assuming mark_unavailable() is a method on DeviceIMEI)
+                imei.is_available = False # Direct update if mark_unavailable doesn't exist
                 imei.save(update_fields=['is_available'])
-
+                
                 # Create issuance record
                 IssuanceRecord.objects.create(
                     device=imei.device,
-                    imei=imei,
+                    imei=imei, # Pass the DeviceIMEI object
                     client=device_request.client,
                     logistics_manager=request.user,
                     device_request=device_request
                 )
 
-                selection.approved = True
-                selection.save(update_fields=['approved'])
-
+            # Mark all selections for this request as approved
+            selections.update(approved=True)
+            
             device_request.status = 'Approved'
             device_request.date_issued = timezone.now()
             device_request.save(update_fields=['status', 'date_issued'])
@@ -494,6 +450,9 @@ class DeviceRequestAdmin(admin.ModelAdmin):
                 device_request.status = 'Rejected'
                 device_request.save(update_fields=['status'])
                 rejected += 1
+                
+                # Release any selected IMEIs that were not approved/rejected yet (safety)
+                device_request.selected_imeis.filter(approved=False, rejected=False).update(rejected=True)
 
         self.message_user(
             request,
@@ -516,9 +475,15 @@ class PurchaseOrderAdmin(ImportExportModelAdmin, BranchScopedAdmin):
 
 @admin.register(IssuanceRecord)
 class IssuanceRecordAdmin(BranchScopedAdmin):
-    list_display = ('device', 'client', 'logistics_manager', 'issued_at')
-    search_fields = ('device__imei_no', 'device__serial_no',
-                     'client__name', 'logistics_manager__username')
+    # FIX: Added imei back to display
+    list_display = ('device', 'imei', 'client', 'logistics_manager', 'issued_at') 
+    # FIX: Search on imei fields, not old device fields
+    search_fields = (
+        'imei__imei_number', 
+        'imei__serial_no',
+        'client__name', 
+        'logistics_manager__username'
+    )
     branch_field = None
 # ReturnRecord admin
 
@@ -526,16 +491,19 @@ class IssuanceRecordAdmin(BranchScopedAdmin):
 @admin.register(ReturnRecord)
 class ReturnRecordAdmin(BranchScopedAdmin):
     list_display = ('device', 'client', 'returned_at', 'reason')
-    search_fields = ('device__imei_no', 'device__serial_no', 'client__name')
+    # FIX: Search fields adjusted since unique IDs are not on Device
+    search_fields = ('device__name', 'client__name')
     branch_field = None
 
 
 @admin.register(DeviceIMEI)
 class DeviceIMEIAdmin(BranchScopedAdmin):
-    list_display = ('imei_number', 'device', 'is_available')
-    search_fields = ('imei_number', 'device__name', 'device__product_id')
+    # FIX: Added serial_no/mac_address for better visibility
+    list_display = ('imei_number', 'serial_no', 'mac_address', 'device', 'is_available') 
+    # FIX: Search fields adjusted
+    search_fields = ('imei_number', 'serial_no', 'mac_address', 'device__name', 'device__category')
     list_filter = ('is_available',)
-    branch_field = None  # It will inherit via device.branch
+    branch_field = None
 
 
 @admin.register(DeviceSelectionGroup)
@@ -543,5 +511,9 @@ class DeviceSelectionGroupAdmin(admin.ModelAdmin):
     list_display = ('id', 'device_request', 'store_clerk',
                     'status', 'created_at', 'reviewed_at', 'reviewed_by')
     list_filter = ('status', 'created_at')
-    search_fields = ('device_request__id', 'store_clerk__username',
-                     'devices__imei_no', 'devices__serial_no')
+    # FIX: Search fields adjusted to the new structure
+    search_fields = (
+        'device_request__id', 
+        'store_clerk__username',
+        'devices__name',
+    )
