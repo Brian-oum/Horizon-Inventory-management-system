@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from .models import Profile, Country, Device, OEM, PurchaseOrder, DeviceRequest, Client, Branch
-from django.db.models import F  # Import F expression for queryset filtering
+from django.db.models import F # Import F expression for queryset filtering
 
 
 class CustomCreationForm(UserCreationForm):
@@ -51,15 +51,16 @@ class OEMForm(forms.ModelForm):
 
 
 class DeviceForm(forms.ModelForm):
+    """
+    FIXED: Removed imei_no, serial_no, and mac_address as they now belong
+    to the DeviceIMEI model.
+    """
     class Meta:
         model = Device
         fields = [
             'name',
             'oem',
-            'category',  # ✅ Added category here
-            'imei_no',
-            'serial_no',
-            'mac_address',
+            'category',
             'status',
             'branch',
             'country',
@@ -69,11 +70,8 @@ class DeviceForm(forms.ModelForm):
             'oem': forms.Select(attrs={'class': 'form-select'}),
             'category': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'e.g. Laptop or Router'  # ✅ Added examples
+                'placeholder': 'e.g. Laptop or Router'
             }),
-            'imei_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'IMEI Number'}),
-            'serial_no': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Serial Number'}),
-            'mac_address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 00:1A:2B:3C:4D:5E'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
             'branch': forms.Select(attrs={'class': 'form-select'}),
             'country': forms.Select(attrs={'class': 'form-select'}),
@@ -87,12 +85,10 @@ class DeviceForm(forms.ModelForm):
         self.fields['name'].required = True
         self.fields['oem'].required = True
         self.fields['status'].required = True
+        self.fields['category'].required = True
 
-        # Optional fields
-        self.fields['imei_no'].required = False
-        self.fields['serial_no'].required = False
-        self.fields['mac_address'].required = False
-        self.fields['category'].required = True  # ✅ Still required
+        # Fields related to unique identifiers are now managed by DeviceIMEI inline in admin
+        # and are not part of this form.
 
         # Hide branch and country for non-superusers
         if user and not user.is_superuser:
@@ -131,7 +127,7 @@ class DeviceRequestForm(forms.ModelForm):
 
     class Meta:
         model = DeviceRequest
-        # REMOVED 'reason' field
+        # 'reason' field was already removed in previous step, kept fields as is
         fields = ['device', 'quantity']
         widgets = {
             'device': forms.Select(attrs={'class': 'form-select form-select-sm'}),
@@ -142,6 +138,10 @@ class DeviceRequestForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
+        # The device queryset should be filtered to only show devices with available stock
+        # This requires accessing the related DeviceIMEI objects which have is_available=True.
+        # This implementation requires further view logic/F-expressions for complex filtering,
+        # but the line below is the basic starting point for a dynamic queryset.
         self.fields['device'].queryset = Device.objects.none()
         self.fields['device'].required = False
 
@@ -151,12 +151,29 @@ class DeviceRequestForm(forms.ModelForm):
                 self.initial['branch'] = profile.branch
 
     def save(self, commit=True, requestor=None):
-        client = Client.objects.create(
-            name=self.cleaned_data['client_name'],
-            phone_no=self.cleaned_data['client_phone'],
-            email=self.cleaned_data['client_email'],
-            address=self.cleaned_data['client_address'],
+        # Check if client with matching details already exists to avoid duplication
+        client_data = {
+            'name': self.cleaned_data['client_name'],
+            'phone_no': self.cleaned_data['client_phone'],
+            'email': self.cleaned_data['client_email'],
+            'address': self.cleaned_data['client_address'],
+        }
+        
+        # Try to get existing client or create a new one
+        client, created = Client.objects.get_or_create(
+            email=client_data['email'],
+            defaults=client_data
         )
+        
+        # If the client existed, update the other fields (name, phone, address)
+        if not created:
+            updated = False
+            for key, value in client_data.items():
+                if getattr(client, key) != value:
+                    setattr(client, key, value)
+                    updated = True
+            if updated:
+                client.save()
 
         device_request = super().save(commit=False)
         if requestor:
@@ -178,7 +195,7 @@ class DeviceRequestForm(forms.ModelForm):
 class ClientForm(forms.ModelForm):
     class Meta:
         model = Client
-        fields = ['name', 'email', 'phone_no', 'address']  # add address if needed
+        fields = ['name', 'email', 'phone_no', 'address']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
@@ -256,6 +273,6 @@ class DeviceUploadForm(forms.Form):
     )
     excel_file = forms.FileField(
         label="Excel File (.xlsx)",
-        help_text="Excel file containing IMEI No and/or Serial No columns",
+        help_text="Excel file containing 'IMEI No' and/or 'Serial No' columns",
         required=True
     )
