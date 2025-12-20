@@ -202,23 +202,14 @@ class DeviceSelectionGroup(models.Model):
     def __str__(self): return f"Selection for Request {self.device_request.id} by {self.store_clerk}"
 
 
+
 class DeviceRequest(models.Model):
     device = models.ForeignKey("Device", on_delete=models.CASCADE, related_name="requests")
     requestor = models.ForeignKey(User, on_delete=models.CASCADE, related_name="device_requests")
     client = models.ForeignKey("Client", on_delete=models.CASCADE, related_name="client_requests", null=True, blank=True)
-    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests")
-    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
-    
-    # FK ADDED: Links the request to the specific physical item (DeviceIMEI) if approved/issued
-    imei_obj = models.ForeignKey(
-        'DeviceIMEI',
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name='device_requests'
-    )
-    
-    # REMOVED imei_no CharField as imei_obj stores the reference
+    branch = models.ForeignKey("Branch", on_delete=models.SET_NULL, null=True, blank=True, related_name="requests")
+    country = models.ForeignKey("Country", on_delete=models.SET_NULL, null=True, blank=True)
+    imei_obj = models.ForeignKey('DeviceIMEI', null=True, blank=True, on_delete=models.SET_NULL, related_name='device_requests')
     quantity = models.PositiveIntegerField(default=1)
     reason = models.TextField(blank=True, null=True)
     application_date = models.DateField(default=timezone.now)
@@ -234,7 +225,6 @@ class DeviceRequest(models.Model):
         ('Partially Returned', 'Partially Returned'),
         ('Fully Returned', 'Fully Returned'),
     ]
-
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     date_requested = models.DateTimeField(auto_now_add=True)
     date_issued = models.DateTimeField(null=True, blank=True)
@@ -251,18 +241,41 @@ class DeviceRequest(models.Model):
         super().save(*args, **kwargs)
 
         if status_changed:
-            # When Issued, mark the specific IMEI as unavailable
+            # Mark IMEI unavailable if issued
             if self.status == 'Issued' and self.imei_obj:
                 self.imei_obj.mark_unavailable()
-            # If changed from Issued/Approved back to something else (e.g., Cancelled/Rejected), potentially re-mark IMEI as available (complex logic, often handled manually or via signals)
-            
-            # --- Email/Notification Logic (Kept as is) ---
+
+            # Set issued date
+            if self.status == 'Issued' and not self.date_issued:
+                self.date_issued = timezone.now()
+                super().save(update_fields=['date_issued'])
+
+            # Optional: send simple notifications
             user = self.requestor
             subject, message = None, None
-            # ... (Notifications logic remains as you provided)
-            # ... (Call to self.delivery_note() remains)
-            # ... (Clerk notifications remain)
-            # ... (Requestor email remains)
+
+            if self.status == 'Rejected':
+                subject = f"Device Request #{self.id} Rejected"
+                message = f"Hello,\n\nYour request for {self.device} has been rejected."
+            elif self.status == 'Approved':
+                subject = f"Device Request #{self.id} Approved"
+                message = f"Hello,\n\nYour request for {self.device} has been approved."
+            elif self.status == 'Issued':
+                subject = f"Device Request #{self.id} Issued"
+                message = f"Hello,\n\nThe device {self.device} has been issued to you."
+            elif self.status == 'Cancelled':
+                subject = f"Device Request #{self.id} Cancelled"
+                message = f"Hello,\n\nYour request for {self.device} has been cancelled."
+
+            if subject and message:
+                send_mail(
+                    subject,
+                    message,
+                    from_email=None,
+                    recipient_list=[user.email],
+                    fail_silently=False
+                )
+
             self._original_status = self.status
 
 
@@ -306,6 +319,7 @@ class IssuanceRecord(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, null=True, blank=True)
     logistics_manager = models.ForeignKey(User, on_delete=models.CASCADE)
     issued_at = models.DateTimeField(auto_now_add=True)
+    imei_obj = models.ForeignKey('DeviceIMEI', null=True, blank=True, on_delete=models.SET_NULL)
     device_request = models.ForeignKey(
         'DeviceRequest',
         on_delete=models.SET_NULL,

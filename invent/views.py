@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 from django.template.loader import render_to_string
 from xhtml2pdf import pisa
 import tempfile
-
+from invent.utils import generate_delivery_note
 
 
 def custom_login(request):
@@ -451,46 +451,66 @@ def inventory_list_view(request):
     query = request.GET.get('q', '')
     status = request.GET.get('status', 'all')
     page = request.GET.get('page', 1)
-    per_page = 10  # Set how many devices per page
+    per_page = 10
 
     user = request.user
-    # COUNTRY FILTER: Restrict by user's country
+
+    # =========================
+    # Base queryset
+    # =========================
     if user.is_superuser:
-        devices = Device.objects.select_related(
-            'oem', 'branch').order_by('category', 'oem__name', 'id')
+        devices = Device.objects.select_related('oem', 'branch')
     else:
         user_country = getattr(user.profile, "country", None)
         devices = Device.objects.select_related('oem', 'branch').filter(
-            branch__country=user_country).order_by('category', 'oem__name', 'id')
+            branch__country=user_country
+        )
 
-    if status and status != 'all':
-        devices = devices.filter(status=status)
+    # =========================
+    # Annotate quantities
+    # =========================
+    devices = devices.annotate(
+        total_units=Count('imeis', distinct=True),
+        available_units=Count(
+            'imeis',
+            filter=Q(imeis__is_available=True),
+            distinct=True
+        )
+    )
+
+    # =========================
+    # Status filter
+    # =========================
+    if status == 'available':
+        devices = devices.filter(available_units__gt=0)
+    elif status == 'issued':
+        devices = devices.filter(available_units=0)
+
+    # =========================
+    # Search (FIXED)
+    # =========================
     if query:
         devices = devices.filter(
-            Q(imei_no__icontains=query) |
-            Q(serial_no__icontains=query) |
             Q(name__icontains=query) |
             Q(category__icontains=query) |
             Q(oem__name__icontains=query) |
-            Q(issuancerecord__client__name__icontains=query)
+            Q(imeis__imei_number__icontains=query) |
+            Q(imeis__serial_no__icontains=query)
         ).distinct()
 
-    for device in devices:
-        last_issuance = (
-            IssuanceRecord.objects
-            .filter(device=device)
-            .order_by('-issued_at')
-            .select_related('client')
-            .first()
-        )
-        device.current_client = last_issuance.client if last_issuance else None
-        device.issued_at = last_issuance.issued_at if last_issuance else None
+    devices = devices.order_by('category', 'oem__name', 'id')
 
+    # =========================
+    # Grouping
+    # =========================
     grouped_devices = defaultdict(lambda: defaultdict(list))
     for device in devices:
         oem_label = f"{device.oem.name} (ID: {device.oem.id})" if device.oem else "-"
         grouped_devices[device.category][oem_label].append(device)
 
+    # =========================
+    # Pagination per OEM group
+    # =========================
     paginated_grouped_devices = {}
     for category, oems in grouped_devices.items():
         paginated_grouped_devices[category] = {}
@@ -592,47 +612,54 @@ def branch_admin_issue_dashboard(request):
 
 # --- Issue Device (Clerk) ---
 
+from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required, permission_required
+from django.db import transaction
+from invent.models import Device, DeviceRequest, Client, IssuanceRecord
+from invent.utils import generate_delivery_note  # Utility handles PDF/email with logo
+
 @login_required
 @permission_required('invent.can_issue_item', raise_exception=True)
 def issue_device(request):
     """
     Handles all device issuance workflows for store clerks.
+    Supports:
+        - Direct issue of a single device to client
+        - Issue approved requests (with selected devices/IMEIs)
     """
     user = request.user
 
-    # Filter available data
+    # -------------------- Context Data -------------------- #
     available_devices = Device.objects.filter(status='available')
     clients = Client.objects.all()
-    pending_requests = DeviceRequest.objects.filter(
-        status='Pending').select_related('device', 'client', 'requestor')
-    waiting_requests = DeviceRequest.objects.filter(
-        status='Waiting Approval').select_related('device', 'client', 'requestor')
-    approved_requests = DeviceRequest.objects.filter(
-        status='Approved').select_related('device', 'client', 'requestor')
-    all_requests = DeviceRequest.objects.all().select_related(
-        'device', 'client', 'requestor')
+    pending_requests = DeviceRequest.objects.filter(status='Pending').select_related('device', 'client', 'requestor')
+    waiting_requests = DeviceRequest.objects.filter(status='Waiting Approval').select_related('device', 'client', 'requestor')
+    approved_requests = DeviceRequest.objects.filter(status='Approved').select_related('device', 'client', 'requestor')
+    all_requests = DeviceRequest.objects.all().select_related('device', 'client', 'requestor')
 
-    # -------------------- HANDLE FORM ACTIONS -------------------- #
+    # -------------------- Handle POST Actions -------------------- #
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        # ---------------- Select IMEIs already handled on another view ---------------- #
-
-        # ----------- DIRECT ISSUE ACTION -----------
+        # ---------------- Direct Issue (no request) ---------------- #
         if action == 'direct_issue':
             device_id = request.POST.get('device_id')
             client_id = request.POST.get('client_id')
 
             if not device_id or not client_id:
-                messages.error(
-                    request, "Please select both a device and a client.")
+                messages.error(request, "Please select both a device and a client.")
                 return redirect('issue_device')
 
-            device = get_object_or_404(
-                Device, id=device_id, status='available')
+            device = get_object_or_404(Device, id=device_id, status='available')
             client = get_object_or_404(Client, id=client_id)
 
             with transaction.atomic():
+                # Pick first available IMEI for this device
+                imei_obj = device.imeis.filter(is_available=True).first()
+                if imei_obj:
+                    imei_obj.mark_unavailable()
+
                 # Mark device as issued
                 device.status = 'issued'
                 device.save()
@@ -642,51 +669,68 @@ def issue_device(request):
                     device=device,
                     client=client,
                     logistics_manager=user,
-                    device_request=None  # direct issue has no request
+                    device_request=None,
+                    imei_obj=imei_obj
                 )
 
-            messages.success(
-                request, f"Device {device.device_name} (IMEI: {device.imei_no}) issued directly to {client.name}.")
+            # Generate delivery note (with logo)
+            generate_delivery_note(device, client, imei_obj)
+
+            messages.success(request, f"Device {device.name} (IMEI: {imei_obj.imei_number if imei_obj else 'N/A'}) issued to {client.name}.")
             return redirect('issue_device')
 
-        # ----------- ISSUE APPROVED REQUEST -----------
+        # ---------------- Issue Approved Request ---------------- #
         elif action == 'issue':
             request_id = request.POST.get('device_request_id')
-            device_request = get_object_or_404(
-                DeviceRequest, id=request_id, status='Approved')
+            device_request = get_object_or_404(DeviceRequest, id=request_id, status='Approved')
 
             selected_devices = device_request.selected_devices.all()
             if not selected_devices.exists():
-                messages.error(
-                    request, "No selected IMEIs found for this request.")
+                messages.error(request, "No selected devices found for this request.")
                 return redirect('issue_device')
 
             with transaction.atomic():
                 for sd in selected_devices:
                     device = sd.device
-                    if device.status == 'available':
-                        device.status = 'issued'
-                        device.save()
-                        IssuanceRecord.objects.create(
-                            device=device,
-                            client=device_request.client,
-                            logistics_manager=user,
-                            device_request=device_request
-                        )
 
+                    # Pick first available IMEI for this device
+                    imei_obj = device.imeis.filter(is_available=True).first()
+                    if not imei_obj:
+                        messages.warning(request, f"No available IMEIs for device {device.name}. Skipped.")
+                        continue
+
+                    # Mark IMEI as unavailable
+                    imei_obj.mark_unavailable()
+
+                    # Mark device as issued
+                    device.status = 'issued'
+                    device.save()
+
+                    # Create issuance record
+                    IssuanceRecord.objects.create(
+                        device=device,
+                        client=device_request.client,
+                        logistics_manager=user,
+                        device_request=device_request,
+                        imei_obj=imei_obj
+                    )
+
+                # Update request status
                 device_request.status = 'Issued'
                 device_request.save()
 
-            messages.success(
-                request, f"Devices for Request #{device_request.id} issued successfully.")
+            # Generate delivery note with company logo
+            generate_delivery_note(device_request)
+
+            messages.success(request, f"Devices for Request #{device_request.id} issued successfully.")
             return redirect('issue_device')
 
-        # ----------- INVALID ACTION -----------
+        # ---------------- Invalid action ---------------- #
         else:
             messages.error(request, "Invalid action.")
             return redirect('issue_device')
 
-    # -------------------- CONTEXT DATA -------------------- #
+    # -------------------- Render Template -------------------- #
     context = {
         'available_devices': available_devices,
         'clients': clients,
@@ -1568,3 +1612,111 @@ def request_list(request, status):
         'status': status,
         'requests': requests
     })
+
+@login_required
+@permission_required('invent.add_device', raise_exception=True)
+def upload_inventory(request):
+    if request.method == 'POST':
+        oem_name = request.POST.get('oem')
+        category = request.POST.get('category')
+        name = request.POST.get('name')
+        excel_file = request.FILES.get('excel_file')
+
+        # =====================
+        # Basic validation
+        # =====================
+        if not all([oem_name, category, name]):
+            messages.error(request, "Please provide OEM, category, and device name.")
+            return redirect("upload_inventory")
+
+        if not excel_file:
+            messages.error(request, "Please upload an Excel file.")
+            return redirect("upload_inventory")
+
+        # =====================
+        # Load Excel
+        # =====================
+        try:
+            wb = openpyxl.load_workbook(excel_file)
+            sheet = wb.active
+        except Exception:
+            messages.error(request, "Invalid Excel file. Upload a valid .xlsx file.")
+            return redirect("upload_inventory")
+
+        header = [str(cell.value).strip().lower() for cell in sheet[1] if cell.value]
+        header_index_map = {h: i for i, h in enumerate(header)}
+
+        if not any(col in header_index_map for col in ["imei no", "serial no"]):
+            messages.error(
+                request, "Excel must contain at least 'IMEI No' or 'Serial No' column."
+            )
+            return redirect("upload_inventory")
+
+        # =====================
+        # Get or create Device
+        # =====================
+        oem_obj, _ = OEM.objects.get_or_create(name=oem_name)
+
+        device, _ = Device.objects.get_or_create(
+            oem=oem_obj,
+            name=name,
+            category=category,
+            defaults={
+                "status": "available",
+                "branch": request.user.profile.branch if not request.user.is_superuser else None,
+                "country": request.user.profile.country if not request.user.is_superuser else None,
+            }
+        )
+
+        added_count = 0
+        skipped_count = 0
+
+        # =====================
+        # Process rows
+        # =====================
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            imei_number = (
+                str(row[header_index_map["imei no"]]).strip()
+                if "imei no" in header_index_map and row[header_index_map["imei no"]]
+                else None
+            )
+            serial_no = (
+                str(row[header_index_map["serial no"]]).strip()
+                if "serial no" in header_index_map and row[header_index_map["serial no"]]
+                else None
+            )
+
+            if not imei_number and not serial_no:
+                skipped_count += 1
+                continue
+
+            # =====================
+            # Duplicate checks
+            # =====================
+            if imei_number and DeviceIMEI.objects.filter(imei_number=imei_number).exists():
+                skipped_count += 1
+                continue
+
+            if serial_no and DeviceIMEI.objects.filter(serial_no=serial_no).exists():
+                skipped_count += 1
+                continue
+
+            # =====================
+            # Create IMEI record
+            # =====================
+            DeviceIMEI.objects.create(
+                device=device,
+                imei_number=imei_number,
+                serial_no=serial_no,
+                is_available=True
+            )
+
+            added_count += 1
+
+        messages.success(
+            request,
+            f"Upload complete: {added_count} devices added, {skipped_count} skipped."
+        )
+        return redirect("inventory_list")
+
+    return render(request, "invent/upload_inventory.html")

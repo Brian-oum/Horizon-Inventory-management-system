@@ -156,7 +156,7 @@
                     <tbody>
                         {% for req in approved_requests %}
                         <tr>
-                            <td>{{ req.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td>{{ req.requestor.username }}</td>
                             <td>{{ req.client.name|default:"N/A" }}</td>
                             <td>
@@ -234,9 +234,9 @@
                     <tbody>
                         {% for req in all_requests %}
                         <tr>
-                            <td>{{ req.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td>{{ req.requestor.username }}</td>
-                            <td>{{ req.device.device_name }}</td>
+                            <td>{{ req.device.name }}</td>
                             <td>{{ req.client.name|default:"N/A" }}</td>
                             <td>
                                 <span class="badge 
