@@ -296,7 +296,12 @@ class SelectedDevice(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     selected_by = models.ForeignKey(User, on_delete=models.CASCADE)
     selected_at = models.DateTimeField(auto_now_add=True)
+    imei = models.ForeignKey(DeviceIMEI, on_delete=models.PROTECT, null=True, blank=True)
+    approved = models.BooleanField(default=False)
+    rejected = models.BooleanField(default=False)
 
+    def __str__(self):
+        return f"{self.imei.imei_number} selected for {self.request}"
 
 class DeviceSelection(models.Model):
     device_request = models.ForeignKey('DeviceRequest', on_delete=models.CASCADE, related_name='selections')
