@@ -26,7 +26,8 @@ from .models import (
     Profile,
     Country,
     DeviceIMEI,
-    DeviceRequestSelectedIMEI
+    DeviceRequestSelectedIMEI,
+    SelectedDevice  
 )
 from django.shortcuts import render, redirect
 
@@ -326,25 +327,35 @@ class DeviceAdmin(ImportExportModelAdmin, BranchScopedAdmin): # Use ImportExport
     
 # Issuance/Request/Return Inlines and Admins
 
-class SelectedIMEIInline(admin.TabularInline):
-    model = DeviceRequestSelectedIMEI
+# --- Admin Inline for SelectedDevice ---
+class SelectedDeviceInline(admin.TabularInline):
+    model = SelectedDevice
     extra = 0
-    # FIX: Use get_imei_number to display the actual ID, not the ForeignKey object
-    readonly_fields = ('get_imei_number', 'date_selected', 'approved', 'rejected') 
-    fields = ('get_imei_number', 'approved', 'rejected', 'date_selected')
-    
+    readonly_fields = ('get_imei_number', 'get_selected_by', 'selected_at')
+    fields = ('get_imei_number', 'get_selected_by', 'selected_at', 'approved', 'rejected')
+
+    # Display the IMEI number instead of the object
     def get_imei_number(self, obj):
-        return obj.imei.imei_number
+        return obj.imei.imei_number if obj.imei else "-"
     get_imei_number.short_description = 'IMEI/ID'
-    
-    # Restrict editing approved/rejected flags via inline
+
+    # Display who selected the IMEI
+    def get_selected_by(self, obj):
+        return obj.selected_by.username if obj.selected_by else "-"
+    get_selected_by.short_description = 'Store Clerk'
+
+    # Only select related fields that exist on SelectedDevice
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('imei', 'request')  # Removed 'selected_by' to avoid FieldError
+
+    # Allow editing approved/rejected flags in admin
     def has_change_permission(self, request, obj=None):
-        return False
-    
+        return True  # Admin can approve/reject
+
     def has_add_permission(self, request, obj=None):
-        return False
-
-
+        return False  # Only allow admin to edit existing selections
+ 
 # DeviceRequest admin
 
 @admin.register(DeviceRequest)
@@ -370,7 +381,7 @@ class DeviceRequestAdmin(admin.ModelAdmin):
         'selected_imeis__imei__serial_no'
     )
 
-    inlines = [SelectedIMEIInline]
+    inlines = [SelectedDeviceInline]
 
     actions = ['approve_requests', 'reject_requests']
 
@@ -379,7 +390,7 @@ class DeviceRequestAdmin(admin.ModelAdmin):
         approved_count = 0
 
         for device_request in queryset:
-            if device_request.status != 'Pending':
+            if device_request.status != 'Waiting Approval':
                 continue
 
             # NOTE: Use the correct related name 'selected_imeis'
@@ -461,8 +472,6 @@ class DeviceRequestAdmin(admin.ModelAdmin):
         )
 
 # PurchaseOrder admin
-
-
 @admin.register(PurchaseOrder)
 class PurchaseOrderAdmin(ImportExportModelAdmin, BranchScopedAdmin):
     list_display = ('id', 'oem', 'branch', 'order_date',

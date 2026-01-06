@@ -10,15 +10,6 @@
   <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded shadow-sm">
     <div class="d-flex align-items-center">
       <h2 class="mb-0 me-3">Hello {{ user.first_name|default:user.username }}</h2>
-      {% if user_branch %}
-        <span class="badge bg-info text-dark">Branch: {{ user_branch.name }}</span>
-      {% else %}
-        <span class="text-muted">Branch: Unassigned</span>
-      {% endif %}
-    </div>
-
-    <div>
-      <a class="btn btn-outline-secondary" href="{% url 'store_clerk_dashboard' %}">Refresh</a>
     </div>
   </div>
 
@@ -33,14 +24,6 @@
     {% endfor %}
   </div>
   {% endif %}
-
-  <!-- Action Buttons -->
-  <div class="d-flex flex-wrap gap-3 mb-4">
-    <a class="btn btn-outline-primary" href="{% url 'issue_device' %}">📤 Issue Device</a>
-    <a class="btn btn-outline-secondary" href="{% url 'manage_stock' %}">⚙ Manage Stock</a>
-    <a class="btn btn-outline-dark" href="{% url 'adjust_stock' %}">🔧 Adjust Stock</a>
-    <a href="{% url 'add_oem' %}" class="btn btn-info"><i class="fas fa-user-plus me-1"></i> Add OEM</a>
-  </div>
 
   <!-- IoT Device Stats (Clickable Cards) -->
   <div class="row text-center mb-4">

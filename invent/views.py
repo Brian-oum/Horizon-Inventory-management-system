@@ -792,9 +792,10 @@ def select_imeis(request, request_id):
                             is_available=True
                         )
                         SelectedDevice.objects.create(
-                            request=device_request,
-                            device=imei_obj.device,
-                            selected_by=user
+                           imei=imei_obj,
+                           device=imei_obj.device,  
+                           request=device_request,
+                           selected_by=request.user 
                         )
                         imei_obj.is_available = False
                         imei_obj.save(update_fields=['is_available'])
@@ -852,9 +853,10 @@ def select_imeis(request, request_id):
 
                 for imei_obj in selected_imeis_qs:
                     SelectedDevice.objects.create(
+                        imei=imei_obj,
+                        device=imei_obj.device,  
                         request=device_request,
-                        device=imei_obj.device,
-                        selected_by=user
+                        selected_by=request.user 
                     )
                     imei_obj.is_available = False
                     imei_obj.save(update_fields=['is_available'])

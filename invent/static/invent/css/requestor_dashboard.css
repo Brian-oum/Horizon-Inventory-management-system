@@ -1,8 +1,8 @@
 :root {
   --sidebar-bg: white;
   --sidebar-text: #0f0f0f; /* Dark text for better contrast */
-  --sidebar-active: #27ae60; /* Slightly darker green */
-  --sidebar-hover: #15b33c;
+  --sidebar-active: #6f42c1; /* Slightly darker green */
+  --sidebar-hover: #6f42c1;
 
   --card-total-bg: #28a745; /* Green */
   --card-approved-bg: #007bff; /* Blue */
