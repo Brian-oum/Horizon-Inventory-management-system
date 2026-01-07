@@ -48,77 +48,102 @@
             margin: 0; /* Remove default body margin */
         }
 
-        /* Fixed Sidebar */
-        .sidebar-wrapper {
-            position: fixed; /* Make the sidebar fixed */
-            top: 0;
-            bottom: 0;
-            left: 0;
-            width: 250px; /* Fixed width for the sidebar */
-            background-color: var(--sidebar-bg); /* Use variable for consistency */
-            color: var(--sidebar-text); /* Use variable for consistency */
-            border-right: 1px solid #e9ecef;
-            z-index: 1030; /* Ensure it's above other content but below Bootstrap's highest z-index for modals/popovers */
-            display: flex; /* Use flexbox for content distribution */
-            flex-direction: column; /* Stack items vertically */
-        }
+       /* Fixed Sidebar */
+.sidebar-wrapper {
+    position: fixed; /* Make the sidebar fixed */
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 238px; /* Fixed width */
+    background-color: var(--sidebar-bg); /* White background */
+    color: var(--sidebar-text); /* Default sidebar text */
+    border-right: 1px solid #e9ecef;
+    z-index: 1030; /* Above content, below modals */
+    display: flex;
+    flex-direction: column; /* Stack nav vertically */
+}
 
-        /* Sidebar Content Area (scrollable) */
-        .sidebar-content {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding-top: 1rem;
-            padding-bottom: 1rem;
-            max-height: calc(100vh - 120px); /* sidebar scroll area minus top & bottom */
-            scrollbar-width: thin; /* for Firefox */
-            scrollbar-color: var(--bs-primary) #f1f1f1; /* for Firefox */
-        }
+/* Sidebar Content Area (scrollable) */
+.sidebar-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    max-height: calc(100vh - 120px);
+    scrollbar-width: thin;
+    scrollbar-color: var(--bs-primary) #f1f1f1;
+}
 
-        /* Optional: nice scrollbar for WebKit browsers (Chrome, Edge, Safari) */
-        .sidebar-content::-webkit-scrollbar {
-            width: 6px;
-        }
-        .sidebar-content::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        .sidebar-content::-webkit-scrollbar-thumb {
-            background-color: var(--bs-primary);
-            border-radius: 3px;
-        }
-        .sidebar-content::-webkit-scrollbar-thumb:hover {
-            background-color: #157347;
-        }
+.sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+.sidebar-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+.sidebar-content::-webkit-scrollbar-thumb {
+    background-color: var(--bs-primary);
+    border-radius: 3px;
+}
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background-color: #157347;
+}
 
+/* Sidebar Links */
+.sidebar-wrapper .nav-link {
+    color: var(--sidebar-text);
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
 
-        .sidebar-wrapper .nav-link {
-            color: var(--sidebar-text); /* Use variable for consistency */
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            transition: background-color 0.2s ease, color 0.2s ease;
-        }
-        .sidebar-wrapper .nav-link:hover { /* This is where you apply the hover color */
-            background-color: var(--sidebar-hover); /* Apply the --sidebar-hover variable here */
-            color: #212529; /* Adjust text color on hover if needed, or make it white for better contrast */
-        }
-        .sidebar-wrapper .nav-link.active {
-            background-color: var(--sidebar-active); /* Apply the --sidebar-active variable here */
-            color: #fff; /* Ensure active link text is white for contrast */
-        }
-        .sidebar-wrapper .nav-link.text-danger {
-            color: #dc3545 !important;
-        }
-        .sidebar-wrapper .nav-link.text-danger:hover {
-            background-color: #dc3545;
-            color: #fff !important;
-        }
+/* Hover Effect for Inactive Links */
+.sidebar-wrapper .nav-link:hover {
+    background-color: #f5f0ff; /* light purple hover */
+    color: #6f42c1;             /* purple text on hover */
+}
 
-        /* Sidebar Bottom Section */
-        .sidebar-bottom {
-            padding-top: 1rem;
-            padding-bottom: 1rem;
-            text-align: center;
-            border-top: 1px solid #e9ecef; /* Separator for bottom section */
-        }
+/* Active Link Styling */
+.sidebar-wrapper .nav-link.active {
+    background-color: #fff;          /* white background */
+    color: #6f42c1;                  /* purple text */
+    border: 2px solid #6f42c1;       /* purple border */
+    border-radius: 0.75rem;          /* rounded corners */
+    font-weight: 500;
+}
+
+/* Danger Links (e.g., Logout) */
+.sidebar-wrapper .nav-link.text-danger {
+    color: #dc3545 !important;
+}
+.sidebar-wrapper .nav-link.text-danger:hover {
+    background-color: #dc3545;
+    color: #fff !important;
+}
+
+/* Sidebar Icons */
+.sidebar-wrapper .nav-link i {
+    color: #6f42c1; /* purple icons by default */
+    margin-right: 0.5rem; /* spacing from text */
+    transition: color 0.2s ease;
+}
+
+/* Active Nav-Link Icons */
+.sidebar-wrapper .nav-link.active i {
+    color: #6f42c1; /* keep icon purple when active */
+}
+
+/* Optional: Hover effect for icons */
+.sidebar-wrapper .nav-link:hover i {
+    color: #8a63e0; /* lighter purple on hover */
+}
+
+/* Sidebar Bottom Section */
+.sidebar-bottom {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    text-align: center;
+    border-top: 1px solid #e9ecef;
+}
 
         /* Main Content Area */
         .main-content {
@@ -146,8 +171,18 @@
             z-index: 1020;
             display: none; /* Hide on larger screens, show on small screens via media query */
         }
+        .dashboard-card {
+            background-color: #ffffff !important; /* white background */
+            border: 1px solid #6f42c1; /* purple border */
+            border-radius: 12px; /* rounded corners */
+            color: #000; /* default text color */
+            transition: transform 0.2s;
+        }
 
-
+        .dashboard-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
         /* General UI components */
         .card {
             border-radius: 0.75rem;
@@ -232,6 +267,30 @@
                 order: -1; /* Place toggler first */
             }
         }
+        .summary-card {
+              background-color: #ffffff !important; /* white background */
+              border: 1px solid #6f42c1; /* purple border */
+              border-radius: 12px; /* rounded corners */
+              color: #000 !important; /* default text color */
+              transition: transform 0.2s;
+        }
+
+        .summary-card:hover {
+             transform: translateY(-3px);
+             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .summary-card h6,
+        .summary-card h2 {
+            color: #000 ; /* make text purple to match border */
+        }
+        .badge-purple {
+           background-color: #6f42c1; /* purple */
+           color: #fff; /* white text */
+           font-weight: 500;
+           padding: 0.4em 0.8em;
+           border-radius: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -257,12 +316,6 @@
                        <i class="fas fa-fw fa-home me-2"></i> Home
                     </a>
                 </li>
-                <li class="nav-item mb-2">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'manage_stock' %}active{% endif %}" href="{% url 'manage_stock' %}">
-                        <i class="fas fa-fw fa-boxes me-2"></i> Manage Stock
-                    </a>
-                </li>
-                
                 
                 <li class="nav-item mb-2 d-flex justify-content-between align-items-center">
                     <a class="nav-link {% if request.resolver_match.url_name == 'issue_device' %}active{% endif %}" href="{% url 'issue_device' %}">
@@ -277,11 +330,6 @@
                         <i class="fas fa-fw fa-arrow-left me-2"></i> Return IoT Device
                     </a>
                 </li>
-                <li class="nav-item mb-2">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'adjust_stock' %}active{% endif %}" href="{% url 'adjust_stock' %}">
-                        <i class="fas fa-fw fa-sliders-h me-2"></i> Adjust Stock
-                    </a>
-                </li>
                 
                 <li class="nav-item mb-2">
                     <a class="nav-link {% if request.resolver_match.url_name == 'upload_inventory' %}active{% endif %}" href="{% url 'upload_inventory' %}">
@@ -289,11 +337,6 @@
                     </a>
                 </li>
                 
-                <li class="nav-item mb-2">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'add_oem' %}active{% endif %}" href="{% url 'add_oem' %}">
-                        <i class="fas fa-fw fa-user-plus me-2"></i> Add OEM
-                    </a>
-                </li>
                 
                 <li class="nav-item mb-2">
                     <a class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" href="{% url 'reports' %}">
@@ -311,7 +354,7 @@
                     </a>
                 </li>
             </ul>
-            <small class="text-muted">Horizon Company</small>
+            <small class="text-muted">HorizonIoT Company Ltd</small>
         </div>
     </nav>
 

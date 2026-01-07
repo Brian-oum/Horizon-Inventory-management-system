@@ -22,6 +22,7 @@ from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 from collections import defaultdict
 import openpyxl
+from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 import logging
 from django.db.models.functions import Coalesce
@@ -31,7 +32,6 @@ from django.utils import timezone
 from .models import DeviceSelectionGroup  # add import at top
 logger = logging.getLogger(__name__)
 from django.template.loader import render_to_string
-from xhtml2pdf import pisa
 import tempfile
 from invent.utils import generate_delivery_note
 
@@ -310,55 +310,81 @@ def cancel_request(request, request_id):
 @permission_required('invent.view_device', raise_exception=True)
 def store_clerk_dashboard(request):
     user = request.user
-    # COUNTRY FILTER: Restrict by user's country
+
+    # =========================
+    # BASE QUERYSETS
+    # =========================
     if user.is_superuser:
-        total_devices = Device.objects.count()
-        devices_available = Device.objects.filter(status='available').count()
-        devices_issued = Device.objects.filter(status='issued').count()
-        devices_returned = Device.objects.filter(status='returned').count()
-        recent_issuances = (
-            IssuanceRecord.objects
-            .select_related('device', 'client')
-            .order_by('-issued_at')[:10]
-        )
-        pending_device_requests = DeviceRequest.objects.filter(
-            status="Pending").select_related("requestor", "device", "client")
+        requests_qs = DeviceRequest.objects.all()
+        devices_qs = Device.objects.all()
+        issuance_qs = IssuanceRecord.objects.all()
     else:
         user_country = getattr(user.profile, "country", None)
-        total_devices = Device.objects.filter(
-            branch__country=user_country).count()
-        devices_available = Device.objects.filter(
-            status='available', branch__country=user_country).count()
-        devices_issued = Device.objects.filter(
-            status='issued', branch__country=user_country).count()
-        devices_returned = Device.objects.filter(
-            status='returned', branch__country=user_country).count()
-        recent_issuances = (
-            IssuanceRecord.objects
-            .filter(device__branch__country=user_country)
-            .select_related('device', 'client')
-            .order_by('-issued_at')[:10]
+        requests_qs = DeviceRequest.objects.filter(branch__country=user_country)
+        devices_qs = Device.objects.filter(branch__country=user_country)
+        issuance_qs = IssuanceRecord.objects.filter(
+            device__branch__country=user_country
         )
-        pending_device_requests = DeviceRequest.objects.filter(
-            status="Pending", branch__country=user_country).select_related("requestor", "device", "client")
+
+    # =========================
+    # REQUEST LISTS
+    # =========================
+    pending_device_requests = requests_qs.filter(
+        status="Pending"
+    ).select_related("requestor", "device", "client")
+
+    approved_device_requests = requests_qs.filter(
+        status="Approved"
+    ).select_related("requestor", "device", "client")
+
+    # =========================
+    # COUNTS
+    # =========================
+    total_requests = requests_qs.count()
+    total_devices = devices_qs.count()
+    devices_available = devices_qs.filter(status='available').count()
+    devices_issued = devices_qs.filter(status='issued').count()
+    devices_returned = devices_qs.filter(status='returned').count()
+    approved_requests_count = approved_device_requests.count()
+
+    # =========================
+    # RECENT ISSUANCES
+    # =========================
+    recent_issuances = (
+        issuance_qs
+        .select_related('device', 'client')
+        .order_by('-issued_at')[:10]
+    )
+
+    # Deduplicate devices (latest issuance per device)
     seen = set()
     recent_devices = []
+
     for record in recent_issuances:
         if record.device.id not in seen:
             record.device.current_client = record.client
             record.device.issued_at = record.issued_at
             recent_devices.append(record.device)
             seen.add(record.device.id)
+
         if len(recent_devices) >= 5:
             break
+
+    # =========================
+    # CONTEXT
+    # =========================
     context = {
-        "total_devices": total_devices,
-        "devices_available": devices_available,
-        "devices_issued": devices_issued,
-        "devices_returned": devices_returned,
-        "recent_devices": recent_devices,
-        "pending_device_requests": pending_device_requests,
+        'total_requests': total_requests,
+        'total_devices': total_devices,
+        'devices_available': devices_available,
+        'devices_issued': devices_issued,
+        'devices_returned': devices_returned,
+        'recent_devices': recent_devices,
+        'pending_device_requests': pending_device_requests,
+        'approved_device_requests': approved_device_requests,
+        'approved_requests_count': approved_requests_count,
     }
+
     return render(request, 'invent/store_clerk_dashboard.html', context)
 
 
@@ -957,31 +983,6 @@ def submit_devices_for_approval(request):
 
 
 
-def delivery_note(device_request):
-    """Generate a PDF delivery note and return the file path using xhtml2pdf."""
-
-    html_content = render_to_string("invent/delivery_note.html", {
-        "request": device_request,
-        "selected_imeis": device_request.selected_devices.all(),
-    })
-
-    # Create temporary pdf file
-    pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-
-    # Write PDF
-    pisa_status = pisa.CreatePDF(
-        html_content,
-        dest=pdf_file,
-    )
-
-    pdf_file.close()
-
-    # Check for errors
-    if pisa_status.err:
-        return None
-
-    return pdf_file.name
-
 
 @login_required
 @permission_required('invent.can_approve_selection', raise_exception=True)
@@ -1296,59 +1297,52 @@ def add_oem(request):
 @permission_required('invent.view_device', raise_exception=True)
 def reports_view(request):
     user = request.user
-    # COUNTRY FILTER: Restrict by user's country
+
+    # --- Base QuerySets ---
     if user.is_superuser:
-        total_items = Device.objects.aggregate(
-            total=Sum('total_quantity'))['total'] or 0
-        total_requests = DeviceRequest.objects.count()
-        pending_count = DeviceRequest.objects.filter(status='Pending').count()
-        approved_count = DeviceRequest.objects.filter(
-            status='Approved').count()
-        issued_count = DeviceRequest.objects.filter(status='Issued').count()
-        rejected_count = DeviceRequest.objects.filter(
-            status='Rejected').count()
-        fully_returned_count = DeviceRequest.objects.filter(
-            status='Fully Returned').count()
-        partially_returned_count = DeviceRequest.objects.filter(
-            status='Partially Returned').count()
-        total_returned_quantity_all_items = DeviceRequest.objects.aggregate(
-            total_returned=Sum('returned_quantity')
-        )['total_returned'] or 0
-        top_requested_items = (
-            DeviceRequest.objects.values('device__name')
-            .annotate(request_count=Count('id'))
-            .order_by('-request_count')[:2]
-        )
+        devices_qs = Device.objects.all()
+        requests_qs = DeviceRequest.objects.all()
     else:
         user_country = getattr(user.profile, "country", None)
-        total_items = Device.objects.filter(branch__country=user_country).aggregate(
-            total=Sum('total_quantity'))['total'] or 0
-        total_requests = DeviceRequest.objects.filter(
-            branch__country=user_country).count()
-        pending_count = DeviceRequest.objects.filter(
-            status='Pending', branch__country=user_country).count()
-        approved_count = DeviceRequest.objects.filter(
-            status='Approved', branch__country=user_country).count()
-        issued_count = DeviceRequest.objects.filter(
-            status='Issued', branch__country=user_country).count()
-        rejected_count = DeviceRequest.objects.filter(
-            status='Rejected', branch__country=user_country).count()
-        fully_returned_count = DeviceRequest.objects.filter(
-            status='Fully Returned', branch__country=user_country).count()
-        partially_returned_count = DeviceRequest.objects.filter(
-            status='Partially Returned', branch__country=user_country).count()
-        total_returned_quantity_all_items = DeviceRequest.objects.filter(branch__country=user_country).aggregate(
-            total_returned=Sum('returned_quantity')
-        )['total_returned'] or 0
-        top_requested_items = (
-            DeviceRequest.objects.filter(
-                branch__country=user_country).values('device__name')
-            .annotate(request_count=Count('id'))
-            .order_by('-request_count')[:2]
-        )
+        devices_qs = Device.objects.filter(branch__country=user_country)
+        requests_qs = DeviceRequest.objects.filter(branch__country=user_country)
+
+    # --- Annotate devices with counts ---
+    devices_qs = devices_qs.annotate(
+        total_quantity=Count('imeis'),
+        available_quantity=Count('imeis', filter=Q(imeis__is_available=True))
+    )
+
+    total_items = devices_qs.aggregate(total=Sum('total_quantity'))['total'] or 0
+    total_available_items = devices_qs.aggregate(total=Sum('available_quantity'))['total'] or 0
+
+    # --- Request statistics ---
+    status_counts = requests_qs.values('status').annotate(count=Count('id'))
+    status_dict = {item['status']: item['count'] for item in status_counts}
+
+    pending_count = status_dict.get('Pending', 0)
+    approved_count = status_dict.get('Approved', 0)
+    issued_count = status_dict.get('Issued', 0)
+    rejected_count = status_dict.get('Rejected', 0)
+    fully_returned_count = status_dict.get('Fully Returned', 0)
+    partially_returned_count = status_dict.get('Partially Returned', 0)
+
+    # Total returned quantity (aggregate over returned_quantity field)
+    total_returned_quantity_all_items = requests_qs.aggregate(
+        total_returned=Sum('returned_quantity')
+    )['total_returned'] or 0
+
+    # Top 2 requested devices
+    top_requested_items = (
+        requests_qs.values('device__name')
+        .annotate(request_count=Count('id'))
+        .order_by('-request_count')[:2]
+    )
+
     context = {
         'total_items': total_items,
-        'total_requests': total_requests,
+        'total_available_items': total_available_items,
+        'total_requests': requests_qs.count(),
         'pending_count': pending_count,
         'approved_count': approved_count,
         'issued_count': issued_count,
@@ -1358,6 +1352,7 @@ def reports_view(request):
         'total_returned_quantity_all_items': total_returned_quantity_all_items,
         'top_requested_items': top_requested_items,
     }
+
     return render(request, 'invent/reports.html', context)
 
 
@@ -1370,31 +1365,59 @@ def total_requests(request):
     query = request.GET.get('q', '')
     status_filter = request.GET.get('status', '')
     user = request.user
-    # COUNTRY FILTER: Restrict by user's country
+
+    # =========================
+    # BASE QUERYSET (Country-aware)
+    # =========================
     if user.is_superuser:
         queryset = DeviceRequest.objects.select_related(
-            "device", "client", "requestor").order_by('-date_requested')
+            "device", "client", "requestor"
+        ).prefetch_related("issuances").order_by('-date_requested')
     else:
         user_country = getattr(user.profile, "country", None)
         queryset = DeviceRequest.objects.select_related(
-            "device", "client", "requestor").filter(branch__country=user_country).order_by('-date_requested')
+            "device", "client", "requestor"
+        ).prefetch_related("issuances").filter(
+            branch__country=user_country
+        ).order_by('-date_requested')
+
+    # =========================
+    # SEARCH
+    # =========================
     if query:
         queryset = queryset.filter(
-            Q(device_imei_no_icontains=query) |
-            Q(device_serial_no_icontains=query) |
-            Q(device_category_icontains=query) |
-            Q(client_name_icontains=query)
+            Q(device__imei__icontains=query) |
+            Q(device__serial_no__icontains=query) |
+            Q(device__category__name__icontains=query) |
+            Q(client__name__icontains=query)
         )
+
+    # =========================
+    # STATUS FILTER
+    # =========================
     if status_filter and status_filter.lower() != 'all':
-        queryset = queryset.filter(status=status_filter)
+
+        # 🔑 ISSUED = has an issuance record
+        if status_filter.lower() == 'issued':
+            queryset = queryset.filter(issuances__isnull=False).distinct()
+
+        else:
+            queryset = queryset.filter(status=status_filter)
+
+    # =========================
+    # PAGINATION
+    # =========================
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+
     context = {
         'page_obj': page_obj,
         'status_filter': status_filter,
     }
+
     return render(request, 'invent/total_requests.html', context)
+
 
 
 @login_required
@@ -1471,39 +1494,58 @@ def export_grouped_inventory(request):
 def export_total_requests(request):
     status_filter = request.GET.get('status')
     user = request.user
-    # COUNTRY FILTER: Restrict by user's country
+
+    # Base queryset
     if user.is_superuser:
-        queryset = DeviceRequest.objects.select_related(
-            "device", "client", "requestor")
+        queryset = DeviceRequest.objects.select_related("device", "client", "requestor")
     else:
         user_country = getattr(user.profile, "country", None)
-        queryset = DeviceRequest.objects.select_related(
-            "device", "client", "requestor").filter(branch__country=user_country)
+        queryset = DeviceRequest.objects.select_related("device", "client", "requestor") \
+            .filter(branch__country=user_country)
+
     if status_filter:
         queryset = queryset.filter(status=status_filter)
+
+    # Workbook setup
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Device Requests"
-    headers = [
-        "Category", "IMEI", "Serial", "Status", "Client", "Issued At"
-    ]
+
+    headers = ["Category", "IMEI", "Serial", "Status", "Client", "Issued At"]
     ws.append(headers)
+
     for req in queryset:
         device = req.device
+
+        # Get latest issuance for this request
+        issuance = IssuanceRecord.objects.select_related("imei").filter(
+            device_request=req
+        ).order_by("-issued_at").first()
+
+        imei_number = issuance.imei.imei_number if issuance and issuance.imei else "-"
+        serial_number = issuance.imei.serial_no if issuance and issuance.imei else "-"
+
         ws.append([
-            device.category or "-", device.imei_no or "-", device.serial_no or "-",
-            req.status, req.client.name if req.client else "-",
-            req.date_issued.strftime(
-                "%Y-%m-%d %H:%M") if req.date_issued else "-"
+            device.category if device and device.category else "-",
+            imei_number,
+            serial_number,
+            req.status,
+            req.client.name if req.client else "-",
+            issuance.issued_at.strftime("%Y-%m-%d %H:%M") if issuance and issuance.issued_at else "-"
         ])
-    for i, col in enumerate(headers, 1):
-        ws.column_dimensions[get_column_letter(i)].width = 20
+
+    # Set column widths
+    for i, _ in enumerate(headers, 1):
+        ws.column_dimensions[get_column_letter(i)].width = 22
+
+    # Return Excel
     response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     response["Content-Disposition"] = 'attachment; filename=total_requests.xlsx'
     wb.save(response)
     return response
+
 
 
 @login_required

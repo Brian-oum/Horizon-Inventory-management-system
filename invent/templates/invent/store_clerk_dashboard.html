@@ -7,11 +7,10 @@
 <div class="container-fluid mt-4">
 
   <!-- Header: greeting + branch badge + back/action area -->
-  <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded shadow-sm">
-    <div class="d-flex align-items-center">
-      <h2 class="mb-0 me-3">Hello {{ user.first_name|default:user.username }}</h2>
-    </div>
+  <div class="mb-3">
+    <h2 class="mb-0" style="margin-top: -20px;">Hello {{ user.first_name|default:user.username }}</h2>
   </div>
+
 
   <!-- Messages -->
   {% if messages %}
@@ -28,44 +27,47 @@
   <!-- IoT Device Stats (Clickable Cards) -->
   <div class="row text-center mb-4">
     <div class="col-sm-6 col-md-3 mb-3">
-      <a href="{% url 'inventory_list' %}?status=all" style="text-decoration:none;">
-        <div class="dashboard-card bg-info text-white p-3 rounded shadow-sm">
-          <h6>Total IoT Devices</h6>
-          <h3>{{ total_devices }}</h3>
-        </div>
-      </a>
+  <a href="{% url 'total_requests' %}?status=all" style="text-decoration:none;">
+    <div class="dashboard-card p-3 shadow-sm text-center">
+      <h6>Total Requests</h6>
+      <h3>{{ total_requests }}</h3>
     </div>
-    <div class="col-sm-6 col-md-3 mb-3">
-      <a href="{% url 'inventory_list' %}?status=available" style="text-decoration:none;">
-        <div class="dashboard-card bg-success text-white p-3 rounded shadow-sm">
-          <h6>Devices Available</h6>
-          <h3>{{ devices_available }}</h3>
-        </div>
-      </a>
+  </a>
+</div>
+
+<div class="col-sm-6 col-md-3 mb-3">
+  <a href="{% url 'total_requests' %}?status=Approved" style="text-decoration:none;">
+    <div class="dashboard-card p-3 shadow-sm text-center">
+      <h6>Approved Requests</h6>
+      <h3>{{ approved_requests_count }}</h3>
     </div>
-    <div class="col-sm-6 col-md-3 mb-3">
-      <a href="{% url 'inventory_list' %}?status=issued" style="text-decoration:none;">
-        <div class="dashboard-card bg-warning text-dark p-3 rounded shadow-sm">
-          <h6>Devices Issued</h6>
-          <h3>{{ devices_issued }}</h3>
-        </div>
-      </a>
+  </a>
+</div>
+
+<div class="col-sm-6 col-md-3 mb-3">
+  <a href="{% url 'total_requests' %}?status=issued" style="text-decoration:none;">
+    <div class="dashboard-card p-3 shadow-sm text-center">
+      <h6>Devices Issued</h6>
+      <h3>{{ devices_issued }}</h3>
     </div>
-    <div class="col-sm-6 col-md-3 mb-3">
-      <a href="{% url 'inventory_list' %}?status=returned" style="text-decoration:none;">
-        <div class="dashboard-card bg-secondary text-white p-3 rounded shadow-sm">
-          <h6>Devices Returned</h6>
-          <h3>{{ devices_returned }}</h3>
-        </div>
-      </a>
+  </a>
+</div>
+
+<div class="col-sm-6 col-md-3 mb-3">
+  <a href="{% url 'total_requests' %}?status=returned" style="text-decoration:none;">
+    <div class="dashboard-card p-3 shadow-sm text-center">
+      <h6>Devices Returned</h6>
+      <h3>{{ devices_returned }}</h3>
     </div>
+  </a>
+</div>
+
   </div>
 
   <!-- Recent Device Activity -->
   <div class="bg-white p-4 rounded shadow-sm mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
       <h5 class="mb-2 mb-sm-0">Recent Device Activity</h5>
-      <a href="{% url 'inventory_list' %}" class="btn btn-sm btn-outline-primary">View All Stock</a>
     </div>
     <div class="table-responsive">
       <table class="table table-hover">
@@ -73,12 +75,9 @@
           <tr>
             <th>ID</th>
             <th>Category</th>
-            <th>IMEI</th>
-            <th>Serial No</th>
             <th>Status</th>
-            <th>Current Client</th>
+            <th>Client</th>
             <th>Issued At</th>
-            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -86,10 +85,8 @@
           <tr>
             <td>{{ forloop.counter }}</td>
             <td>{{ device.category }}</td>
-            <td>{{ device.imei_no|default:"-" }}</td>
-            <td>{{ device.serial_no|default:"-" }}</td>
             <td>
-              <span class="badge
+              <span class="badge badge-purple
                 {% if device.status == 'available' %}bg-success
                 {% elif device.status == 'issued' %}bg-primary
                 {% elif device.status == 'returned' %}bg-secondary
@@ -106,14 +103,6 @@
               {% endif %}
             </td>
             <td>{{ device.issued_at|default:"-"|date:"Y-m-d H:i" }}</td>
-            <td>
-              <a href="{% url 'issue_device' %}" class="btn btn-sm btn-success me-1" title="Issue Device">
-                <i class="fas fa-share-square"></i>
-              </a>
-              <a href="{% url 'return_device' %}" class="btn btn-sm btn-warning" title="Process Return">
-                <i class="fas fa-undo"></i>
-              </a>
-            </td>
           </tr>
           {% empty %}
           <tr><td colspan="8" class="text-center text-muted">No recent device activity found.</td></tr>

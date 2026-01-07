@@ -145,11 +145,11 @@ EMAIL_PORT = 587
 # <-- Set to True or False based on your provider (or EMAIL_USE_SSL = True)
 EMAIL_USE_TLS = True
 # <-- REPLACE with your actual email address
-EMAIL_HOST_USER = 'brianobanda08@gmail.com'
+EMAIL_HOST_USER = 'horizoniot2023@gmail.com'
 # <-- REPLACE with your actual email password or an App Password
-EMAIL_HOST_PASSWORD = 'nqkg yewg gxwq anji'
+EMAIL_HOST_PASSWORD = 'jcen qhlp muwv xpkp'
 # <-- REPLACE with your actual email address (sender)
-DEFAULT_FROM_EMAIL = 'brianobanda08@gmail.com'
+DEFAULT_FROM_EMAIL = 'horizoniot2023@gmail.com'
 
 # --- AUTHENTICATION AND REDIRECTION SETTINGS ---
 # The URL where requests are redirected for login, if required by login_required()
@@ -164,11 +164,6 @@ LOGIN_REDIRECT_URL = '/'
 # The URL to redirect to after a user logs out.
 # It's good practice to send them back to the login page.
 LOGOUT_REDIRECT_URL = 'login'
-
-# --- SESSION TIMEOUT SETTINGS ---
-SESSION_COOKIE_AGE = 1200  # <-- 20 minutes (1200 seconds) -->
-# Changed to False for persistent sessions until timeout
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 

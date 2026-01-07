@@ -363,3 +363,22 @@ class Profile(models.Model):
         }
 
     def __str__(self): return f"{self.user.username}'s profile"
+
+class DeviceReports(models.Model):
+    branch = models.OneToOneField('Branch', on_delete=models.CASCADE)
+
+    total_requests = models.IntegerField(default=0)
+    pending_requests = models.IntegerField(default=0)
+    approved_requests = models.IntegerField(default=0)
+    issued_requests = models.IntegerField(default=0)
+    rejected_requests = models.IntegerField(default=0)
+    fully_returned_requests = models.IntegerField(default=0)
+    partially_returned_requests = models.IntegerField(default=0)
+    total_returned_quantity = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Device Request Report"
+        verbose_name_plural = "Device Request Reports"
+
+    def __str__(self):
+        return self.branch.name
