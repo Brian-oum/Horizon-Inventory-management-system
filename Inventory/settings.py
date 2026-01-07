@@ -165,11 +165,6 @@ LOGIN_REDIRECT_URL = '/'
 # It's good practice to send them back to the login page.
 LOGOUT_REDIRECT_URL = 'login'
 
-# --- SESSION TIMEOUT SETTINGS ---
-SESSION_COOKIE_AGE = 1200  # <-- 20 minutes (1200 seconds) -->
-# Changed to False for persistent sessions until timeout
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = '/media/'

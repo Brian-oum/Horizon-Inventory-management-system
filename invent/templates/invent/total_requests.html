@@ -15,7 +15,7 @@ All Requests
 <div class="container mt-4">
 <!-- Header -->
 <div class="d-flex justify-content-between align-items-center mb-3">
-<h2 class="mb-0 text-primary">
+<h2 class="mb-0 " style="color:#6f42c1">
 <i class="fas fa-list-alt me-2"></i>
 {# Dynamic Heading for the page content #}
 {% if status_filter and status_filter.lower != 'all' %}
@@ -36,7 +36,7 @@ All Device Requests
             <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control"
                     placeholder="Search by IMEI, Serial, Category, Client">
         </div>
-        <button type="submit" class="btn btn-success">Search</button>
+        <button type="submit" class="btn" style="background:#6f42c1">Search</button>
         
         {# To ensure the 'Reset' button links back to the status filter if one is applied #}
         {% if status_filter and status_filter != 'all' %}
@@ -47,7 +47,7 @@ All Device Requests
     </form>
 
     {# Pass the current status filter to the export view #}
-    <a href="{% url 'export_total_requests' %}?status={{ status_filter|default:'' }}" class="btn btn-success">
+    <a href="{% url 'export_total_requests' %}?status={{ status_filter|default:'' }}" class="btn" style="color:#6f42c1">
         <i class="fas fa-file-excel"></i> Export All
     </a>
 </div>
@@ -58,8 +58,6 @@ All Device Requests
         <thead class="table-light">
             <tr>
                 <th>Category</th>
-                <th>IMEI</th>
-                <th>Serial</th>
                 <th>Status</th>
                 <th>Client</th>
                 <th>Request Qty</th>
@@ -72,18 +70,16 @@ All Device Requests
             <tr>
                 {# Access device attributes via the foreign key 'req.device' #}
                 <td>{{ req.device.category }}</td>
-                <td>{{ req.device.imei_no }}</td>
-                <td>{{ req.device.serial_no|default:"-" }}</td>
                 
                 {# Access status and client directly from the DeviceRequest object 'req' #}
                 <td>
                     {# Use a color-coded badge based on the exact status #}
                     {% if req.status == "Issued" %}
-                        <span class="badge bg-info text-dark">{{ req.status }}</span>
+                        <span class="badge bg-success text-white">{{ req.status }}</span>
                     {% elif req.status == "Pending" %}
-                        <span class="badge bg-warning text-dark">{{ req.status }}</span>
+                        <span class="badge bg-warning text-white">{{ req.status }}</span>
                     {% elif req.status == "Approved" %}
-                        <span class="badge bg-success">{{ req.status }}</span>
+                        <span class="badge bg-info">{{ req.status }}</span>
                     {% elif req.status == "Rejected" %}
                         <span class="badge bg-danger">{{ req.status }}</span>
                     {% elif req.status == "Returned" %}

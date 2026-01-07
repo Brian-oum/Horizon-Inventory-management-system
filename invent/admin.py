@@ -3,6 +3,7 @@ from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
+from django.db.models import Count, Q, Sum
 from django.utils.html import format_html
 from django.shortcuts import redirect
 from django import forms
@@ -27,7 +28,8 @@ from .models import (
     Country,
     DeviceIMEI,
     DeviceRequestSelectedIMEI,
-    SelectedDevice  
+    SelectedDevice, 
+    DeviceReports
 )
 from django.shortcuts import render, redirect
 
@@ -526,3 +528,30 @@ class DeviceSelectionGroupAdmin(admin.ModelAdmin):
         'store_clerk__username',
         'devices__name',
     )
+
+# admin.py
+
+from django.contrib import admin
+from django.db.models import Count, Sum, Q, Value
+from django.db.models.functions import Coalesce
+
+@admin.register(DeviceReports)
+class DeviceReportsAdmin(admin.ModelAdmin):
+
+    list_display = (
+        'branch',
+        'total_requests',
+        'pending_requests',
+        'approved_requests',
+        'issued_requests',
+        'rejected_requests',
+        'fully_returned_requests',
+        'partially_returned_requests',
+        'total_returned_quantity',
+    )
+
+    readonly_fields = list_display
+
+    def has_add_permission(self, request): return False
+    def has_change_permission(self, request, obj=None): return False
+    def has_delete_permission(self, request): return False

@@ -12,75 +12,71 @@
     <!-- Summary Cards Grid -->
     <div class="row g-3 mb-4">
         <div class="col-md-2 col-sm-6">
-            <a href="{% url 'inventory_list' %}" class="text-decoration-none">
-                <div class="card text-white bg-primary h-100 text-center shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title">Total Items</h6>
-                        <h2 class="card-text">{{ total_items }}</h2>
-                    </div>
-                </div>
-            </a>
+    <a href="{% url 'total_requests' %}?status=all" class="text-decoration-none">
+        <div class="card summary-card h-100 text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title">Total Requests</h6>
+                <h2 class="card-text">{{ total_requests }}</h2>
+            </div>
         </div>
-        <div class="col-md-2 col-sm-6">
-            <a href="{% url 'total_requests' %}?status=all" class="text-decoration-none">
-                <div class="card text-white bg-primary h-100 text-center shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title">Total Requests</h6>
-                        <h2 class="card-text">{{ total_requests }}</h2>
-                    </div>
-                </div>
-            </a>
+    </a>
+</div>
+
+<div class="col-md-2 col-sm-6">
+    <a href="{% url 'total_requests' %}?status=Pending" class="text-decoration-none">
+        <div class="card summary-card h-100 text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title">Pending</h6>
+                <h2 class="card-text">{{ pending_count }}</h2>
+            </div>
         </div>
-        <div class="col-md-2 col-sm-6">
-            <a href="{% url 'total_requests' %}?status=Pending" class="text-decoration-none">
-                <div class="card text-white bg-warning h-100 text-center shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title">Pending</h6>
-                        <h2 class="card-text">{{ pending_count }}</h2>
-                    </div>
-                </div>
-            </a>
+    </a>
+</div>
+
+<div class="col-md-2 col-sm-6">
+    <a href="{% url 'total_requests' %}?status=Approved" class="text-decoration-none">
+        <div class="card summary-card h-100 text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title">Approved</h6>
+                <h2 class="card-text">{{ approved_count }}</h2>
+            </div>
         </div>
-        <div class="col-md-2 col-sm-6">
-            <a href="{% url 'total_requests' %}?status=Approved" class="text-decoration-none">
-                <div class="card text-white bg-success h-100 text-center shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title">Approved</h6>
-                        <h2 class="card-text">{{ approved_count }}</h2>
-                    </div>
-                </div>
-            </a>
+    </a>
+</div>
+
+<div class="col-md-2 col-sm-6">
+    <a href="{% url 'total_requests' %}?status=Issued" class="text-decoration-none">
+        <div class="card summary-card h-100 text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title">Issued</h6>
+                <h2 class="card-text">{{ issued_count }}</h2>
+            </div>
         </div>
-        <div class="col-md-2 col-sm-6">
-            <a href="{% url 'total_requests' %}?status=Issued" class="text-decoration-none">
-                <div class="card text-white bg-info h-100 text-center shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title">Issued</h6>
-                        <h2 class="card-text">{{ issued_count }}</h2>
-                    </div>
-                </div>
-            </a>
+    </a>
+</div>
+
+<div class="col-md-2 col-sm-6">
+    <a href="{% url 'total_requests' %}?status=Rejected" class="text-decoration-none">
+        <div class="card summary-card h-100 text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title">Rejected</h6>
+                <h2 class="card-text">{{ rejected_count }}</h2>
+            </div>
         </div>
-        <div class="col-md-2 col-sm-6">
-            <a href="{% url 'total_requests' %}?status=Rejected" class="text-decoration-none">
-                <div class="card text-white bg-danger h-100 text-center shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title">Rejected</h6>
-                        <h2 class="card-text">{{ rejected_count }}</h2>
-                    </div>
-                </div>
-            </a>
+    </a>
+</div>
+
+<div class="col-md-2 col-sm-6">
+    <a href="{% url 'total_requests' %}?status=Fully Returned" class="text-decoration-none">
+        <div class="card summary-card h-100 text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title">Returned</h6>
+                <h2 class="card-text">{{ fully_returned_count }}</h2>
+            </div>
         </div>
-        <div class="col-md-2 col-sm-6">
-            <a href="{% url 'total_requests' %}?status=Fully Returned" class="text-decoration-none">
-                <div class="card text-white bg-success h-100 text-center shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title">Returned</h6>
-                        <h2 class="card-text">{{ fully_returned_count }}</h2>
-                    </div>
-                </div>
-            </a>
-        </div>
+    </a>
+</div>
+
     </div>
 
     <!-- Top Requested Items Table -->
