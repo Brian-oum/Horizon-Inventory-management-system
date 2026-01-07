@@ -32,7 +32,6 @@ from django.utils import timezone
 from .models import DeviceSelectionGroup  # add import at top
 logger = logging.getLogger(__name__)
 from django.template.loader import render_to_string
-from xhtml2pdf import pisa
 import tempfile
 from invent.utils import generate_delivery_note
 
@@ -983,31 +982,6 @@ def submit_devices_for_approval(request):
     return redirect('issue_device')
 
 
-
-def delivery_note(device_request):
-    """Generate a PDF delivery note and return the file path using xhtml2pdf."""
-
-    html_content = render_to_string("invent/delivery_note.html", {
-        "request": device_request,
-        "selected_imeis": device_request.selected_devices.all(),
-    })
-
-    # Create temporary pdf file
-    pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-
-    # Write PDF
-    pisa_status = pisa.CreatePDF(
-        html_content,
-        dest=pdf_file,
-    )
-
-    pdf_file.close()
-
-    # Check for errors
-    if pisa_status.err:
-        return None
-
-    return pdf_file.name
 
 
 @login_required
