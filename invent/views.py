@@ -1761,6 +1761,6 @@ def upload_inventory(request):
             request,
             f"Upload complete: {added_count} devices added, {skipped_count} skipped."
         )
-        return redirect("inventory_list")
+        return redirect("store_clerk_dashboard")
 
     return render(request, "invent/upload_inventory.html")
