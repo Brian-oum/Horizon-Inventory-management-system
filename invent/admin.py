@@ -532,8 +532,11 @@ class DeviceSelectionGroupAdmin(admin.ModelAdmin):
 # admin.py
 
 from django.contrib import admin
-from django.db.models import Count, Sum, Q, Value
+from django.db.models import Count, Sum, Q
 from django.db.models.functions import Coalesce
+
+from .models import DeviceReports
+
 
 @admin.register(DeviceReports)
 class DeviceReportsAdmin(admin.ModelAdmin):
@@ -551,7 +554,85 @@ class DeviceReportsAdmin(admin.ModelAdmin):
     )
 
     readonly_fields = list_display
+    ordering = ('branch__name',)
+    list_per_page = 25
 
-    def has_add_permission(self, request): return False
-    def has_change_permission(self, request, obj=None): return False
-    def has_delete_permission(self, request): return False
+    # 🔒 Read-only report
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request):
+        return False
+
+    # 📊 LIVE aggregation from DeviceRequest
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+
+        return qs.annotate(
+            total_requests=Count(
+                'branch__requests',
+                distinct=True
+            ),
+            pending_requests=Count(
+                'branch__requests',
+                filter=Q(branch__requests__status='Pending'),
+                distinct=True
+            ),
+            approved_requests=Count(
+                'branch__requests',
+                filter=Q(branch__requests__status='Approved'),
+                distinct=True
+            ),
+            issued_requests=Count(
+                'branch__requests',
+                filter=Q(branch__requests__status='Issued'),
+                distinct=True
+            ),
+            rejected_requests=Count(
+                'branch__requests',
+                filter=Q(branch__requests__status='Rejected'),
+                distinct=True
+            ),
+            fully_returned_requests=Count(
+                'branch__requests',
+                filter=Q(branch__requests__status='Fully Returned'),
+                distinct=True
+            ),
+            partially_returned_requests=Count(
+                'branch__requests',
+                filter=Q(branch__requests__status='Partially Returned'),
+                distinct=True
+            ),
+            total_returned_quantity=Coalesce(
+                Sum('branch__requests__returned_quantity'),
+                0
+            ),
+        )
+
+    # 🧾 Display methods (required for annotated fields)
+    def total_requests(self, obj):
+        return obj.total_requests
+
+    def pending_requests(self, obj):
+        return obj.pending_requests
+
+    def approved_requests(self, obj):
+        return obj.approved_requests
+
+    def issued_requests(self, obj):
+        return obj.issued_requests
+
+    def rejected_requests(self, obj):
+        return obj.rejected_requests
+
+    def fully_returned_requests(self, obj):
+        return obj.fully_returned_requests
+
+    def partially_returned_requests(self, obj):
+        return obj.partially_returned_requests
+
+    def total_returned_quantity(self, obj):
+        return obj.total_returned_quantity

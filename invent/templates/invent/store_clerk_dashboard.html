@@ -25,43 +25,42 @@
   {% endif %}
 
   <!-- IoT Device Stats (Clickable Cards) -->
-  <div class="row text-center mb-4">
+  <div class="row text-center mb-4 dashboard-cards">
     <div class="col-sm-6 col-md-3 mb-3">
-  <a href="{% url 'total_requests' %}?status=all" style="text-decoration:none;">
-    <div class="dashboard-card p-3 shadow-sm text-center">
-      <h6>Total Requests</h6>
-      <h3>{{ total_requests }}</h3>
+      <a href="{% url 'total_requests' %}?status=all" style="text-decoration:none;">
+        <div class="dashboard-card p-3 shadow-sm text-center">
+          <h6>Total Requests</h6>
+          <h3>{{ total_requests }}</h3>
+        </div>
+      </a>
     </div>
-  </a>
-</div>
 
-<div class="col-sm-6 col-md-3 mb-3">
-  <a href="{% url 'total_requests' %}?status=Approved" style="text-decoration:none;">
-    <div class="dashboard-card p-3 shadow-sm text-center">
-      <h6>Approved Requests</h6>
-      <h3>{{ approved_requests_count }}</h3>
+    <div class="col-sm-6 col-md-3 mb-3">
+      <a href="{% url 'total_requests' %}?status=Approved" style="text-decoration:none;">
+        <div class="dashboard-card p-3 shadow-sm text-center">
+          <h6>Approved Requests</h6>
+          <h3>{{ approved_requests_count }}</h3>
+        </div>
+      </a>
     </div>
-  </a>
-</div>
 
-<div class="col-sm-6 col-md-3 mb-3">
-  <a href="{% url 'total_requests' %}?status=issued" style="text-decoration:none;">
-    <div class="dashboard-card p-3 shadow-sm text-center">
-      <h6>Devices Issued</h6>
-      <h3>{{ devices_issued }}</h3>
+    <div class="col-sm-6 col-md-3 mb-3">
+      <a href="{% url 'total_requests' %}?status=issued" style="text-decoration:none;">
+        <div class="dashboard-card p-3 shadow-sm text-center">
+          <h6>Devices Issued</h6>
+          <h3>{{ devices_issued }}</h3>
+        </div>
+      </a>
     </div>
-  </a>
-</div>
 
-<div class="col-sm-6 col-md-3 mb-3">
-  <a href="{% url 'total_requests' %}?status=returned" style="text-decoration:none;">
-    <div class="dashboard-card p-3 shadow-sm text-center">
-      <h6>Devices Returned</h6>
-      <h3>{{ devices_returned }}</h3>
+    <div class="col-sm-6 col-md-3 mb-3">
+      <a href="{% url 'total_requests' %}?status=returned" style="text-decoration:none;">
+        <div class="dashboard-card p-3 shadow-sm text-center">
+          <h6>Devices Returned</h6>
+          <h3>{{ devices_returned }}</h3>
+        </div>
+      </a>
     </div>
-  </a>
-</div>
-
   </div>
 
   <!-- Recent Device Activity -->
